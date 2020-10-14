@@ -1,0 +1,630 @@
+
+# include "scsp_D3Q19.cuh"
+# include "scsp_D3Q19_includes.cuh"
+# include "../../IO/GetPot"
+# include <math.h>
+using namespace std;  
+
+
+
+// --------------------------------------------------------
+// Constructor:
+// --------------------------------------------------------
+
+scsp_D3Q19::scsp_D3Q19()
+{
+	Q = 19;
+	GetPot inputParams("input.dat");	
+	nVoxels = inputParams("Lattice/nVoxels",0);
+	numIolets = inputParams("Lattice/numIolets",0);
+	nu = inputParams("LBM/nu",0.1666666);
+	forceFlag = false;
+	velIBFlag = false;
+	inoutFlag = false;
+	xyzFlag = false;	
+}
+
+
+
+// --------------------------------------------------------
+// Destructor:
+// --------------------------------------------------------
+
+scsp_D3Q19::~scsp_D3Q19()
+{
+		
+}
+
+
+
+// --------------------------------------------------------
+// Allocate arrays:
+// --------------------------------------------------------
+
+void scsp_D3Q19::allocate()
+{
+	// allocate array memory (host):
+    uH = (float*)malloc(nVoxels*sizeof(float));
+    vH = (float*)malloc(nVoxels*sizeof(float));
+	wH = (float*)malloc(nVoxels*sizeof(float));
+    rH = (float*)malloc(nVoxels*sizeof(float));
+	nListH = (int*)malloc(nVoxels*Q*sizeof(int));
+	voxelTypeH = (int*)malloc(nVoxels*sizeof(int));
+	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));	
+	ioletsH = (iolet*)malloc(numIolets*sizeof(iolet));
+			
+	// allocate array memory (device):
+	cudaMalloc((void **) &u, nVoxels*sizeof(float));
+	cudaMalloc((void **) &v, nVoxels*sizeof(float));
+	cudaMalloc((void **) &w, nVoxels*sizeof(float));
+	cudaMalloc((void **) &r, nVoxels*sizeof(float));
+	cudaMalloc((void **) &f1, nVoxels*Q*sizeof(float));
+	cudaMalloc((void **) &f2, nVoxels*Q*sizeof(float));		
+	cudaMalloc((void **) &voxelType, nVoxels*sizeof(int));
+	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));	
+	cudaMalloc((void **) &iolets, numIolets*sizeof(iolet));	
+	
+}
+
+
+
+// --------------------------------------------------------
+// Allocate voxel position arrays:
+// --------------------------------------------------------
+
+void scsp_D3Q19::allocate_voxel_positions()
+{
+	// allocate voxel position arrays (host):
+	xH = (int*)malloc(nVoxels*sizeof(int));
+	yH = (int*)malloc(nVoxels*sizeof(int));
+	zH = (int*)malloc(nVoxels*sizeof(int));
+	xyzFlag = true;	
+}
+
+
+
+// --------------------------------------------------------
+// Allocate force arrays:
+// --------------------------------------------------------
+
+void scsp_D3Q19::allocate_forces()
+{
+	// allocate force arrays (device):
+	cudaMalloc((void **) &Fx, nVoxels*sizeof(float));
+	cudaMalloc((void **) &Fy, nVoxels*sizeof(float));
+	cudaMalloc((void **) &Fz, nVoxels*sizeof(float));
+	forceFlag = true;
+}
+
+
+
+// --------------------------------------------------------
+// Allocate IB velocity arrays.  These arrays store IB
+// node velocities extrapolated to LB voxels.
+// --------------------------------------------------------
+
+void scsp_D3Q19::allocate_IB_velocities()
+{
+	// allocate IB velocity arrays (device):
+	cudaMalloc((void **) &uIBvox, nVoxels*sizeof(float));
+	cudaMalloc((void **) &vIBvox, nVoxels*sizeof(float));
+	cudaMalloc((void **) &wIBvox, nVoxels*sizeof(float));
+	cudaMalloc((void **) &weights, nVoxels*sizeof(float));
+	velIBFlag = true;
+}
+
+
+
+// --------------------------------------------------------
+// Allocate inoutH[] and inout[] arrays (to declare if
+// voxel is inside or outside immersed boundary).
+// --------------------------------------------------------
+
+void scsp_D3Q19::allocate_inout()
+{
+	// allocate inout arrays (host & device):
+	inoutH = (int*)malloc(nVoxels*sizeof(int));
+	cudaMalloc((void **) &inout, nVoxels*sizeof(int));	
+	inoutFlag = true;
+}
+
+
+
+// --------------------------------------------------------
+// Deallocate arrays:
+// --------------------------------------------------------
+
+void scsp_D3Q19::deallocate()
+{
+	// free array memory (host):
+	free(uH);
+	free(vH);
+	free(wH);
+	free(rH);
+	free(nListH);
+	free(voxelTypeH);
+	free(streamIndexH);	
+	free(ioletsH);	
+	if (xyzFlag) {
+		free(xH);
+		free(yH);
+		free(zH);
+	}
+	if (inoutFlag) {
+		free(inoutH);
+	}
+			
+	// free array memory (device):
+	cudaFree(u);
+	cudaFree(v);
+	cudaFree(w);
+	cudaFree(r);
+	cudaFree(f1);
+	cudaFree(f2);	
+	cudaFree(voxelType);
+	cudaFree(streamIndex);
+	cudaFree(iolets);
+	if (forceFlag) {
+		cudaFree(Fx);
+		cudaFree(Fy);
+		cudaFree(Fz);
+	}
+	if (velIBFlag) {
+		cudaFree(uIBvox);
+		cudaFree(vIBvox);
+		cudaFree(wIBvox);
+		cudaFree(weights);
+	}
+	if (inoutFlag) {
+		cudaFree(inout);
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Copy arrays from host to device:
+// --------------------------------------------------------
+
+void scsp_D3Q19::memcopy_host_to_device()
+{
+    cudaMemcpy(u, uH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(v, vH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(w, wH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(r, rH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(voxelType, voxelTypeH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(streamIndex, streamIndexH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
+	cudaMemcpy(iolets, ioletsH, sizeof(iolet)*numIolets, cudaMemcpyHostToDevice);
+}
+
+
+
+// --------------------------------------------------------
+// Copy arrays from host to device (just iolets):
+// --------------------------------------------------------
+
+void scsp_D3Q19::memcopy_host_to_device_iolets()
+{
+	cudaMemcpy(iolets, ioletsH, sizeof(iolet)*numIolets, cudaMemcpyHostToDevice);
+}
+
+
+
+// --------------------------------------------------------
+// Copy arrays from device to host:
+// --------------------------------------------------------
+
+void scsp_D3Q19::memcopy_device_to_host()
+{
+    cudaMemcpy(rH, r, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(uH, u, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(vH, v, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(wH, w, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+}
+
+
+
+// --------------------------------------------------------
+// Copy arrays from device to host (just inout array):
+// --------------------------------------------------------
+
+void scsp_D3Q19::memcopy_device_to_host_inout()
+{
+    cudaMemcpy(inoutH, inout, sizeof(int)*nVoxels, cudaMemcpyDeviceToHost);
+}
+
+
+
+// --------------------------------------------------------
+// Initialize lattice as a "box":
+// --------------------------------------------------------
+
+void scsp_D3Q19::create_lattice_box()
+{
+	GetPot inputParams("input.dat");	
+	Nx = inputParams("Lattice/Nx",1);
+	Ny = inputParams("Lattice/Ny",1);
+	Nz = inputParams("Lattice/Nz",1);
+	int flowDir = inputParams("Lattice/flowDir",0);
+	int xLBC = inputParams("Lattice/xLBC",0);
+	int xUBC = inputParams("Lattice/xUBC",0);
+	int yLBC = inputParams("Lattice/yLBC",0);
+	int yUBC = inputParams("Lattice/yUBC",0);
+	int zLBC = inputParams("Lattice/zLBC",0);
+	int zUBC = inputParams("Lattice/zUBC",0);		
+	build_box_lattice_D3Q19(nVoxels,flowDir,Nx,Ny,Nz,
+	                        xLBC,xUBC,yLBC,yUBC,zLBC,zUBC,
+							voxelTypeH,nListH);
+}
+
+
+
+// --------------------------------------------------------
+// Initialize lattice as a "box" with periodic BC's:
+// --------------------------------------------------------
+
+void scsp_D3Q19::create_lattice_box_periodic()
+{
+	GetPot inputParams("input.dat");
+	// still need to add this...
+}
+
+
+
+// --------------------------------------------------------
+// Construct nList[] using bounding box:
+// --------------------------------------------------------
+
+void scsp_D3Q19::bounding_box_nList_construct()
+{
+	bounding_box_nList_construct_D3Q19(nVoxels,xH,yH,zH,nListH);
+}
+
+
+
+// --------------------------------------------------------
+// Build the streamIndex[] array for PUSH streaming:
+// --------------------------------------------------------
+
+void scsp_D3Q19::stream_index_push()
+{
+	// still need to add this...
+}
+
+
+
+// --------------------------------------------------------
+// Build the streamIndex[] array for PULL streaming:
+// --------------------------------------------------------
+
+void scsp_D3Q19::stream_index_pull()
+{
+	stream_index_pull_D3Q19(nVoxels,nListH,streamIndexH);
+}
+
+
+
+// --------------------------------------------------------
+// Read information about iolet:
+// --------------------------------------------------------
+
+void scsp_D3Q19::read_iolet_info(int i, const char* name) 
+{
+	char namemod[20];
+	GetPot inputParams("input.dat");
+	if (i >= 0 and i < numIolets) {
+		strcpy(namemod, name);
+		strcat(namemod, "/type");
+		ioletsH[i].type = inputParams(namemod,1);
+		strcpy(namemod, name);
+		strcat(namemod, "/uBC");
+		ioletsH[i].uBC  = inputParams(namemod,0.0);
+		strcpy(namemod, name);
+		strcat(namemod, "/vBC");
+		ioletsH[i].vBC  = inputParams(namemod,0.0);
+		strcpy(namemod, name);
+		strcat(namemod, "/wBC");
+		ioletsH[i].wBC  = inputParams(namemod,0.0);
+		strcpy(namemod, name);
+		strcat(namemod, "/rBC");
+		ioletsH[i].rBC  = inputParams(namemod,1.0);
+		strcpy(namemod, name);
+		strcat(namemod, "/pBC");
+		ioletsH[i].pBC  = inputParams(namemod,0.0);
+	}
+	else {
+		cout << "iolet index is not correct" << endl;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Setters for host arrays:
+// --------------------------------------------------------
+
+void scsp_D3Q19::setU(int i, float val)
+{
+	uH[i] = val;
+}
+
+void scsp_D3Q19::setV(int i, float val)
+{
+	vH[i] = val;
+}
+
+void scsp_D3Q19::setW(int i, float val)
+{
+	wH[i] = val;
+}
+
+void scsp_D3Q19::setR(int i, float val)
+{
+	rH[i] = val;
+}
+
+void scsp_D3Q19::setVoxelType(int i, int val)
+{
+	voxelTypeH[i] = val;
+}
+
+void scsp_D3Q19::setIoletU(int i, float val)
+{
+	ioletsH[i].uBC = val;
+}
+
+void scsp_D3Q19::setIoletV(int i, float val)
+{
+	ioletsH[i].vBC = val;
+}
+
+void scsp_D3Q19::setIoletW(int i, float val)
+{
+	ioletsH[i].wBC = val;
+}
+
+void scsp_D3Q19::setIoletR(int i, float val)
+{
+	ioletsH[i].rBC = val;
+}
+
+
+
+// --------------------------------------------------------
+// Getters for host arrays:
+// --------------------------------------------------------
+
+float scsp_D3Q19::getU(int i)
+{
+	return uH[i];
+}
+
+float scsp_D3Q19::getV(int i)
+{
+	return vH[i];
+}
+
+float scsp_D3Q19::getW(int i)
+{
+	return wH[i];
+}
+
+float scsp_D3Q19::getR(int i)
+{
+	return rH[i];
+}
+
+int scsp_D3Q19::getX(int i)
+{
+	return xH[i];
+}
+
+int scsp_D3Q19::getY(int i)
+{
+	return yH[i];
+}
+
+int scsp_D3Q19::getZ(int i)
+{
+	return zH[i];
+}
+
+int scsp_D3Q19::getNList(int i)
+{
+	return nListH[i];
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_initial_equilibrium_D3Q19" kernel:
+// --------------------------------------------------------
+
+void scsp_D3Q19::initial_equilibrium(int nBlocks, int nThreads)
+{
+	scsp_initial_equilibrium_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,r,u,v,w,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_stream_collide_save_D3Q19" kernel:
+// --------------------------------------------------------
+
+void scsp_D3Q19::stream_collide_save(int nBlocks, int nThreads, bool save)
+{
+	scsp_stream_collide_save_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,streamIndex,voxelType,iolets,nu,nVoxels,save);
+	float* temp = f1;
+	f1 = f2;
+	f2 = temp;
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_stream_collide_save_forcing_D3Q19" kernel:
+// --------------------------------------------------------
+
+void scsp_D3Q19::stream_collide_save_forcing(int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	scsp_stream_collide_save_forcing_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,Fx,Fy,Fz,streamIndex,voxelType,iolets,nu,nVoxels);
+	float* temp = f1;
+	f1 = f2;
+	f2 = temp;
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_stream_collide_save_IBforcing_D3Q19" kernel:
+// --------------------------------------------------------
+
+void scsp_D3Q19::stream_collide_save_IBforcing(int nBlocks, int nThreads)
+{
+	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
+	scsp_stream_collide_save_IBforcing_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,uIBvox,vIBvox,wIBvox,weights,streamIndex,voxelType,iolets,nu,nVoxels);
+	float* temp = f1;
+	f1 = f2;
+	f2 = temp;	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "extrapolate_velocity_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void scsp_D3Q19::extrapolate_velocity_from_IBM(int nBlocks, int nThreads,
+	                                           float* xIB, float* yIB, float* zIB,
+                                               float* vxIB, float* vyIB, float* vzIB,
+											   int nNodes)
+{
+	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
+	extrapolate_velocity_IBM3D
+	<<<nBlocks,nThreads>>> (xIB,yIB,zIB,vxIB,vyIB,vzIB,
+	uIBvox,vIBvox,wIBvox,weights,Nx,Ny,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_zero_forces_D3Q19" kernel:
+// --------------------------------------------------------
+
+void scsp_D3Q19::zero_forces(int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	scsp_zero_forces_D3Q19 
+	<<<nBlocks,nThreads>>> (Fx,Fy,Fz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_zero_forces_D3Q19" kernel:
+// --------------------------------------------------------
+
+void scsp_D3Q19::zero_forces_with_IBM(int nBlocks, int nThreads)
+{
+	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	scsp_zero_forces_D3Q19
+	<<<nBlocks,nThreads>>> (Fx,Fy,Fz,uIBvox,vIBvox,wIBvox,weights,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "inside_hemisphere" kernel:
+// --------------------------------------------------------
+
+void scsp_D3Q19::inside_hemisphere(int nBlocks, int nThreads)
+{
+	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
+	inside_hemisphere_D3Q19
+	<<<nBlocks,nThreads>>> (weights,inout,Nx,Ny,Nz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Read lattice geometry:
+// --------------------------------------------------------
+
+void scsp_D3Q19::read_lattice_geometry(int type)
+{
+	// read voxel position, voxel type, and voxel nList:
+	if (type == 1) {
+		read_lattice_geometry_D3Q19(nVoxels,xH,yH,zH,voxelTypeH,nListH);
+	}
+	// read voxel position, and voxel type:
+	else if (type == 2) {
+		read_lattice_geometry_D3Q19(nVoxels,xH,yH,zH,voxelTypeH);
+	}
+	// read voxel position:
+	else if (type == 3) {
+		read_lattice_geometry_D3Q19(nVoxels,xH,yH,zH);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Write VTK output: structured with u[], v[], w[], r[]:
+// --------------------------------------------------------
+
+void scsp_D3Q19::vtk_structured_output_ruvw(std::string tagname, int tagnum,
+                                            int iskip, int jskip, int kskip)
+{
+	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,rH,uH,vH,wH,iskip,jskip,kskip);
+}
+
+
+
+// --------------------------------------------------------
+// Write VTK output: structured with u[], v[], w[], int[]:
+// --------------------------------------------------------
+
+void scsp_D3Q19::vtk_structured_output_iuvw_inout(std::string tagname, int tagnum,
+                                                  int iskip, int jskip, int kskip)
+{
+	if (!inoutFlag) cout << "Warning: inout arrays have not been initialized" << endl;
+	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,inoutH,uH,vH,wH,iskip,jskip,kskip);
+}
+
+
+
+// --------------------------------------------------------
+// Write VTK output: structured with u[], v[], w[], int[]:
+// --------------------------------------------------------
+
+void scsp_D3Q19::vtk_structured_output_iuvw_vtype(std::string tagname, int tagnum,
+                                                  int iskip, int jskip, int kskip)
+{
+	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,voxelTypeH,uH,vH,wH,iskip,jskip,kskip);
+}
+
+
+
+// --------------------------------------------------------
+// Write VTK output: polydata with u[], v[], w[], r[]:
+// --------------------------------------------------------
+
+void scsp_D3Q19::vtk_polydata_output_ruvw(std::string tagname, int tagnum)
+{
+	write_vtk_polydata(tagname,tagnum,nVoxels,xH,yH,zH,rH,uH,vH,wH);
+}
+
+
+
+
+
+
+
