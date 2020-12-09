@@ -87,6 +87,7 @@ void scsp_D2Q9::allocate_IB_velocities()
 	// allocate force arrays (device):
 	cudaMalloc((void **) &uIBvox, nVoxels*sizeof(float));
 	cudaMalloc((void **) &vIBvox, nVoxels*sizeof(float));
+	cudaMalloc((void **) &weights, nVoxels*sizeof(float));
 	velIBFlag = true;
 }
 
@@ -123,6 +124,7 @@ void scsp_D2Q9::deallocate()
 	if (velIBFlag) {
 		cudaFree(uIBvox);
 		cudaFree(vIBvox);
+		cudaFree(weights);
 	}	
 }
 
@@ -139,6 +141,17 @@ void scsp_D2Q9::memcopy_host_to_device()
 	cudaMemcpy(r, rH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
 	cudaMemcpy(voxelType, voxelTypeH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
 	cudaMemcpy(streamIndex, streamIndexH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
+	cudaMemcpy(iolets, ioletsH, sizeof(iolet2D)*numIolets, cudaMemcpyHostToDevice);
+}
+
+
+
+// --------------------------------------------------------
+// Copy arrays from host to device (just iolets):
+// --------------------------------------------------------
+
+void scsp_D2Q9::memcopy_host_to_device_iolets()
+{
 	cudaMemcpy(iolets, ioletsH, sizeof(iolet2D)*numIolets, cudaMemcpyHostToDevice);
 }
 
@@ -339,6 +352,7 @@ void scsp_D2Q9::stream_collide_save(int nBlocks, int nThreads, bool save)
 
 void scsp_D2Q9::stream_collide_save_forcing(int nBlocks, int nThreads)
 {
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	scsp_stream_collide_save_forcing_D2Q9 
 	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,Fx,Fy,streamIndex,voxelType,iolets,nu,nVoxels);
 	float* temp = f1;
@@ -349,12 +363,115 @@ void scsp_D2Q9::stream_collide_save_forcing(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "scsp_stream_collide_save_forcing_D2Q9" kernel:
+// --------------------------------------------------------
+
+void scsp_D2Q9::stream_collide_save_IBforcing(int nBlocks, int nThreads)
+{
+	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
+	scsp_stream_collide_save_IBforcing_D2Q9 
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,uIBvox,vIBvox,weights,streamIndex,voxelType,iolets,nu,nVoxels);
+	float* temp = f1;
+	f1 = f2;
+	f2 = temp;
+}
+
+
+
+// --------------------------------------------------------
+// Call to "extrapolate_velocity_IBM2D" kernel.  
+// Note: this kernel is in the IBM/2D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void scsp_D2Q9::extrapolate_velocity_from_IBM(int nBlocks, int nThreads,
+	                                          float* xIB, float* yIB, float* vxIB,
+											  float* vyIB, int nNodes)
+{
+	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
+	extrapolate_velocity_IBM2D
+	<<<nBlocks,nThreads>>> (xIB,yIB,vxIB,vyIB,uIBvox,vIBvox,weights,Nx,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "extrapolate_force_IBM2D" kernel.  
+// Note: this kernel is in the IBM/2D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void scsp_D2Q9::extrapolate_forces_from_IBM(int nBlocks, int nThreads,
+	                                        float* xIB, float* yIB, float* fxIB,
+											float* fyIB, int nNodes)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	extrapolate_force_IBM2D
+	<<<nBlocks,nThreads>>> (xIB,yIB,fxIB,fyIB,Fx,Fy,Nx,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "interpolate_velocity_IBM2D" kernel.  
+// Note: this kernel is in the IBM/2D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void scsp_D2Q9::interpolate_velocity_to_IBM(int nBlocks, int nThreads,
+	                                        float* xIB, float* yIB, float* vxIB,
+											float* vyIB, int nNodes)
+{
+	interpolate_velocity_IBM2D
+	<<<nBlocks,nThreads>>> (xIB,yIB,vxIB,vyIB,u,v,Nx,nNodes);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_zero_forces_D2Q9" kernel:
 // --------------------------------------------------------
 
 void scsp_D2Q9::zero_forces(int nBlocks, int nThreads)
 {
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	scsp_zero_forces_D2Q9 
 	<<<nBlocks,nThreads>>> (Fx,Fy,nVoxels);
 }
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_zero_forces_D2Q9" kernel:
+// --------------------------------------------------------
+
+void scsp_D2Q9::zero_forces_with_IBM(int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
+	scsp_zero_forces_D2Q9
+	<<<nBlocks,nThreads>>> (Fx,Fy,uIBvox,vIBvox,weights,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Wrtie output:
+// --------------------------------------------------------
+
+void scsp_D2Q9::write_output(std::string tagname, int step)
+{
+	GetPot inputParams("input.dat");
+	Nx = inputParams("Lattice/Nx",1);
+	Ny = inputParams("Lattice/Ny",1);
+	Nz = inputParams("Lattice/Nz",1);
+	write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rH,uH,vH);
+}
+
+
+
+
+
+
+
 

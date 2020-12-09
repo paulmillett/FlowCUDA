@@ -131,7 +131,8 @@ void scsp_3D_hemisphere_3::initSystem()
 	// ----------------------------------------------
 	
 	lbm.read_iolet_info(0,"Iolet1");
-	lbm.read_iolet_info(1,"Iolet2");	
+	lbm.read_iolet_info(1,"Iolet2");
+	lbm.read_iolet_info(2,"Iolet3");	
 			
 	// ----------------------------------------------			
 	// edit inlet condition: 
@@ -141,15 +142,39 @@ void scsp_3D_hemisphere_3::initSystem()
 	Ny = inputParams("Lattice/Ny",0);
 	Nz = inputParams("Lattice/Nz",0);
 	
+	// reset top z-surface to bounce-back
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {
 			int k = Nz - 1;
 			int ndx = k*Nx*Ny + j*Nx + i;
-			float rx = float(i - 124);
-			float ry = float(j - 100);
+			lbm.setVoxelType(ndx,0);
+		}
+	}
+	
+	// iolet #2:
+	for (int j=0; j<Ny; j++) {
+		for (int i=0; i<Nx; i++) {
+			int k = Nz - 1;
+			int ndx = k*Nx*Ny + j*Nx + i;
+			float rx = float(i - 84);
+			float ry = float(j - 60);
 			float rr = sqrt(rx*rx + ry*ry);
-			if (rr > 10.0) {
-				lbm.setVoxelType(ndx,0);
+			if (rr <= 10.0) {
+				lbm.setVoxelType(ndx,2);
+			} 
+		}	
+	}
+	
+	// iolet #3:
+	for (int j=0; j<Ny; j++) {
+		for (int i=0; i<Nx; i++) {
+			int k = Nz - 1;
+			int ndx = k*Nx*Ny + j*Nx + i;
+			float rx = float(i - 36);
+			float ry = float(j - 60);
+			float rr = sqrt(rx*rx + ry*ry);
+			if (rr <= 10.0) {
+				lbm.setVoxelType(ndx,3);
 			} 
 		}	
 	}
@@ -171,6 +196,10 @@ void scsp_3D_hemisphere_3::initSystem()
 	
 	ibm.read_ibm_start_positions("hemisphere1.dat");
 	ibm.read_ibm_end_positions("hemisphere2.dat");
+	
+	ibm.shift_start_positions(-41.0,-41.0,-81.0);
+	ibm.shift_end_positions(-40.0,-40.0,-81.0);
+	
 	ibm.initialize_positions_to_start();
 	
 	// ----------------------------------------------

@@ -86,6 +86,7 @@ public:
 	void setIoletV(int,float);
 	void setIoletW(int,float);
 	void setIoletR(int,float);
+	void setIoletType(int,int);
 	float getU(int);
 	float getV(int);
 	float getW(int);

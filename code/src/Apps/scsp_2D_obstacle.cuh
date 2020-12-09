@@ -4,6 +4,8 @@
 
 # include "../Base/FlowBase.cuh"
 # include "../D2Q9/iolets/boundary_condition_iolet.cuh"
+# include "../D2Q9/classes/scsp_D2Q9.cuh"
+# include "../IBM/2D/struct_ibm2D.cuh"
 # include <cuda.h>
 # include <string>
 
@@ -20,43 +22,14 @@ private:
 	int Nx,Ny,Nz;
 	int numIolets;
 	int nNodes;
+	int nSteps;
 	float tau;
 	float nu;
-	float kstiff;
 	std::string vtkFormat;
 	
-	// host arrays:
-	float* uH;
-	float* vH;
-	float* rH;
-	float* xIBH;
-	float* yIBH;
-	int* nListH;
-	int* voxelTypeH;
-	int* streamIndexH;
-	int* xH;
-	int* yH;
-	iolet2D* ioletsH;
-	
-	// device arrays:
-	float* u;
-	float* v;
-	float* r;
-	float* f1;
-	float* f2;
-	float* Fx;
-	float* Fy;
-	float* xIB;
-	float* yIB;
-	float* xIB0;
-	float* yIB0;
-	float* vxIB;
-	float* vyIB;
-	float* fxIB;
-	float* fyIB;
-	int* voxelType;
-	int* streamIndex;
-	iolet2D* iolets;
+	// objects:
+	scsp_D2Q9 lbm;
+	struct_ibm2D ibm;
 	
 public:
 

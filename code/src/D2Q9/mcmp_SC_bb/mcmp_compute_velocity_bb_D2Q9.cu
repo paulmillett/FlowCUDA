@@ -40,12 +40,12 @@ __global__ void mcmp_compute_velocity_bb_D2Q9(float* fA,
 		}
 		
 		// --------------------------------------------------	
-		// if this is a fluid site:
+		// if this is a solid site:
 		// --------------------------------------------------
 		
 		else if (s[i] == 1) {
-			u[i] = 0.0;  // later, fill in with particle velocity
-			v[i] = 0.0;  
+			//u[i] = 0.0;  // later, fill in with particle velocity
+			//v[i] = 0.0;  
 		}
 					
 	}

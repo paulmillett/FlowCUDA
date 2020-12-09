@@ -1,17 +1,6 @@
 
 # include "mcmp_2D_dropsurface_bb.cuh"
-# include "../D2Q9/mcmp_SC_bb/mcmp_initial_equilibrium_bb_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC_bb/mcmp_collide_stream_bb_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC_bb/mcmp_compute_density_bb_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC_bb/mcmp_compute_SC_forces_bb_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC_bb/mcmp_compute_velocity_bb_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC_bb/mcmp_bounce_back_D2Q9.cuh"
-# include "../D2Q9/init/stream_index_builder_D2Q9.cuh"
-# include "../D2Q9/init/stream_index_builder_bb_D2Q9.cuh"
-# include "../D2Q9/particles/map_particles_to_grid_D2Q9.cuh"
-# include "../Lattice/lattice_builders_D2Q9.cuh"
 # include "../IO/GetPot"
-# include "../IO/write_vtk_output.cuh"
 # include <math.h>
 # include <string> 
 using namespace std;   
@@ -22,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-mcmp_2D_dropsurface_bb::mcmp_2D_dropsurface_bb() 
+mcmp_2D_dropsurface_bb::mcmp_2D_dropsurface_bb() : lbm()
 {	
 	
 	// ----------------------------------------------
@@ -54,8 +43,7 @@ mcmp_2D_dropsurface_bb::mcmp_2D_dropsurface_bb()
 	gAS = inputParams("LBM/gAS",6.0);
 	gBS = inputParams("LBM/gBS",6.0); 
 	nParticles = inputParams("LBM/nParticles",1);
-	
-			
+				
 	// ----------------------------------------------
 	// output parameters:
 	// ----------------------------------------------
@@ -63,46 +51,10 @@ mcmp_2D_dropsurface_bb::mcmp_2D_dropsurface_bb()
 	vtkFormat = inputParams("Output/format","structured");
 	
 	// ----------------------------------------------
-	// allocate array memory (host):
+	// allocate array memory (host & device):
 	// ----------------------------------------------
 	
-    uH = (float*)malloc(nVoxels*sizeof(float));
-    vH = (float*)malloc(nVoxels*sizeof(float));
-    rAH = (float*)malloc(nVoxels*sizeof(float));
-	rBH = (float*)malloc(nVoxels*sizeof(float));
-	xH = (int*)malloc(nVoxels*sizeof(int));
-	yH = (int*)malloc(nVoxels*sizeof(int));
-	sH = (int*)malloc(nVoxels*sizeof(int));
-	nListH = (int*)malloc(nVoxels*Q*sizeof(int));	
-	voxelTypeH = (int*)malloc(nVoxels*sizeof(int));
-	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));
-	pH = (particle2D*)malloc(nParticles*sizeof(particle2D));
-	pIDH = (int*)malloc(nVoxels*sizeof(int));
-	
-	// ----------------------------------------------
-	// allocate array memory (device):
-	// ----------------------------------------------
-	
-	cudaMalloc((void **) &u, nVoxels*sizeof(float));
-	cudaMalloc((void **) &v, nVoxels*sizeof(float));
-	cudaMalloc((void **) &rA, nVoxels*sizeof(float));
-	cudaMalloc((void **) &rB, nVoxels*sizeof(float));
-	cudaMalloc((void **) &f1A, nVoxels*Q*sizeof(float));
-	cudaMalloc((void **) &f1B, nVoxels*Q*sizeof(float));
-	cudaMalloc((void **) &f2A, nVoxels*Q*sizeof(float));
-	cudaMalloc((void **) &f2B, nVoxels*Q*sizeof(float));	
-	cudaMalloc((void **) &FxA, nVoxels*sizeof(float));
-	cudaMalloc((void **) &FxB, nVoxels*sizeof(float));
-	cudaMalloc((void **) &FyA, nVoxels*sizeof(float));
-	cudaMalloc((void **) &FyB, nVoxels*sizeof(float));	
-	cudaMalloc((void **) &x, nVoxels*sizeof(int));
-	cudaMalloc((void **) &y, nVoxels*sizeof(int));
-	cudaMalloc((void **) &s, nVoxels*sizeof(int));
-	cudaMalloc((void **) &pID, nVoxels*sizeof(int));
-	cudaMalloc((void **) &nList, nVoxels*Q*sizeof(int));
-	cudaMalloc((void **) &voxelType, nVoxels*sizeof(int));
-	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));
-	cudaMalloc((void **) &p, nParticles*sizeof(particle2D));
+	lbm.allocate();
 	
 }
 
@@ -114,49 +66,7 @@ mcmp_2D_dropsurface_bb::mcmp_2D_dropsurface_bb()
 
 mcmp_2D_dropsurface_bb::~mcmp_2D_dropsurface_bb()
 {
-	
-	// ----------------------------------------------
-	// free array memory (host):
-	// ----------------------------------------------
-	
-	free(uH);
-	free(vH);
-	free(rAH);
-	free(rBH);
-	free(xH);
-	free(yH);
-	free(sH);
-	free(nListH);
-	free(voxelTypeH);
-	free(streamIndexH);
-	free(pH);
-	free(pIDH);
-	
-	// ----------------------------------------------
-	// free array memory (device):
-	// ----------------------------------------------
-	
-	cudaFree(u);
-	cudaFree(v);
-	cudaFree(rA);
-	cudaFree(rB);
-	cudaFree(f1A);
-	cudaFree(f2A);
-	cudaFree(f1B);
-	cudaFree(f2B);
-	cudaFree(FxA);
-	cudaFree(FxB);
-	cudaFree(FyA);
-	cudaFree(FyB);
-	cudaFree(x);
-	cudaFree(y);
-	cudaFree(s);
-	cudaFree(pID);
-	cudaFree(nList);
-	cudaFree(voxelType);
-	cudaFree(streamIndex);
-	cudaFree(p);
-	
+	lbm.deallocate();	
 }
 
 
@@ -176,55 +86,39 @@ void mcmp_2D_dropsurface_bb::initSystem()
 	string latticeSource = inputParams("Lattice/source","box");	
 	
 	// ----------------------------------------------
-	// create the lattice using "box" function.
-	// function location:
-	// "lattice/lattice_builders_D2Q9.cuh"	 
+	// create the periodic lattice:
 	// ----------------------------------------------	
 	
-	if (latticeSource == "box") {
-		Nx = inputParams("Lattice/Nx",0);
-		Ny = inputParams("Lattice/Ny",0);
-		Nz = inputParams("Lattice/Nz",0);
-		build_box_lattice_D2Q9(nVoxels,Nx,Ny,voxelTypeH,nListH);
-		for (int j=0; j<Ny; j++) {
-			for (int i=0; i<Nx; i++) {
-				int ndx = j*Nx + i;
-				xH[ndx] = i;
-				yH[ndx] = j;
-			}
-		}
-	}	
+	lbm.create_lattice_box_periodic();	
 			
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------
-			
+	
+	Nx = inputParams("Lattice/Nx",1);
+	Ny = inputParams("Lattice/Ny",1);
 	// initialize solid field:
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {		
 			int ndx = j*Nx + i;	
-			sH[ndx] = 0;	
-			pIDH[ndx] = -1;		
-			if (j <= 35) {
-				sH[ndx] = 1;
-				pIDH[ndx] = 0;
-			}
+			lbm.setS(ndx,0);	
+			if (j <= 35) lbm.setS(ndx,1); 
 		}
 	}
-		
+	
 	// initialize density fields: 
+	srand (static_cast <unsigned> (time(0)));	
 	float rInner = inputParams("LBM/rInner",10.0);	
 	float rOuter = inputParams("LBM/rOuter",15.0);
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {
 			int ndx = j*Nx + i;
+			int sij = lbm.getS(ndx);
 			
-			
-			// Random mixed state:
+			// Random mixed state:			
 			float ranA = (float)rand()/RAND_MAX;
 			float rhoA = 0.5 + 0.1*(ranA-0.5);
-			float rhoB = 1.0 - rhoA;
-			
+			float rhoB = 1.0 - rhoA;			
 			
 			/*
 			// Square island state:
@@ -240,26 +134,23 @@ void mcmp_2D_dropsurface_bb::initSystem()
 			}
 			*/
 			
-			rAH[ndx] = rhoA*float(1 - sH[ndx]); 
-			rBH[ndx] = rhoB*float(1 - sH[ndx]); 
+			lbm.setRA(ndx,rhoA*float(1 - sij));
+			lbm.setRB(ndx,rhoB*float(1 - sij));			
 					
 		}
-	}
-			
+	}		
+		
 	// initialize velocity fields
 	for (int i=0; i<nVoxels; i++) {
-		uH[i] = 0.0;
-		vH[i] = 0.0;	
+		lbm.setU(i,0.0);
+		lbm.setV(i,0.0);
 	}	
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
-	// function location:
-	// "D2Q9/stream_index_builder_D2Q9.cuh"
 	// ----------------------------------------------
-		
-	stream_index_push_D2Q9(nVoxels,nListH,streamIndexH);
-	//stream_index_push_bb_D2Q9(nVoxels,nListH,sH,streamIndexH);
+	
+	lbm.stream_index_push();	
 			
 	// ----------------------------------------------
 	// write initial output file:
@@ -271,25 +162,13 @@ void mcmp_2D_dropsurface_bb::initSystem()
 	// copy arrays from host to device: 
 	// ----------------------------------------------
 	
-    cudaMemcpy(u, uH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(v, vH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(rA, rAH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(rB, rBH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(x, xH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(y, yH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(s, sH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(nList, nListH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
-	cudaMemcpy(voxelType, voxelTypeH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(streamIndex, streamIndexH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
-	cudaMemcpy(p, pH, sizeof(particle2D)*nParticles, cudaMemcpyHostToDevice);
-	cudaMemcpy(pID, pIDH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
+	lbm.memcopy_host_to_device();
 	
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
-	mcmp_initial_equilibrium_bb_D2Q9 
-	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,u,v,nVoxels);	
+	lbm.initial_equilibrium_bb(nBlocks,nThreads);	
 		
 }
 
@@ -323,34 +202,18 @@ void mcmp_2D_dropsurface_bb::cycleForward(int stepsPerCycle, int currentCycle)
 		// update density fields:
 		// ------------------------------
 		
-		mcmp_compute_density_bb_D2Q9
-		<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,nVoxels);
-				
+		lbm.compute_density_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 		
 		// ------------------------------
 		// update fluid fields:											   
 		// ------------------------------ 
 		
-		mcmp_compute_SC_forces_bb_D2Q9 
-		<<<nBlocks,nThreads>>> (rA,rB,FxA,FxB,FyA,FyB,s,nList,gAB,gAS,gBS,nVoxels);	
-				
-		mcmp_compute_velocity_bb_D2Q9 
-		<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,FxA,FxB,FyA,FyB,u,v,s,nVoxels);
-				
-		mcmp_collide_stream_bb_D2Q9 
-		<<<nBlocks,nThreads>>> (f1A,f1B,f2A,f2B,rA,rB,u,v,FxA,FxB,FyA,FyB,s,streamIndex,nu,nVoxels);
-		
-		mcmp_bounce_back_D2Q9
-		<<<nBlocks,nThreads>>> (f2A,f2B,s,nList,streamIndex,nVoxels);
-																				 
-		float* tempA = f1A;
-		float* tempB = f1B;
-		f1A = f2A;
-		f1B = f2B;
-		f2A = tempA;
-		f2B = tempB;
-		
+		lbm.compute_SC_forces_bb(nBlocks,nThreads);
+		lbm.compute_velocity_bb(nBlocks,nThreads);
+		lbm.collide_stream_bb(nBlocks,nThreads);
+		lbm.bounce_back(nBlocks,nThreads);
+		lbm.swap_populations();				
 		cudaDeviceSynchronize();
 				
 	}
@@ -359,11 +222,8 @@ void mcmp_2D_dropsurface_bb::cycleForward(int stepsPerCycle, int currentCycle)
 	// copy arrays from device to host:
 	// ----------------------------------------------
 	
-    cudaMemcpy(uH, u, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	cudaMemcpy(vH, v, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	cudaMemcpy(rAH, rA, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	cudaMemcpy(rBH, rB, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	
+	lbm.memcopy_device_to_host();
+		
 	// ----------------------------------------------
 	// write output from this cycle:
 	// ----------------------------------------------
@@ -387,11 +247,8 @@ void mcmp_2D_dropsurface_bb::writeOutput(std::string tagname, int step)
 	// "io/write_vtk_output.cuh"
 	// ----------------------------------------------
 	
-	if (vtkFormat == "structured") {
-		//write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,uH,vH);
-		write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH);
-	}
-	
+	lbm.write_output(tagname,step); 
+
 }
 
 

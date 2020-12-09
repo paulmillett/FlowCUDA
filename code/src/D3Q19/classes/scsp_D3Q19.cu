@@ -388,6 +388,11 @@ void scsp_D3Q19::setIoletR(int i, float val)
 	ioletsH[i].rBC = val;
 }
 
+void scsp_D3Q19::setIoletType(int i, int val)
+{
+	ioletsH[i].type = val;
+}
+
 
 
 // --------------------------------------------------------

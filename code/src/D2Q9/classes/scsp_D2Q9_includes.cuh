@@ -10,6 +10,10 @@
 # include "../scsp/scsp_stream_collide_save_IBforcing_D2Q9.cuh"
 # include "../scsp/scsp_stream_collide_save_forcing_D2Q9.cuh"
 # include "../scsp/scsp_zero_forces_D2Q9.cuh"
+# include "../../IBM/2D/extrapolate_velocity_IBM2D.cuh"
+# include "../../IBM/2D/interpolate_velocity_IBM2D.cuh"
+# include "../../IBM/2D/extrapolate_force_IBM2D.cuh"
+# include "../../IO/write_vtk_output.cuh"
 
 
 # endif  // SCSP_D2Q9_INCLUDES_H

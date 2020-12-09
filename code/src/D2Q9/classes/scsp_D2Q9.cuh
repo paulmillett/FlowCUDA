@@ -38,6 +38,7 @@ private:
 	float* Fy;
 	float* uIBvox;
 	float* vIBvox;
+	float* weights;
 	int* voxelType;
 	int* streamIndex;
 	iolet2D* iolets;
@@ -52,6 +53,7 @@ public:
 	void allocate_IB_velocities();
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
+	void memcopy_host_to_device_iolets();
 	void create_lattice_box();
 	void create_lattice_box_periodic();
 	void create_lattice_file();
@@ -68,7 +70,13 @@ public:
 	void initial_equilibrium(int,int);
 	void stream_collide_save(int,int,bool);	
 	void stream_collide_save_forcing(int,int);
+	void stream_collide_save_IBforcing(int,int);
+	void extrapolate_forces_from_IBM(int,int,float*,float*,float*,float*,int);
+	void interpolate_velocity_to_IBM(int,int,float*,float*,float*,float*,int);
+	void extrapolate_velocity_from_IBM(int,int,float*,float*,float*,float*,int);
 	void zero_forces(int,int);	
+	void zero_forces_with_IBM(int,int);
+	void write_output(std::string,int);
 
 };
 

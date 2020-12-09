@@ -1,19 +1,6 @@
 
 # include "scsp_2D_obstacle.cuh"
-# include "../D2Q9/scsp/scsp_initial_equilibrium_D2Q9.cuh"
-# include "../D2Q9/scsp/scsp_stream_collide_save_forcing_D2Q9.cuh"
-# include "../D2Q9/scsp/scsp_zero_forces_D2Q9.cuh"
-# include "../D2Q9/init/stream_index_builder_D2Q9.cuh"
-# include "../IBM/2D/compute_node_force_IBM2D.cuh"
-# include "../IBM/2D/extrapolate_force_IBM2D.cuh"
-# include "../IBM/2D/interpolate_velocity_IBM2D.cuh"
-# include "../IBM/2D/set_reference_node_positions_IBM2D.cuh"
-# include "../IBM/2D/update_node_position_IBM2D.cuh"
-# include "../IBM/2D/update_node_ref_position_IBM2D.cuh"
 # include "../IO/GetPot"
-# include "../IO/read_lattice_geometry.cuh"
-# include "../IO/write_vtk_output.cuh"
-# include "../Lattice/lattice_builders_D2Q9.cuh"
 # include <string>
 # include <math.h>
 using namespace std;  
@@ -24,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_2D_obstacle::scsp_2D_obstacle()
+scsp_2D_obstacle::scsp_2D_obstacle() : lbm(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -48,6 +35,12 @@ scsp_2D_obstacle::scsp_2D_obstacle()
 	nBlocks = (nVoxels+(nThreads-1))/nThreads;  // integer division
 	
 	// ----------------------------------------------
+	// time parameters:
+	// ----------------------------------------------
+	
+	nSteps = inputParams("Time/nSteps",0);
+	
+	// ----------------------------------------------
 	// Lattice Boltzmann parameters:
 	// ----------------------------------------------
 	
@@ -58,7 +51,6 @@ scsp_2D_obstacle::scsp_2D_obstacle()
 	// ----------------------------------------------
 	
 	nNodes = inputParams("IBM/nNodes",0);
-	kstiff = inputParams("IBM/kstiff",0.0);
 	nBlocksIB = (nNodes+(nThreads-1))/nThreads; // integer division	
 	
 	// ----------------------------------------------
@@ -74,43 +66,13 @@ scsp_2D_obstacle::scsp_2D_obstacle()
 	vtkFormat = inputParams("Output/format","polydata");
 	
 	// ----------------------------------------------
-	// allocate array memory (host):
+	// allocate array memory (host & device):
 	// ----------------------------------------------
 	
-    uH = (float*)malloc(nVoxels*sizeof(float));
-    vH = (float*)malloc(nVoxels*sizeof(float));
-    rH = (float*)malloc(nVoxels*sizeof(float));
-	xIBH = (float*)malloc(nNodes*sizeof(float));
-	yIBH = (float*)malloc(nNodes*sizeof(float));
-	nListH = (int*)malloc(nVoxels*Q*sizeof(int));
-	voxelTypeH = (int*)malloc(nVoxels*sizeof(int));
-	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));
-	xH = (int*)malloc(nVoxels*sizeof(int));
-	yH = (int*)malloc(nVoxels*sizeof(int));
-	ioletsH = (iolet2D*)malloc(numIolets*sizeof(iolet2D));
-	
-	// ----------------------------------------------
-	// allocate array memory (device):
-	// ----------------------------------------------
-	
-	cudaMalloc((void **) &u, nVoxels*sizeof(float));
-	cudaMalloc((void **) &v, nVoxels*sizeof(float));
-	cudaMalloc((void **) &r, nVoxels*sizeof(float));
-	cudaMalloc((void **) &f1, nVoxels*Q*sizeof(float));
-	cudaMalloc((void **) &f2, nVoxels*Q*sizeof(float));
-	cudaMalloc((void **) &Fx, nVoxels*sizeof(float));
-	cudaMalloc((void **) &Fy, nVoxels*sizeof(float));
-	cudaMalloc((void **) &xIB, nNodes*sizeof(float));
-	cudaMalloc((void **) &yIB, nNodes*sizeof(float));
-	cudaMalloc((void **) &xIB0, nNodes*sizeof(float));
-	cudaMalloc((void **) &yIB0, nNodes*sizeof(float));
-	cudaMalloc((void **) &vxIB, nNodes*sizeof(float));
-	cudaMalloc((void **) &vyIB, nNodes*sizeof(float));
-	cudaMalloc((void **) &fxIB, nNodes*sizeof(float));
-	cudaMalloc((void **) &fyIB, nNodes*sizeof(float));
-	cudaMalloc((void **) &voxelType, nVoxels*sizeof(int));
-	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));	
-	cudaMalloc((void **) &iolets, numIolets*sizeof(iolet2D));
+	lbm.allocate();
+	lbm.allocate_forces();
+	lbm.allocate_IB_velocities();
+	ibm.allocate();
 	
 }
 
@@ -121,47 +83,9 @@ scsp_2D_obstacle::scsp_2D_obstacle()
 // --------------------------------------------------------
 
 scsp_2D_obstacle::~scsp_2D_obstacle()
-{
-	
-	// ----------------------------------------------
-	// free array memory (host):
-	// ----------------------------------------------
-	
-	free(uH);
-	free(vH);
-	free(rH);
-	free(nListH);
-	free(voxelTypeH);
-	free(streamIndexH);
-	free(xH);
-	free(yH);
-	free(ioletsH);
-	free(xIBH);
-	free(yIBH);
-		
-	// ----------------------------------------------
-	// free array memory (device):
-	// ----------------------------------------------
-	
-	cudaFree(u);
-	cudaFree(v);
-	cudaFree(r);
-	cudaFree(f1);
-	cudaFree(f2);
-	cudaFree(Fx);
-	cudaFree(Fy);
-	cudaFree(voxelType);
-	cudaFree(streamIndex);
-	cudaFree(iolets);
-	cudaFree(xIB);
-	cudaFree(yIB);
-	cudaFree(xIB0);
-	cudaFree(yIB0);
-	cudaFree(vxIB);
-	cudaFree(vyIB);
-	cudaFree(fxIB);
-	cudaFree(fyIB);
-	
+{	
+	lbm.deallocate();
+	ibm.deallocate();		
 }
 
 
@@ -183,57 +107,35 @@ void scsp_2D_obstacle::initSystem()
 	// ----------------------------------------------
 	// create the lattice using "box" function.
 	// function location:
-	// "lattice/lattice_builders_D3Q19.cuh"	 
+	// "lattice/lattice_builders_D2Q9.cuh"	 
 	// ----------------------------------------------	
 	
 	if (latticeSource == "box") {
-		Nx = inputParams("Lattice/Nx",0);
-		Ny = inputParams("Lattice/Ny",0);
-		Nz = 1;
-		int flowDir = inputParams("Lattice/flowDir",0);
-		int xLBC = inputParams("Lattice/xLBC",0);
-		int xUBC = inputParams("Lattice/xUBC",0);
-		int yLBC = inputParams("Lattice/yLBC",0);
-		int yUBC = inputParams("Lattice/yUBC",0);			
-		build_box_lattice_D2Q9(nVoxels,flowDir,Nx,Ny,
-		                       xLBC,xUBC,yLBC,yUBC,
-							   voxelTypeH,nListH);
+		lbm.create_lattice_box();
 	}	
-		
+			
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
-	// function location:
-	// "D2Q9/init/stream_index_builder_D2Q9.cuh"
 	// ----------------------------------------------
-		
-	stream_index_pull_D2Q9(nVoxels,nListH,streamIndexH);
+	
+	lbm.stream_index_pull();
 	
 	// ----------------------------------------------			
 	// initialize inlets/outlets: 
 	// ----------------------------------------------
 	
-	// I'm assuming there are 2 iolets!!!!
-	ioletsH[0].type = inputParams("Iolet1/type",1);
-	ioletsH[0].uBC = inputParams("Iolet1/uBC",0.0);
-	ioletsH[0].vBC = inputParams("Iolet1/vBC",0.0);
-	ioletsH[0].rBC = inputParams("Iolet1/rBC",1.0);
-	ioletsH[0].pBC = inputParams("Iolet1/pBC",0.0);
-	
-	ioletsH[1].type = inputParams("Iolet2/type",1);
-	ioletsH[1].uBC = inputParams("Iolet2/uBC",0.0);
-	ioletsH[1].vBC = inputParams("Iolet2/vBC",0.0);
-	ioletsH[1].rBC = inputParams("Iolet2/rBC",1.0);
-	ioletsH[1].pBC = inputParams("Iolet2/pBC",0.0);	
+	lbm.read_iolet_info(0,"Iolet1");
+	lbm.read_iolet_info(1,"Iolet2");	
 		
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------
-	
+		
 	for (int i=0; i<nVoxels; i++) {
-		uH[i] = 0.00;
-		vH[i] = 0.00;
-		rH[i] = 1.0;
-	} 
+		lbm.setU(i,0.0);
+		lbm.setV(i,0.0);
+		lbm.setR(i,1.0);		
+	}
 	
 	// ----------------------------------------------			
 	// initialize immersed boundary info: 
@@ -244,9 +146,13 @@ void scsp_2D_obstacle::initSystem()
 	float radiusx = 8.0;
 	float radiusy = 12.0;
 	for (int i=0; i<nNodes; i++) { 
-		xIBH[i] = xcent + radiusx*sin(2.0*M_PI*float(i)/nNodes);
-		yIBH[i] = ycent + radiusy*cos(2.0*M_PI*float(i)/nNodes);
+		float xst = xcent + radiusx*sin(2.0*M_PI*float(i)/nNodes);
+		float yst = ycent + radiusy*cos(2.0*M_PI*float(i)/nNodes);
+		ibm.setXStart(i,xst);
+		ibm.setYStart(i,yst);
 	}
+	
+	ibm.set_positions_to_start_positions();
 	
 	// ----------------------------------------------
 	// write initial output file:
@@ -258,28 +164,20 @@ void scsp_2D_obstacle::initSystem()
 	// copy arrays from host to device: 
 	// ----------------------------------------------
 	
-    cudaMemcpy(u, uH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(v, vH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(r, rH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(xIB, xIBH, sizeof(float)*nNodes, cudaMemcpyHostToDevice);
-	cudaMemcpy(yIB, yIBH, sizeof(float)*nNodes, cudaMemcpyHostToDevice);
-	cudaMemcpy(voxelType, voxelTypeH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
-	cudaMemcpy(streamIndex, streamIndexH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
-	cudaMemcpy(iolets, ioletsH, sizeof(iolet2D)*numIolets, cudaMemcpyHostToDevice);
+	lbm.memcopy_host_to_device();
+	ibm.memcopy_host_to_device();
 	
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
-	scsp_initial_equilibrium_D2Q9 
-	<<<nBlocks,nThreads>>> (f1,r,u,v,nVoxels);	
+	lbm.initial_equilibrium(nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// define reference IBM node positions: 
 	// ----------------------------------------------
 	
-	set_reference_node_positions_IBM2D
-	<<<nBlocksIB,nThreads>>> (xIB,yIB,xIB0,yIB0,nNodes);
+	ibm.set_reference_node_positions(nBlocksIB,nThreads);	
 	
 }
 
@@ -306,32 +204,14 @@ void scsp_2D_obstacle::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 	
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;
-		
-		update_node_ref_position_IBM2D
-		<<<nBlocksIB,nThreads>>> (xIB0,yIB0,nNodes);
-		
-		scsp_zero_forces_D2Q9
-		<<<nBlocks,nThreads>>> (Fx,Fy,nVoxels);
-		
-		compute_node_force_IBM2D
-		<<<nBlocksIB,nThreads>>> (xIB,yIB,xIB0,yIB0,fxIB,fyIB,kstiff,nNodes);
-		
-		extrapolate_force_IBM2D
-		<<<nBlocksIB,nThreads>>> (xIB,yIB,fxIB,fyIB,Fx,Fy,Nx,nNodes);
-				
-		scsp_stream_collide_save_forcing_D2Q9 
-		<<<nBlocks,nThreads>>> (f1,f2,r,u,v,Fx,Fy,streamIndex,voxelType,iolets,nu,nVoxels);
-		float* temp = f1;
-		f1 = f2;
-		f2 = temp;
-		
-		interpolate_velocity_IBM2D
-		<<<nBlocksIB,nThreads>>> (xIB,yIB,vxIB,vyIB,u,v,Nx,nNodes);
-		
-		update_node_position_IBM2D
-		<<<nBlocksIB,nThreads>>> (xIB,yIB,vxIB,vyIB,nNodes);														 
-		
+		cummulativeSteps++;		
+		ibm.update_node_ref_position(nBlocksIB,nThreads);		
+		lbm.zero_forces(nBlocks,nThreads);
+		ibm.compute_node_forces(nBlocksIB,nThreads);
+		lbm.extrapolate_forces_from_IBM(nBlocksIB,nThreads,ibm.x,ibm.y,ibm.fx,ibm.fy,ibm.nNodes);	
+		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		lbm.interpolate_velocity_to_IBM(nBlocksIB,nThreads,ibm.x,ibm.y,ibm.vx,ibm.vy,ibm.nNodes);		
+		ibm.update_node_positions(nBlocksIB,nThreads);			
 		cudaDeviceSynchronize();
 	}
 	
@@ -339,11 +219,8 @@ void scsp_2D_obstacle::cycleForward(int stepsPerCycle, int currentCycle)
 	// copy arrays from device to host:
 	// ----------------------------------------------
 	
-    cudaMemcpy(rH, r, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	cudaMemcpy(uH, u, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	cudaMemcpy(vH, v, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	cudaMemcpy(xIBH, xIB, sizeof(float)*nNodes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(yIBH, yIB, sizeof(float)*nNodes, cudaMemcpyDeviceToHost);
+	lbm.memcopy_device_to_host();
+	ibm.memcopy_device_to_host(); 
 		
 	// ----------------------------------------------
 	// write output from this cycle:
@@ -368,9 +245,9 @@ void scsp_2D_obstacle::writeOutput(std::string tagname, int step)
 	// "io/write_vtk_output.cuh"
 	// ----------------------------------------------
 	
-	write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rH,uH,vH);
-	write_vtk_immersed_boundary_2D("ibm",step,nNodes,xIBH,yIBH);
-		
+	lbm.write_output(tagname,step);
+	ibm.write_output("ibm",step);		
+			
 }
 
 

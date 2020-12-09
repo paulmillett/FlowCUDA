@@ -3,7 +3,7 @@
 # define SCSP_3D_IOLETS_H
 
 # include "../Base/FlowBase.cuh"
-# include "../D3Q19/iolets/boundary_condition_iolet.cuh"
+# include "../D3Q19/classes/scsp_D3Q19.cuh"
 # include <cuda.h>
 # include <string>
 
@@ -22,31 +22,9 @@ private:
 	float nu;
 	std::string vtkFormat;
 	
-	// host arrays:
-	float* uH;
-	float* vH;
-	float* wH;
-	float* rH;
-	float* pH;
-	int* nListH;
-	int* voxelTypeH;
-	int* streamIndexH;
-	int* xH;
-	int* yH;
-	int* zH;
-	iolet* ioletsH;
+	// scsp_D3Q19 object:
+	scsp_D3Q19 lbm;
 	
-	// device arrays:
-	float* u;
-	float* v;
-	float* w;
-	float* r;
-	float* p;
-	float* f1;
-	float* f2;
-	int* voxelType;
-	int* streamIndex;
-	iolet* iolets;
 	
 public:
 
