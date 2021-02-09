@@ -507,14 +507,11 @@ void scsp_D3Q19::stream_collide_save_IBforcing(int nBlocks, int nThreads)
 // --------------------------------------------------------
 
 void scsp_D3Q19::extrapolate_velocity_from_IBM(int nBlocks, int nThreads,
-	                                           float* xIB, float* yIB, float* zIB,
-                                               float* vxIB, float* vyIB, float* vzIB,
-											   int nNodes)
+	                                           float3* rIB, float3* vIB, int nNodes)
 {
 	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
 	extrapolate_velocity_IBM3D
-	<<<nBlocks,nThreads>>> (xIB,yIB,zIB,vxIB,vyIB,vzIB,
-	uIBvox,vIBvox,wIBvox,weights,Nx,Ny,nNodes);
+	<<<nBlocks,nThreads>>> (rIB,vIB,uIBvox,vIBvox,wIBvox,weights,Nx,Ny,nNodes);
 }
 
 

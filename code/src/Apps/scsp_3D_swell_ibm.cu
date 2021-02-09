@@ -245,7 +245,7 @@ void scsp_3D_swell_ibm::cycleForward(int stepsPerCycle, int currentCycle)
 		lbm.zero_forces_with_IBM(nBlocks,nThreads);
 		
 		// extrapolate IBM node velocities to LBM voxels:
-		lbm.extrapolate_velocity_from_IBM(nBlocksIB,nThreads,ibm.x,ibm.y,ibm.z,ibm.vx,ibm.vy,ibm.vz,ibm.nNodes);
+		lbm.extrapolate_velocity_from_IBM(nBlocksIB,nThreads,ibm.r,ibm.v,ibm.nNodes);
 		
 		// calculate time-dependent inlet velocity:
 		float invel = sin(float(cummulativeSteps)/float(nSteps)*M_PI);

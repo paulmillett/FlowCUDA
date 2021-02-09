@@ -212,7 +212,8 @@ void mcmp_2D_particle_bb::cycleForward(int stepsPerCycle, int currentCycle)
 		lbm.compute_velocity_bb(nBlocks,nThreads);
 		lbm.collide_stream_bb(nBlocks,nThreads);
 		lbm.bounce_back_moving(nBlocks,nThreads);
-		lbm.swap_populations();				
+		lbm.swap_populations();	
+		parts.move_particles(nBlocks,nThreads);			
 		cudaDeviceSynchronize();
 				
 	}

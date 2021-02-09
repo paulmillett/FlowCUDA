@@ -10,6 +10,10 @@
 # include "../Apps/mcmp_2D_capbridge.cuh"
 # include "../Apps/mcmp_2D_dropsurface.cuh"
 # include "../Apps/mcmp_2D_dropsurface_bb.cuh"
+# include "../Apps/mcmp_2D_particle_bb.cuh"
+# include "../Apps/mcmp_2D_particle_psm.cuh"
+# include "../Apps/mcmp_2D_capbridge_psm.cuh"
+# include "../Apps/mcmp_2D_capbridge_dip.cuh"
 # include "../Apps/scsp_2D_obstacle.cuh"
 # include "../Apps/scsp_2D_expand.cuh"
 # include "../Apps/scsp_2D_expand_2.cuh"
@@ -41,6 +45,10 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "mcmp_2D_capbridge") return new mcmp_2D_capbridge();
 	if (specifier == "mcmp_2D_dropsurface") return new mcmp_2D_dropsurface();
 	if (specifier == "mcmp_2D_dropsurface_bb") return new mcmp_2D_dropsurface_bb();
+	if (specifier == "mcmp_2D_particle_bb") return new mcmp_2D_particle_bb();
+	if (specifier == "mcmp_2D_particle_psm") return new mcmp_2D_particle_psm();
+	if (specifier == "mcmp_2D_capbridge_psm") return new mcmp_2D_capbridge_psm();
+	if (specifier == "mcmp_2D_capbridge_dip") return new mcmp_2D_capbridge_dip();
 	if (specifier == "scsp_2D_obstacle") return new scsp_2D_obstacle();
 	if (specifier == "scsp_2D_expand") return new scsp_2D_expand();
 	if (specifier == "scsp_2D_expand_2") return new scsp_2D_expand_2();

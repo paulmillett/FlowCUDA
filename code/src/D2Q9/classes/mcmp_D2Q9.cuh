@@ -19,6 +19,7 @@ private:
 	float gAB;
 	float gAS;	
 	float gBS;
+	float omega;
 		
 	// host arrays:
 	float* uH;
@@ -83,16 +84,22 @@ public:
 	float getRA(int);
 	float getRB(int);
 	void initial_equilibrium_bb(int,int);
+	void initial_equilibrium_psm(int,int);
 	void initial_particles_on_lattice(float*,float*,float*,int*,int,int,int);
 	void compute_density_bb(int,int);
+	void compute_density_psm(int,int);
 	void update_particles_on_lattice(float*,float*,float*,float*,float*,int*,int,int,int);
+	void update_particles_on_lattice_psm(float*,float*,float*,float*,float*,int*,int,int,int);
 	void compute_SC_forces_bb(int,int);
+	void compute_SC_forces_psm(float*,float*,float*,int*,int,int);
 	void compute_velocity_bb(int,int);
+	void compute_velocity_psm(float*,float*,float*,float*,float*,int*,int,int);
+	void set_boundary_velocity_psm(int,int);
 	void collide_stream_bb(int,int);
+	void collide_stream_psm(float*,float*,float*,int*,float,float,int,int);
 	void bounce_back(int,int);
 	void bounce_back_moving(int,int);
-	void swap_populations();
-	
+	void swap_populations();	
 	
 	void write_output(std::string,int);
 

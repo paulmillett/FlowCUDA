@@ -40,6 +40,8 @@ void particles2D::allocate()
     xH = (float*)malloc(nParts*sizeof(float));
 	yH = (float*)malloc(nParts*sizeof(float));
 	radH = (float*)malloc(nParts*sizeof(float));
+	rInnerH = (float*)malloc(nParts*sizeof(float));
+	rOuterH = (float*)malloc(nParts*sizeof(float));
 				
 	// allocate array memory (device):
 	cudaMalloc((void **) &x, nParts*sizeof(float));
@@ -49,6 +51,9 @@ void particles2D::allocate()
 	cudaMalloc((void **) &fx, nParts*sizeof(float));
 	cudaMalloc((void **) &fy, nParts*sizeof(float));
 	cudaMalloc((void **) &rad, nParts*sizeof(float));
+	cudaMalloc((void **) &rInner, nParts*sizeof(float));
+	cudaMalloc((void **) &rOuter, nParts*sizeof(float));
+	cudaMalloc((void **) &B, nVoxels*sizeof(float));
 	cudaMalloc((void **) &pIDgrid, nVoxels*sizeof(int));	
 }
 
@@ -64,6 +69,8 @@ void particles2D::deallocate()
 	free(xH);
 	free(yH);
 	free(radH);
+	free(rInnerH);
+	free(rOuterH);
 				
 	// free array memory (device):
 	cudaFree(x);
@@ -73,6 +80,7 @@ void particles2D::deallocate()
 	cudaFree(fx);
 	cudaFree(fy);	
 	cudaFree(rad);
+	cudaFree(B);
 	cudaFree(pIDgrid);
 }
 
@@ -87,6 +95,8 @@ void particles2D::memcopy_host_to_device()
     cudaMemcpy(x, xH, sizeof(float)*nParts, cudaMemcpyHostToDevice);
 	cudaMemcpy(y, yH, sizeof(float)*nParts, cudaMemcpyHostToDevice);
 	cudaMemcpy(rad, radH, sizeof(float)*nParts, cudaMemcpyHostToDevice);
+	cudaMemcpy(rInner, rInnerH, sizeof(float)*nParts, cudaMemcpyHostToDevice);
+	cudaMemcpy(rOuter, rOuterH, sizeof(float)*nParts, cudaMemcpyHostToDevice);
 }
 
 
@@ -99,6 +109,24 @@ void particles2D::memcopy_device_to_host()
 {
     cudaMemcpy(xH, x, sizeof(float)*nParts, cudaMemcpyDeviceToHost);
 	cudaMemcpy(yH, y, sizeof(float)*nParts, cudaMemcpyDeviceToHost);
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels:
+// --------------------------------------------------------
+
+void particles2D::zero_forces(int nBlocks, int nThreads)
+{
+    zero_forces_2D
+	<<<nBlocks,nThreads>>>(fx,fy,nParts);
+}
+
+void particles2D::move_particles(int nBlocks, int nThreads)
+{
+    move_particles_2D
+	<<<nBlocks,nThreads>>>(x,y,vx,vy,fx,fy,nParts);
 }
 
 

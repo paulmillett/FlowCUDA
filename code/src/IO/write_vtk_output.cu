@@ -646,7 +646,7 @@ void write_vtk_polydata(std::string tagname, int tagnum, int nVoxels,
 // -------------------------------------------------------------------------
 
 void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes, int nFaces,
-                                    float* x, float* y, float* z, int* v1, int* v2, int* v3)
+                                    float3* r, int* v1, int* v2, int* v3)
 {
 	
 	// -----------------------------------
@@ -677,7 +677,7 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 	outfile << " " << endl;	
 	outfile << "POINTS " << nNodes << " float" << endl;
 	for (int n=0; n<nNodes; n++) {
-		outfile << fixed << setprecision(3) << x[n] << "  " << y[n] << "  " << z[n] << endl;
+		outfile << fixed << setprecision(3) << r[n].x << "  " << r[n].y << "  " << r[n].z << endl;
 	}
 	
 	// -----------------------------------------------
@@ -688,6 +688,65 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 	outfile << "POLYGONS " << nFaces << " " << 4*nFaces << endl;
 	for (int i=0; i<nFaces; i++) {
 		outfile << 3 << " " << v1[i] << " " << v2[i] << " " << v3[i] << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+		
+	outfile.close();
+	
+}
+
+
+
+// -------------------------------------------------------------------------
+// Write IBM mesh to 'vtk' file:
+// -------------------------------------------------------------------------
+
+void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes, int nFaces,
+                                    float3* r, triangle* faces)
+{
+	
+	// -----------------------------------
+	//	Define the file location and name:
+	// -----------------------------------
+
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+
+	// -----------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------
+
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing IBM data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET POLYDATA" << endl;			
+	
+	// -----------------------------------
+	//	Write the node positions:
+	// -----------------------------------
+
+	outfile << " " << endl;	
+	outfile << "POINTS " << nNodes << " float" << endl;
+	for (int n=0; n<nNodes; n++) {
+		outfile << fixed << setprecision(3) << r[n].x << "  " << r[n].y << "  " << r[n].z << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the polygon information:
+	// -----------------------------------------------
+	
+	outfile << " " << endl;
+	outfile << "POLYGONS " << nFaces << " " << 4*nFaces << endl;
+	for (int i=0; i<nFaces; i++) {
+		outfile << 3 << " " << faces[i].v0 << " " << faces[i].v1 << " " << faces[i].v2 << endl;
 	}
 	
 	// -----------------------------------------------

@@ -23,8 +23,9 @@ mcmp_D2Q9::mcmp_D2Q9()
 	numIolets = inputParams("Lattice/numIolets",0);
 	nu = inputParams("LBM/nu",0.1666666);
 	gAB = inputParams("LBM/gAB",6.0);
-	gAS = inputParams("LBM/gAS",6.0);
-	gBS = inputParams("LBM/gBS",6.0); 
+	gAS = inputParams("LBM/gAS",4.5);
+	gBS = inputParams("LBM/gBS",4.5); 
+	omega = inputParams("LBM/omega",0.0);
 }
 
 
@@ -370,6 +371,12 @@ void mcmp_D2Q9::initial_equilibrium_bb(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,u,v,nVoxels);	
 }
 
+void mcmp_D2Q9::initial_equilibrium_psm(int nBlocks, int nThreads)
+{
+	mcmp_initial_equilibrium_psm_D2Q9 
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,u,v,nVoxels);	
+}
+
 void mcmp_D2Q9::initial_particles_on_lattice(float* prx, float* pry, float* prad, int* pIDgrid, 
 	int nParts, int nBlocks, int nThreads)
 {
@@ -383,11 +390,24 @@ void mcmp_D2Q9::compute_density_bb(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,nVoxels);
 }
 
+void mcmp_D2Q9::compute_density_psm(int nBlocks, int nThreads)
+{
+	mcmp_compute_density_psm_D2Q9
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,nVoxels);
+}
+
 void mcmp_D2Q9::update_particles_on_lattice(float* prx, float* pry, float* pvx, float* pvy,
 	float* prad, int* pIDgrid, int nParts, int nBlocks, int nThreads)
 {
 	mcmp_update_particles_on_lattice_D2Q9
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,u,v,prx,pry,pvx,pvy,prad,x,y,s,pIDgrid,nList,nVoxels,nParts);
+}
+
+void mcmp_D2Q9::update_particles_on_lattice_psm(float* prx, float* pry, float* B, 
+	float* rInner, float* rOuter, int* pIDgrid, int nParts, int nBlocks, int nThreads)
+{
+	mcmp_update_particles_on_lattice_psm_D2Q9
+	<<<nBlocks,nThreads>>> (B,prx,pry,rOuter,rInner,x,y,pIDgrid,nu,nVoxels,nParts);
 }
 
 void mcmp_D2Q9::compute_SC_forces_bb(int nBlocks, int nThreads)
@@ -396,16 +416,44 @@ void mcmp_D2Q9::compute_SC_forces_bb(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (rA,rB,FxA,FxB,FyA,FyB,s,nList,gAB,gAS,gBS,nVoxels);	
 }
 
+void mcmp_D2Q9::compute_SC_forces_psm(float* B, float* pfx, float* pfy, int* pIDgrid, 
+	int nBlocks, int nThreads)
+{
+	mcmp_compute_SC_forces_psm_D2Q9 
+	<<<nBlocks,nThreads>>> (rA,rB,B,FxA,FxB,FyA,FyB,pfx,pfy,nList,pIDgrid,gAB,gAS,gBS,omega,nVoxels);	
+}
+
 void mcmp_D2Q9::compute_velocity_bb(int nBlocks, int nThreads)
 {
 	mcmp_compute_velocity_bb_D2Q9 
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,FxA,FxB,FyA,FyB,u,v,s,nVoxels);
 }
 
+void mcmp_D2Q9::compute_velocity_psm(float* pvx, float* pvy, float* pfx, float* pfy, 
+	float* B, int* pIDgrid, int nBlocks, int nThreads)
+{
+	mcmp_compute_velocity_psm_D2Q9 
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,FxA,FxB,FyA,FyB,u,v,pvx,pvy,pfx,pfy,B,pIDgrid,nVoxels);
+}
+
+void mcmp_D2Q9::set_boundary_velocity_psm(int nBlocks, int nThreads)
+{
+	mcmp_set_boundary_velocity_psm_D2Q9 
+	<<<nBlocks,nThreads>>> (rA,rB,FxA,FxB,FyA,FyB,u,v,y,Ny,nVoxels);
+}
+
 void mcmp_D2Q9::collide_stream_bb(int nBlocks, int nThreads)
 {
 	mcmp_collide_stream_bb_D2Q9 
 	<<<nBlocks,nThreads>>> (f1A,f1B,f2A,f2B,rA,rB,u,v,FxA,FxB,FyA,FyB,s,streamIndex,nu,nVoxels);
+}
+
+void mcmp_D2Q9::collide_stream_psm(float* pvx, float* pvy, float* B, int* pIDgrid, 
+	float rApart, float rBpart, int nBlocks, int nThreads)
+{
+	mcmp_collide_stream_psm_D2Q9 
+	<<<nBlocks,nThreads>>> (f1A,f1B,f2A,f2B,rA,rB,u,v,FxA,FxB,FyA,FyB,pvx,pvy,B,pIDgrid,streamIndex,
+	                        rApart,rBpart,nu,nVoxels);
 }
 
 void mcmp_D2Q9::bounce_back(int nBlocks, int nThreads)
@@ -429,7 +477,10 @@ void mcmp_D2Q9::bounce_back_moving(int nBlocks, int nThreads)
 void mcmp_D2Q9::write_output(std::string tagname, int step)
 {
 	write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH);
+	write_vtk_structured_grid_2D("rA",step,Nx,Ny,Nz,rAH,uH,vH);
+	write_vtk_structured_grid_2D("rB",step,Nx,Ny,Nz,rBH,uH,vH);
 }
+
 
 
 

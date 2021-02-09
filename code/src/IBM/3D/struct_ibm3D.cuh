@@ -2,8 +2,12 @@
 # ifndef STRUCT_IBM3D_H
 # define STRUCT_IBM3D_H
 
+# include "../../IO/read_ibm_information.cuh"
+# include "../../IO/write_vtk_output.cuh"
+# include "kernels_ibm3D.cuh"
 # include <cuda.h>
 # include <string>
+# include "../../Utils/helper_math.h"
 
 struct struct_ibm3D {
 	
@@ -14,35 +18,19 @@ struct struct_ibm3D {
 	bool facesFlag;
 		
 	// host arrays:
-	float* xH;
-	float* yH;
-	float* zH;
-	float* xH_start;
-	float* yH_start;
-	float* zH_start;
-	float* xH_end;
-	float* yH_end;
-	float* zH_end;
+	float3* rH;	
+	float3* rH_start;
+	float3* rH_end;
 	int* faceV1;
 	int* faceV2;
 	int* faceV3;
 		
 	// device arrays:
-	float* x;
-	float* y;
-	float* z;
-	float* x_start;
-	float* y_start;
-	float* z_start;
-	float* x_end;
-	float* y_end;
-	float* z_end;	
-	float* vx;
-	float* vy;
-	float* vz;
-	float* fx;
-	float* fy;
-	float* fz;	
+	float3* r;
+	float3* r_start;
+	float3* r_end;
+	float3* v;
+	float3* f;		
 	
 	// methods:
 	struct_ibm3D();

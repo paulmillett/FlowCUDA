@@ -73,6 +73,11 @@ __global__ void mcmp_update_particles_on_lattice_D2Q9(float* fA,
 			u[i] = partvx;
 			v[i] = partvy;
 			pIDgrid[i] = pID;
+			// zero all the populations			
+			for (int n=0; n<9; n++) {
+				fA[offst+n] = 0.0;
+				fB[offst+n] = 0.0;
+			}
 		}
 		
 		// fluid site becomes particle site (COVERING)
