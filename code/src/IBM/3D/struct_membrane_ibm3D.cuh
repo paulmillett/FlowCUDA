@@ -5,6 +5,7 @@
 # include "../../IO/read_ibm_information.cuh"
 # include "../../IO/write_vtk_output.cuh"
 # include "kernels_ibm3D.cuh"
+# include "kernels_membrane_ibm3D.cuh"
 # include <cuda.h>
 # include <string>
 # include "data.h"
@@ -43,7 +44,11 @@ struct struct_membrane_ibm3D {
 	void read_ibm_information(std::string);
 	void shift_node_positions(float,float,float);
 	void write_output(std::string,int);
-	void update_node_positions(int,int);	
+	void update_node_positions(int,int);
+	void interpolate_velocity(float*,float*,float*,int,int,int,int);
+	void extrapolate_force(float*,float*,float*,int,int,int,int);
+	void compute_node_forces(int,int);
+
 
 };
 

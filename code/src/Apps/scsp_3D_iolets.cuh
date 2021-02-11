@@ -3,7 +3,7 @@
 # define SCSP_3D_IOLETS_H
 
 # include "../Base/FlowBase.cuh"
-# include "../D3Q19/classes/scsp_D3Q19.cuh"
+# include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
 # include <cuda.h>
 # include <string>
 
@@ -23,7 +23,7 @@ private:
 	std::string vtkFormat;
 	
 	// scsp_D3Q19 object:
-	scsp_D3Q19 lbm;
+	class_scsp_D3Q19 lbm;
 	
 	
 public:

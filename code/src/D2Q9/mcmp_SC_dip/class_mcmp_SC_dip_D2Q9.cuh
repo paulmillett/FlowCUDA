@@ -7,16 +7,7 @@
 # include "../init/stream_index_builder_D2Q9.cuh"
 # include "../init/stream_index_builder_bb_D2Q9.cuh"
 # include "../../IO/write_vtk_output.cuh"
-# include "mcmp_collide_stream_dip_D2Q9.cuh"
-# include "mcmp_compute_SC_forces_dip_D2Q9.cuh"
-# include "mcmp_compute_density_dip_D2Q9.cuh"
-# include "mcmp_compute_velocity_dip_D2Q9.cuh"
-# include "mcmp_initial_equilibrium_dip_D2Q9.cuh"
-# include "mcmp_update_particles_on_lattice_dip_D2Q9.cuh"
-# include "mcmp_set_boundary_velocity_dip_D2Q9.cuh"
-# include "mcmp_move_particles_dip_D2Q9.cuh"
-# include "mcmp_zero_particle_forces_dip_D2Q9.cuh"
-# include "particle2D_dip.cuh"
+# include "kernels_mcmp_SC_dip_D2Q9.cuh"
 # include <cuda.h>
 # include <string>
 
@@ -108,13 +99,14 @@ public:
 	float getPrOuter(int);
 	void initial_equilibrium_dip(int,int);
 	void compute_density_dip(int,int);
-	void update_particles_on_lattice_dip(int,int);
+	void map_particles_to_lattice_dip(int,int);
 	void compute_SC_forces_dip(int,int);
 	void compute_velocity_dip(int,int);
 	void set_boundary_velocity_dip(int,int);
 	void collide_stream_dip(int,int);
 	void zero_particle_forces_dip(int,int);
 	void move_particles_dip(int,int);
+	void fix_particle_velocity_dip(float,int,int);
 	void swap_populations();	
 	
 	void write_output(std::string,int);

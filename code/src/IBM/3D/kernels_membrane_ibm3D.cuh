@@ -18,7 +18,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 	triangle*,
 	float3*,
 	float3*,
-	cell*,
+	edge*,
     float,
 	float,
     int);
@@ -57,4 +57,14 @@ __device__ inline void add_force_to_vertex(
 	const float3); 
 
 
-# endif  // KERNELS_IBM3D_H
+__global__ void zero_node_forces_IBM3D(
+    float3*,
+	int);
+	
+	
+__global__ void zero_cell_volumes_IBM3D(
+    cell*,
+	int);
+
+
+# endif  // KERNELS_MEMBRANE_IBM3D_H

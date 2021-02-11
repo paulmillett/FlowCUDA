@@ -216,7 +216,7 @@ void mcmp_2D_capbridge_dip::cycleForward(int stepsPerCycle, int currentCycle)
 		// update density fields:
 		// ------------------------------
 		
-		lbm.update_particles_on_lattice_dip(nBlocks,nThreads);
+		lbm.map_particles_to_lattice_dip(nBlocks,nThreads);
 		lbm.compute_density_dip(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 		
@@ -233,6 +233,7 @@ void mcmp_2D_capbridge_dip::cycleForward(int stepsPerCycle, int currentCycle)
 		// update particles:											   
 		// ------------------------------ 
 		
+		lbm.fix_particle_velocity_dip(0.005,nBlocks,nThreads);
 		lbm.move_particles_dip(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 				

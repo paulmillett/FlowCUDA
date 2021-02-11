@@ -1,16 +1,15 @@
 
-# ifndef MCMP_2D_PARTICLE_PSM_H
-# define MCMP_2D_PARTICLE_PSM_H
+# ifndef MCMP_2D_PARTICLE_DIP_H
+# define MCMP_2D_PARTICLE_DIP_H
 
 # include "../Base/FlowBase.cuh"
-# include "../D2Q9/classes/mcmp_D2Q9.cuh"
-# include "../D2Q9/particles/particles2D.cuh"
+# include "../D2Q9/mcmp_SC_dip/class_mcmp_SC_dip_D2Q9.cuh"
 # include <cuda.h>
 # include <string>
 
 
 
-class mcmp_2D_particle_psm : public FlowBase {
+class mcmp_2D_particle_dip : public FlowBase {
 	
 private:
 
@@ -23,23 +22,22 @@ private:
 	int nParts;
 	float tau;
 	float nu;
-	float gAB;
 	float rApart;
 	float rBpart;
 	std::string vtkFormat;
 	
 	// objects
-	mcmp_D2Q9 lbm;
-	particles2D parts;
+	class_mcmp_SC_dip_D2Q9 lbm;
+	
 		
 public:
 
-	mcmp_2D_particle_psm();
-	~mcmp_2D_particle_psm();
+	mcmp_2D_particle_dip();
+	~mcmp_2D_particle_dip();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 
 };
 
-# endif  // MCMP_2D_PARTICLE_PSM_H
+# endif  // MCMP_2D_PARTICLE_DIP_H

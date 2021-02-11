@@ -3,6 +3,7 @@
 
 
 
+
 // --------------------------------------------------------
 // IBM3D kernel to compute force on node based on the 
 // membrane model of Zavodszky et al (Frontiers in Physiology
@@ -17,7 +18,7 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 	float ka,
 	int nFaces)
 {
-	// define node:
+	// define face:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nFaces) {
@@ -78,7 +79,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 	float kb,
 	int nEdges)
 {
-	// define node:
+	// define edge:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nEdges) {
@@ -139,7 +140,7 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 	float kv,
 	int nFaces)
 {
-	// define node:
+	// define face:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nFaces) {
@@ -228,6 +229,36 @@ __device__ inline void add_force_to_vertex(
 	atomicAdd(&f.x,g.x);
 	atomicAdd(&f.y,g.y);
 	atomicAdd(&f.z,g.z);
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to zero node forces and cell volumes:
+// --------------------------------------------------------
+
+__global__ void zero_node_forces_IBM3D(
+	float3* vertF,	
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) vertF[i] = make_float3(0.0);
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to zero node forces and cell volumes:
+// --------------------------------------------------------
+
+__global__ void zero_cell_volumes_IBM3D(
+	cell* cells,	
+	int nCells)
+{
+	// define cell:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nCells) cells[i].vol = 0.0;
 }
 
 

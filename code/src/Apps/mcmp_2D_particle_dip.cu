@@ -1,5 +1,5 @@
 
-# include "mcmp_2D_particle_psm.cuh"
+# include "mcmp_2D_particle_dip.cuh"
 # include "../IO/GetPot"
 # include <math.h>
 # include <string> 
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-mcmp_2D_particle_psm::mcmp_2D_particle_psm() : lbm(), parts()
+mcmp_2D_particle_dip::mcmp_2D_particle_dip() : lbm()
 {	
 	
 	// ----------------------------------------------
@@ -41,7 +41,6 @@ mcmp_2D_particle_psm::mcmp_2D_particle_psm() : lbm(), parts()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-	gAB = inputParams("LBM/gAB",6.0);
 		
 	// ----------------------------------------------
 	// Particles parameters:
@@ -62,7 +61,6 @@ mcmp_2D_particle_psm::mcmp_2D_particle_psm() : lbm(), parts()
 	// ----------------------------------------------
 	
 	lbm.allocate();
-	parts.allocate();	
 	
 }
 
@@ -72,10 +70,9 @@ mcmp_2D_particle_psm::mcmp_2D_particle_psm() : lbm(), parts()
 // Destructor:
 // --------------------------------------------------------
 
-mcmp_2D_particle_psm::~mcmp_2D_particle_psm()
+mcmp_2D_particle_dip::~mcmp_2D_particle_dip()
 {
 	lbm.deallocate();
-	parts.deallocate();	
 }
 
 
@@ -84,7 +81,7 @@ mcmp_2D_particle_psm::~mcmp_2D_particle_psm()
 // Initialize system:
 // --------------------------------------------------------
 
-void mcmp_2D_particle_psm::initSystem()
+void mcmp_2D_particle_dip::initSystem()
 {
 	
 	// ----------------------------------------------
@@ -99,35 +96,37 @@ void mcmp_2D_particle_psm::initSystem()
 	// ----------------------------------------------	
 	
 	lbm.create_lattice_box_periodic();	
-			
+	
+	// ----------------------------------------------			
+	// initialize particles: 
+	// ----------------------------------------------
+	
+	lbm.setPrx(0,100.5);
+	lbm.setPry(0,75.5);
+	lbm.setPrInner(0,20.0);
+	lbm.setPrOuter(0,25.0);	
+	
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------
-	
-	// particle's initial position:
-	parts.xH[0] = 100.5;
-	parts.yH[0] = 75.5;
-	parts.rInnerH[0] = 20.0;
-	parts.rOuterH[0] = 25.0;
-	
+		
 	// initialize solid field:
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {		
 			int ndx = j*Nx + i;	
 			lbm.setX(ndx,i);
 			lbm.setY(ndx,j);
-			lbm.setS(ndx,0);
-			float dx = float(i) - parts.xH[0];
-			float dy = float(j) - parts.yH[0];
+			float dx = float(i) - lbm.getPrx(0);
+			float dy = float(j) - lbm.getPry(0);
 			float rr = sqrt(dx*dx + dy*dy);
 			float Bi = 0.0;
-			if (rr <= parts.rOuterH[0]) {
-				if (rr < parts.rInnerH[0]) {
+			if (rr <= lbm.getPrOuter(0)) {
+				if (rr < lbm.getPrInner(0)) {
 					Bi = 1.0;
 				}
 				else {
-					float rsc = rr - parts.rInnerH[0];
-					Bi = 1.0 - rsc/(parts.rOuterH[0] - parts.rInnerH[0]);
+					float rsc = rr - lbm.getPrInner(0);
+					Bi = 1.0 - rsc/(lbm.getPrOuter(0) - lbm.getPrInner(0));
 				}
 			}	
 			//float ranA = (float)rand()/RAND_MAX;
@@ -163,13 +162,12 @@ void mcmp_2D_particle_psm::initSystem()
 	// ----------------------------------------------
 	
 	lbm.memcopy_host_to_device();
-	parts.memcopy_host_to_device();
 	
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
-	lbm.initial_equilibrium_psm(nBlocks,nThreads);
+	lbm.initial_equilibrium_dip(nBlocks,nThreads);
 		
 }
 
@@ -181,7 +179,7 @@ void mcmp_2D_particle_psm::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void mcmp_2D_particle_psm::cycleForward(int stepsPerCycle, int currentCycle)
+void mcmp_2D_particle_dip::cycleForward(int stepsPerCycle, int currentCycle)
 {
 	
 	// ----------------------------------------------
@@ -203,34 +201,31 @@ void mcmp_2D_particle_psm::cycleForward(int stepsPerCycle, int currentCycle)
 		// zero particle forces:
 		// ------------------------------
 		
-		parts.zero_forces(nBlocks,nThreads);
+		lbm.zero_particle_forces_dip(nBlocks,nThreads);
 		
 		// ------------------------------
 		// update density fields:
 		// ------------------------------
 		
-		lbm.update_particles_on_lattice_psm(parts.x,parts.y,parts.B,parts.rInner,parts.rOuter,
-		                                    parts.pIDgrid,nParts,nBlocks,nThreads);
-		lbm.compute_density_psm(nBlocks,nThreads);
+		lbm.map_particles_to_lattice_dip(nBlocks,nThreads);
+		lbm.compute_density_dip(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 		
 		// ------------------------------
 		// update fluid fields:											   
 		// ------------------------------ 
 		
-		lbm.compute_SC_forces_psm(parts.B,parts.fx,parts.fy,parts.pIDgrid,nBlocks,nThreads);
-		lbm.compute_velocity_psm(parts.vx,parts.vy,parts.fx,parts.fy,parts.B,parts.pIDgrid,nBlocks,nThreads);
-		
-		lbm.set_boundary_velocity_psm(nBlocks,nThreads);
-		
-		lbm.collide_stream_psm(parts.vx,parts.vy,parts.B,parts.pIDgrid,rApart,rBpart,nBlocks,nThreads);  		
+		lbm.compute_SC_forces_dip(nBlocks,nThreads);
+		lbm.compute_velocity_dip(nBlocks,nThreads);
+		lbm.set_boundary_velocity_dip(nBlocks,nThreads);
+		lbm.collide_stream_dip(nBlocks,nThreads);  		
 		lbm.swap_populations();	
 		
 		// ------------------------------
 		// update particles:											   
 		// ------------------------------ 
 		
-		parts.move_particles(nBlocks,nThreads);			
+		lbm.move_particles_dip(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 				
 	}
@@ -255,7 +250,7 @@ void mcmp_2D_particle_psm::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output:
 // --------------------------------------------------------
 
-void mcmp_2D_particle_psm::writeOutput(std::string tagname, int step)
+void mcmp_2D_particle_dip::writeOutput(std::string tagname, int step)
 {
 	
 	// ----------------------------------------------

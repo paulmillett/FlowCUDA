@@ -400,9 +400,9 @@ void class_mcmp_SC_dip_D2Q9::compute_density_dip(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,nVoxels);
 }
 
-void class_mcmp_SC_dip_D2Q9::update_particles_on_lattice_dip(int nBlocks, int nThreads)
+void class_mcmp_SC_dip_D2Q9::map_particles_to_lattice_dip(int nBlocks, int nThreads)
 {
-	mcmp_update_particles_on_lattice_dip_D2Q9
+	mcmp_map_particles_to_lattice_dip_D2Q9
 	<<<nBlocks,nThreads>>> (rS,pt,x,y,pIDgrid,nVoxels,nParts);
 } 
 
@@ -434,6 +434,12 @@ void class_mcmp_SC_dip_D2Q9::move_particles_dip(int nBlocks, int nThreads)
 {
 	mcmp_move_particles_dip_D2Q9
 	<<<nBlocks,nThreads>>> (pt,nParts);
+}
+
+void class_mcmp_SC_dip_D2Q9::fix_particle_velocity_dip(float pvel, int nBlocks, int nThreads)
+{
+	mcmp_fix_particle_velocity_dip_D2Q9
+	<<<nBlocks,nThreads>>> (pt,pvel,nParts);
 }
 
 void class_mcmp_SC_dip_D2Q9::zero_particle_forces_dip(int nBlocks, int nThreads)

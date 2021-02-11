@@ -153,6 +153,63 @@ void struct_membrane_ibm3D::update_node_positions(int nBlocks, int nThreads)
 
 
 
+// --------------------------------------------------------
+// Call to "interpolate_velocity_IBM3D" kernel:
+// --------------------------------------------------------
+
+void struct_membrane_ibm3D::interpolate_velocity(float* uLBM, float* vLBM, 
+	float* wLBM, int Nx, int Ny, int nBlocks, int nThreads)
+{
+	interpolate_velocity_IBM3D
+	<<<nBlocks,nThreads>>> (r,v,uLBM,vLBM,wLBM,Nx,Ny,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "extrapolate_force_IBM3D" kernel:
+// --------------------------------------------------------
+
+void struct_membrane_ibm3D::extrapolate_force(float* fxLBM, float* fyLBM, 
+	float* fzLBM, int Nx, int Ny, int nBlocks, int nThreads)
+{
+	extrapolate_force_IBM3D
+	<<<nBlocks,nThreads>>> (r,v,fxLBM,fyLBM,fzLBM,Nx,Ny,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on nodes based 
+// on the membrane mechanics model:
+// --------------------------------------------------------
+
+void struct_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
+{
+	// First, zero the nodes forces and the cell volumes:
+	zero_node_forces_IBM3D
+	<<<nBlocks,nThreads>>> (f,nNodes);
+	
+	zero_cell_volumes_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
+	// Second, compute the area dilation force for each face:
+	compute_node_force_membrane_area_IBM3D
+	<<<nBlocks,nThreads>>> (faces,r,f,cells,ka,nFaces);
+	
+	// Third, compute the edge extension and bending force for each edge:
+	compute_node_force_membrane_edge_IBM3D
+	<<<nBlocks,nThreads>>> (faces,r,f,edges,ks,kb,nEdges);
+	
+	// Last, compute the volume expansion force for each face:
+	compute_node_force_membrane_volume_IBM3D
+	<<<nBlocks,nThreads>>> (faces,f,cells,kv,nFaces);
+}
+
+
+
+
+
 
 
 

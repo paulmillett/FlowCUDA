@@ -1,12 +1,20 @@
 
-# ifndef SCSP_D3Q19_H
-# define SCSP_D3Q19_H
+# ifndef CLASS_SCSP_D3Q19_H
+# define CLASS_SCSP_D3Q19_H
 
+# include "../../Lattice/lattice_builders_D3Q19.cuh"
+# include "../../Lattice/bounding_box_nList_construct_D3Q19.cuh"
+# include "../init/stream_index_builder_D3Q19.cuh"
 # include "../iolets/boundary_condition_iolet.cuh"
+# include "../inout/inside_hemisphere_D3Q19.cuh"
+# include "../../IO/write_vtk_output.cuh"
+# include "../../IO/read_lattice_geometry.cuh"
+# include "../../IBM/3D/kernels_ibm3D.cuh"
+# include "kernels_scsp_D3Q19.cuh"
 # include <cuda.h>
 # include <string>
 
-class scsp_D3Q19 {
+class class_scsp_D3Q19 {
 	
 private:
 
@@ -59,8 +67,8 @@ private:
 	
 public:
 
-	scsp_D3Q19();
-	~scsp_D3Q19();
+	class_scsp_D3Q19();
+	~class_scsp_D3Q19();
 	void allocate();
 	void deallocate();
 	void allocate_forces();
@@ -111,4 +119,4 @@ public:
 
 };
 
-# endif  // SCSP_D3Q19_H
+# endif  // CLASS_SCSP_D3Q19_H
