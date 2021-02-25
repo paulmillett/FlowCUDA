@@ -491,6 +491,89 @@ void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
 // Write output in a VTK Structured Grid format (note: this is for 3D simulations):
 // -----------------------------------------------------------------------------------------
 
+void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY, int NZ,
+                               float* rA, float* rB, float* u, float* v, float* w,
+							   int iskip, int jskip, int kskip)
+{		
+	
+	// -----------------------------------------------
+	//	Define the file location and name:
+	// -----------------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------------------
+	
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing grid data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET STRUCTURED_POINTS" << endl;
+	outfile << "DIMENSIONS" << d << NX/iskip << d << NY/jskip << d << NZ/kskip << endl;	
+	outfile << "ORIGIN " << d << 0 << d << 0 << d << 0 << endl;
+	outfile << "SPACING" << d << 1.0*iskip << d << 1.0*jskip << d << 1.0*kskip << endl;	
+    outfile << " " << endl;
+    outfile << "POINT_DATA " << (NX/iskip)*(NY/jskip)*(NZ/kskip) << endl;
+    outfile << "SCALARS " << tagname << " float" << endl;
+    outfile << "LOOKUP_TABLE default" << endl;
+		
+	// -----------------------------------------------
+	// Write the 'rho' data:
+	// NOTE: x-data increases fastest,
+	//       then y-data
+	// -----------------------------------------------
+	
+	for (int k=0; k<NZ; k+=kskip) {
+		for (int j=0; j<NY; j+=jskip) {
+			for (int i=0; i<NX; i+=iskip) {
+				int ndx = k*NX*NY + j*NX + i;
+				float op = rA[ndx] - rB[ndx];
+				outfile << fixed << setprecision(3) << op << endl;
+			}
+		}
+	}	
+	
+	// -----------------------------------------------				
+	// Write the 'velocity' data:
+	// NOTE: x-data increases fastest,
+	//       then y-data	
+	// -----------------------------------------------
+	
+	outfile << "   " << endl;
+	outfile << "VECTORS Velocity float" << endl;		
+	for (int k=0; k<NZ; k+=kskip) {
+		for (int j=0; j<NY; j+=jskip) {
+			for (int i=0; i<NX; i+=iskip) {
+				int ndx = k*NX*NY + j*NX + i;
+				outfile << fixed << setprecision(3) << u[ndx] << " "
+					                                << v[ndx] << " " 
+													<< w[ndx] << endl;
+			}
+		}
+	}
+	
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+	
+	outfile.close();
+	
+}
+
+
+
+
+// -----------------------------------------------------------------------------------------
+// Write output in a VTK Structured Grid format (note: this is for 3D simulations):
+// -----------------------------------------------------------------------------------------
+
 void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
 	                           int NZ, int* iarray, float* u, float* v, float* w,
 							   int iskip, int jskip, int kskip)

@@ -3,7 +3,7 @@
 # define MCMP_2D_PARTICLE_BB_H
 
 # include "../Base/FlowBase.cuh"
-# include "../D2Q9/classes/mcmp_D2Q9.cuh"
+# include "../D2Q9/mcmp_SC_bb/class_mcmp_SC_bb_D2Q9.cuh"
 # include "../D2Q9/particles/particles2D.cuh"
 # include <cuda.h>
 # include <string>
@@ -29,7 +29,7 @@ private:
 	std::string vtkFormat;
 	
 	// objects
-	mcmp_D2Q9 lbm;
+	class_mcmp_SC_bb_D2Q9 lbm;
 	particles2D parts;
 		
 public:

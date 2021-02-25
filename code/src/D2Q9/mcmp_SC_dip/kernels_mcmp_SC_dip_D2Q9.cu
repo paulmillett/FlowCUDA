@@ -50,7 +50,8 @@ __global__ void mcmp_fix_particle_velocity_dip_D2Q9(particle2D_dip* pt,
 {
 	// define particle:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nParts) {		
+	if (i < nParts) {	
+		//printf("%f \n",pt[0].f.x);	
 		pt[i].f = make_float2(0.0);
 		if (i == 0) {
 			pt[i].v.x = -pvel;
@@ -130,7 +131,9 @@ __global__ void mcmp_map_particles_to_lattice_dip_D2Q9(float* rS,
 // D2Q9 set velocity on the y=0 and y=Ny-1 boundaries: 
 // --------------------------------------------------------
 
-__global__ void mcmp_set_boundary_velocity_dip_D2Q9(float* rA,
+__global__ void mcmp_set_boundary_velocity_dip_D2Q9(float uBC,
+                                                    float vBC,
+	                                                float* rA,
 										            float* rB,
 										            float* FxA,
 										            float* FxB,
@@ -147,8 +150,6 @@ __global__ void mcmp_set_boundary_velocity_dip_D2Q9(float* rA,
 	
 	if (i < nVoxels) {
 		if (y[i] == 0 || y[i] == Ny-1) {
-			float uBC = 0.05;
-			float vBC = 0.00;
 			float rTotal = rA[i] + rB[i];
 			float fxBC = (uBC - u[i])*2.0*rTotal;
 			float fyBC = (vBC - v[i])*2.0*rTotal;
@@ -246,7 +247,9 @@ __global__ void mcmp_initial_equilibrium_dip_D2Q9(float* fA,
 
 
 // --------------------------------------------------------
-// D2Q9 compute velocity (barycentric) for the system: 
+// D2Q9 compute velocity (barycentric) for the system.
+// Here, the fluid velocity is calculated as normal, but
+// it is amended to match the particle velocity.
 // --------------------------------------------------------
 
 __global__ void mcmp_compute_velocity_dip_D2Q9(float* fA,
@@ -296,6 +299,60 @@ __global__ void mcmp_compute_velocity_dip_D2Q9(float* fA,
 			atomicAdd(&pt[pID].f.x, -partfx);
 			atomicAdd(&pt[pID].f.y, -partfy);			
 		}							
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 compute velocity (barycentric) for the system.
+// Here, the fluid velocity is calculated by incorporating
+// the particle velocity in the weighted sum.   
+// -------------------------------------------------------- 
+
+__global__ void mcmp_compute_velocity_dip_2_D2Q9(float* fA,
+                                                 float* fB,
+										         float* rA,
+										         float* rB,
+											     float* rS,
+										         float* FxA,
+										         float* FxB,
+										         float* FyA,
+										         float* FyB,
+										         float* u,
+										         float* v,											   
+											     particle2D_dip* pt,											   
+											     int* pIDgrid,
+										         int nVoxels) 
+{
+	// define current voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {
+		// barycentric velocity		
+		int offst = i*9;			
+		float uA = fA[offst+1] + fA[offst+5] + fA[offst+8] - (fA[offst+3] + fA[offst+6] + fA[offst+7]) + 0.5*FxA[i];
+		float uB = fB[offst+1] + fB[offst+5] + fB[offst+8] - (fB[offst+3] + fB[offst+6] + fB[offst+7]) + 0.5*FxB[i];
+		float vA = fA[offst+2] + fA[offst+5] + fA[offst+6] - (fA[offst+4] + fA[offst+7] + fA[offst+8]) + 0.5*FyA[i];
+		float vB = fB[offst+2] + fB[offst+5] + fB[offst+6] - (fB[offst+4] + fB[offst+7] + fB[offst+8]) + 0.5*FyB[i];
+		float rTotal = rA[i] + rB[i] + rS[i];
+		// include contribution from particles:
+		float rSVx = 0.0;
+		float rSVy = 0.0;
+		int pID = pIDgrid[i]; 
+		if (pID >= 0) {
+			rSVx = rS[i]*pt[pID].v.x;
+			rSVy = rS[i]*pt[pID].v.y;
+		}
+		u[i] = (uA + uB + rSVx)/rTotal;
+		v[i] = (vA + vB + rSVy)/rTotal;		
+		// add force to particles:
+		if (pID > -1) {
+			float pFx = 2.0*rS[i]*(u[i] - pt[pID].v.x);
+			float pFy = 2.0*rS[i]*(v[i] - pt[pID].v.y);
+			atomicAdd(&pt[pID].f.x, pFx);
+			atomicAdd(&pt[pID].f.y, pFy);
+		}
 	}
 }
 

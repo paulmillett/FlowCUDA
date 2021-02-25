@@ -213,7 +213,7 @@ void mcmp_2D_dropsurface_bb::cycleForward(int stepsPerCycle, int currentCycle)
 		lbm.compute_velocity_bb(nBlocks,nThreads);
 		lbm.collide_stream_bb(nBlocks,nThreads);
 		lbm.bounce_back(nBlocks,nThreads);
-		lbm.swap_populations();				
+		lbm.swap_populations();	 			
 		cudaDeviceSynchronize();
 				
 	}

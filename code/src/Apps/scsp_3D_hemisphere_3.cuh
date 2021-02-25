@@ -4,7 +4,7 @@
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
-# include "../IBM/3D/struct_ibm3D.cuh"
+# include "../IBM/3D/class_ibm3D.cuh"
 # include <cuda.h>
 # include <string>
 
@@ -30,7 +30,7 @@ private:
 	
 	// objects:
 	class_scsp_D3Q19 lbm;
-	struct_ibm3D ibm;
+	class_ibm3D ibm;
 		
 public:
 

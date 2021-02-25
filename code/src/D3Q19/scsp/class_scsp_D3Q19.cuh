@@ -2,8 +2,8 @@
 # ifndef CLASS_SCSP_D3Q19_H
 # define CLASS_SCSP_D3Q19_H
 
-# include "../../Lattice/lattice_builders_D3Q19.cuh"
-# include "../../Lattice/bounding_box_nList_construct_D3Q19.cuh"
+# include "../init/lattice_builders_D3Q19.cuh"
+# include "../init/bounding_box_nList_construct_D3Q19.cuh"
 # include "../init/stream_index_builder_D3Q19.cuh"
 # include "../iolets/boundary_condition_iolet.cuh"
 # include "../inout/inside_hemisphere_D3Q19.cuh"

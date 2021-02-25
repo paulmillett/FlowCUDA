@@ -1,7 +1,7 @@
 # ifndef WRITE_VTK_OUTPUT_H
 # define WRITE_VTK_OUTPUT_H
 
-# include "../IBM/3D/data.h"
+# include "../IBM/3D/membrane_data.h"
 # include <string>
 
 
@@ -25,6 +25,9 @@ void write_vtk_structured_grid(std::string,int,int,int,int,float*,
 							   														  							   
 void write_vtk_structured_grid(std::string,int,int,int,int,float*,
                                float*,float*,float*,int,int,int);
+							   
+void write_vtk_structured_grid(std::string,int,int,int,int,float*,
+                               float*,float*,float*,float*,int,int,int);
 							   
 void write_vtk_structured_grid(std::string,int,int,int,int,int*,
 							   float*,float*,float*,int,int,int);

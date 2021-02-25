@@ -124,7 +124,6 @@ void mcmp_2D_capbridge_psm::initSystem()
 			int ndx = j*Nx + i;	
 			lbm.setX(ndx,i);
 			lbm.setY(ndx,j);
-			lbm.setS(ndx,0);
 			float Bi = 0.0;
 			for (int k=0; k<nParts; k++) {
 				float dx = float(i) - parts.xH[k];

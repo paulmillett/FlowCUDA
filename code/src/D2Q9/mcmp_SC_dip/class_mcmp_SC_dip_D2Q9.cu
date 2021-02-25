@@ -167,6 +167,17 @@ void class_mcmp_SC_dip_D2Q9::memcopy_device_to_host()
 
 
 // --------------------------------------------------------
+// Copy arrays from device to host:
+// --------------------------------------------------------
+
+void class_mcmp_SC_dip_D2Q9::memcopy_device_to_host_particles()
+{
+    cudaMemcpy(ptH, pt, sizeof(particle2D_dip)*nParts, cudaMemcpyDeviceToHost);
+}
+
+
+
+// --------------------------------------------------------
 // Initialize lattice as a "box":
 // --------------------------------------------------------
 
@@ -372,6 +383,16 @@ float class_mcmp_SC_dip_D2Q9::getPry(int i)
 	return ptH[i].r.y;
 }
 
+float class_mcmp_SC_dip_D2Q9::getPfx(int i)
+{
+	return ptH[i].f.x;
+}
+
+float class_mcmp_SC_dip_D2Q9::getPfy(int i)
+{
+	return ptH[i].f.y;
+}
+
 float class_mcmp_SC_dip_D2Q9::getPrInner(int i)
 {
 	return ptH[i].rInner;
@@ -418,10 +439,16 @@ void class_mcmp_SC_dip_D2Q9::compute_velocity_dip(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,rS,FxA,FxB,FyA,FyB,u,v,pt,pIDgrid,nVoxels);
 }
 
-void class_mcmp_SC_dip_D2Q9::set_boundary_velocity_dip(int nBlocks, int nThreads)
+void class_mcmp_SC_dip_D2Q9::compute_velocity_dip_2(int nBlocks, int nThreads)
+{
+	mcmp_compute_velocity_dip_2_D2Q9 
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,rS,FxA,FxB,FyA,FyB,u,v,pt,pIDgrid,nVoxels);
+}
+
+void class_mcmp_SC_dip_D2Q9::set_boundary_velocity_dip(float uBC, float vBC, int nBlocks, int nThreads)
 {
 	mcmp_set_boundary_velocity_dip_D2Q9 
-	<<<nBlocks,nThreads>>> (rA,rB,FxA,FxB,FyA,FyB,u,v,y,Ny,nVoxels);
+	<<<nBlocks,nThreads>>> (uBC,vBC,rA,rB,FxA,FxB,FyA,FyB,u,v,y,Ny,nVoxels);
 }
 
 void class_mcmp_SC_dip_D2Q9::collide_stream_dip(int nBlocks, int nThreads)
@@ -457,8 +484,8 @@ void class_mcmp_SC_dip_D2Q9::zero_particle_forces_dip(int nBlocks, int nThreads)
 void class_mcmp_SC_dip_D2Q9::write_output(std::string tagname, int step)
 {
 	write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH);
-	write_vtk_structured_grid_2D("rA",step,Nx,Ny,Nz,rAH,uH,vH);
-	write_vtk_structured_grid_2D("rB",step,Nx,Ny,Nz,rBH,uH,vH);
+	//write_vtk_structured_grid_2D("rA",step,Nx,Ny,Nz,rAH,uH,vH);
+	//write_vtk_structured_grid_2D("rB",step,Nx,Ny,Nz,rBH,uH,vH);
 }
 
 

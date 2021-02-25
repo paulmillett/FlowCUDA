@@ -1,8 +1,8 @@
 # ifndef KERNELS_MEMBRANE_IBM3D_H
 # define KERNELS_MEMBRANE_IBM3D_H
-# include "data.h"
-# include <cuda.h>
 # include "../../Utils/helper_math.h"
+# include "membrane_data.h"
+# include <cuda.h>
 
 
 __global__ void compute_node_force_membrane_area_IBM3D(

@@ -4,8 +4,8 @@
 
 # include "../Base/FlowBase.cuh"
 # include "../D2Q9/iolets/boundary_condition_iolet.cuh"
-# include "../D2Q9/classes/scsp_D2Q9.cuh"
-# include "../IBM/2D/struct_ibm2D.cuh"
+# include "../D2Q9/scsp/class_scsp_D2Q9.cuh"
+# include "../IBM/2D/class_ibm2D.cuh"
 # include <cuda.h>
 # include <string>
 
@@ -28,8 +28,8 @@ private:
 	std::string vtkFormat;
 	
 	// objects:
-	scsp_D2Q9 lbm;
-	struct_ibm2D ibm;
+	class_scsp_D2Q9 lbm;
+	class_ibm2D ibm;
 	
 public:
 

@@ -3,17 +3,11 @@
 # define CLASS_MCMP_SC_PSM_D2Q9_H
 
 # include "../iolets/boundary_condition_iolet.cuh"
-# include "../../Lattice/lattice_builders_D2Q9.cuh"
+# include "../init/lattice_builders_D2Q9.cuh"
 # include "../init/stream_index_builder_D2Q9.cuh"
 # include "../init/stream_index_builder_bb_D2Q9.cuh"
 # include "../../IO/write_vtk_output.cuh"
-# include "mcmp_collide_stream_psm_D2Q9.cuh"
-# include "mcmp_compute_SC_forces_psm_D2Q9.cuh"
-# include "mcmp_compute_density_psm_D2Q9.cuh"
-# include "mcmp_compute_velocity_psm_D2Q9.cuh"
-# include "mcmp_initial_equilibrium_psm_D2Q9.cuh"
-# include "mcmp_update_particles_on_lattice_psm_D2Q9.cuh"
-# include "mcmp_set_boundary_velocity_psm_D2Q9.cuh"
+# include "kernels_mcmp_SC_psm_D2Q9.cuh"
 # include <cuda.h>
 # include <string>
 

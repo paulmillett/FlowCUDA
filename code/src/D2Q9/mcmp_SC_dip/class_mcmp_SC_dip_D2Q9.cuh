@@ -3,7 +3,7 @@
 # define CLASS_MCMP_SC_DIP_D2Q9_H
 
 # include "../iolets/boundary_condition_iolet.cuh"
-# include "../../Lattice/lattice_builders_D2Q9.cuh"
+# include "../init/lattice_builders_D2Q9.cuh"
 # include "../init/stream_index_builder_D2Q9.cuh"
 # include "../init/stream_index_builder_bb_D2Q9.cuh"
 # include "../../IO/write_vtk_output.cuh"
@@ -72,6 +72,7 @@ public:
 	void deallocate();
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
+	void memcopy_device_to_host_particles();
 	void create_lattice_box();
 	void create_lattice_box_periodic();
 	void create_lattice_file();
@@ -95,6 +96,8 @@ public:
 	float getRB(int);
 	float getPrx(int);
 	float getPry(int);
+	float getPfx(int);
+	float getPfy(int);
 	float getPrInner(int);
 	float getPrOuter(int);
 	void initial_equilibrium_dip(int,int);
@@ -102,7 +105,8 @@ public:
 	void map_particles_to_lattice_dip(int,int);
 	void compute_SC_forces_dip(int,int);
 	void compute_velocity_dip(int,int);
-	void set_boundary_velocity_dip(int,int);
+	void compute_velocity_dip_2(int,int);
+	void set_boundary_velocity_dip(float,float,int,int);
 	void collide_stream_dip(int,int);
 	void zero_particle_forces_dip(int,int);
 	void move_particles_dip(int,int);

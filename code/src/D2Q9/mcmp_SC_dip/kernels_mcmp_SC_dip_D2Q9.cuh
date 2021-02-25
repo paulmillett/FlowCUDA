@@ -50,6 +50,8 @@ __global__ void mcmp_map_particles_to_lattice_dip_D2Q9(
 
 
 __global__ void mcmp_set_boundary_velocity_dip_D2Q9(
+	float,
+	float,
 	float*,
 	float*,
 	float*,
@@ -74,6 +76,23 @@ __global__ void mcmp_initial_equilibrium_dip_D2Q9(
 
 
 __global__ void mcmp_compute_velocity_dip_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	particle2D_dip*,
+	int*,
+	int);
+	
+	
+__global__ void mcmp_compute_velocity_dip_2_D2Q9(
 	float*,
 	float*,
 	float*,

@@ -216,8 +216,8 @@ void mcmp_2D_particle_dip::cycleForward(int stepsPerCycle, int currentCycle)
 		// ------------------------------ 
 		
 		lbm.compute_SC_forces_dip(nBlocks,nThreads);
-		lbm.compute_velocity_dip(nBlocks,nThreads);
-		lbm.set_boundary_velocity_dip(nBlocks,nThreads);
+		lbm.compute_velocity_dip_2(nBlocks,nThreads);
+		lbm.set_boundary_velocity_dip(0.05,0.00,nBlocks,nThreads);
 		lbm.collide_stream_dip(nBlocks,nThreads);  		
 		lbm.swap_populations();	
 		

@@ -1,0 +1,8 @@
+# ifndef LATTICE_BUILDERS_D3Q19_H
+# define LATTICE_BUILDERS_D3Q19_H
+
+void build_box_lattice_D3Q19(int,int,int,int,int*,int*);
+void build_box_lattice_D3Q19(int,int,int,int,int,int,int,int,int,int,int,int*,int*);
+int voxel_index(int,int,int,int,int,int);
+
+# endif  // LATTICE_BUILDERS_D3Q19_H

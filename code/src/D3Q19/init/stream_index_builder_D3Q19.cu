@@ -6,6 +6,41 @@
 // --------------------------------------------------------
 // Build the streamIndex[] array, which stores the indices
 // of the streaming populations of neighboring voxels:
+// Note: this is for "PUSH" streaming!
+// --------------------------------------------------------
+
+void stream_index_push_D3Q19(int nVoxels, int* nListDir, int* streamIndex)
+{		
+	int Q = 19;
+	for (int i=0; i<nVoxels; i++) {
+		int offst = i*Q;
+		streamIndex[offst+0] = offst;                      // dir-0 (no streaming)
+		streamIndex[offst+1] = Q*nListDir[offst + 1] + 1;  // dir-1 streamed to nbr 1
+		streamIndex[offst+2] = Q*nListDir[offst + 2] + 2;  // dir-2 streamed to nbr 2
+		streamIndex[offst+3] = Q*nListDir[offst + 3] + 3;  // dir-3 streamed to nbr 3
+		streamIndex[offst+4] = Q*nListDir[offst + 4] + 4;  // dir-4 streamed to nbr 4
+		streamIndex[offst+5] = Q*nListDir[offst + 5] + 5;  // dir-5 streamed to nbr 5
+		streamIndex[offst+6] = Q*nListDir[offst + 6] + 6;  // dir-6 streamed to nbr 6
+		streamIndex[offst+7] = Q*nListDir[offst + 7] + 7;  // dir-7 streamed to nbr 7
+		streamIndex[offst+8] = Q*nListDir[offst + 8] + 8;  // dir-8 streamed to nbr 8	
+		streamIndex[offst+9] = Q*nListDir[offst + 9] + 9;  // dir-9 streamed to nbr 9	
+		streamIndex[offst+10] = Q*nListDir[offst + 10] + 10;  // dir-10 streamed to nbr 10	
+		streamIndex[offst+11] = Q*nListDir[offst + 11] + 11;  // dir-11 streamed to nbr 11	
+		streamIndex[offst+12] = Q*nListDir[offst + 12] + 12;  // dir-12 streamed to nbr 12	
+		streamIndex[offst+13] = Q*nListDir[offst + 13] + 13;  // dir-13 streamed to nbr 13	
+		streamIndex[offst+14] = Q*nListDir[offst + 14] + 14;  // dir-14 streamed to nbr 14	
+		streamIndex[offst+15] = Q*nListDir[offst + 15] + 15;  // dir-15 streamed to nbr 15	
+		streamIndex[offst+16] = Q*nListDir[offst + 16] + 16;  // dir-16 streamed to nbr 16	
+		streamIndex[offst+17] = Q*nListDir[offst + 17] + 17;  // dir-17 streamed to nbr 17	
+		streamIndex[offst+18] = Q*nListDir[offst + 18] + 18;  // dir-18 streamed to nbr 18			
+	}				
+}
+
+
+
+// --------------------------------------------------------
+// Build the streamIndex[] array, which stores the indices
+// of the streaming populations of neighboring voxels:
 // Note: this is for "PULL" streaming!
 // --------------------------------------------------------
 

@@ -1,15 +1,10 @@
 
 # include "mcmp_2D_dropsurface.cuh"
-# include "../D2Q9/mcmp_SC/mcmp_initial_equilibrium_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC/mcmp_collide_stream_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC/mcmp_collide_stream_solid_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC/mcmp_compute_density_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC/mcmp_compute_SC_forces_solid_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC/mcmp_compute_velocity_solid_D2Q9.cuh"
-# include "../D2Q9/mcmp_SC/mcmp_compute_velocity_D2Q9.cuh"
+# include "../D2Q9/mcmp_SC/kernels_mcmp_SC_D2Q9.cuh"
+# include "../D2Q9/mcmp_SC/kernels_mcmp_SC_solid_D2Q9.cuh"
 # include "../D2Q9/init/stream_index_builder_D2Q9.cuh"
 # include "../D2Q9/particles/map_particles_to_grid_D2Q9.cuh"
-# include "../Lattice/lattice_builders_D2Q9.cuh"
+# include "../D2Q9/init/lattice_builders_D2Q9.cuh"
 # include "../IO/GetPot"
 # include "../IO/write_vtk_output.cuh"
 # include <math.h>

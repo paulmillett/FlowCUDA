@@ -14,6 +14,7 @@
 # include "../Apps/mcmp_2D_particle_dip.cuh"
 # include "../Apps/mcmp_2D_capbridge_psm.cuh"
 # include "../Apps/mcmp_2D_capbridge_dip.cuh"
+# include "../Apps/mcmp_2D_drag_dip.cuh"
 # include "../Apps/scsp_2D_obstacle.cuh"
 # include "../Apps/scsp_2D_expand.cuh"
 # include "../Apps/scsp_2D_expand_2.cuh"
@@ -21,8 +22,10 @@
 # include "../Apps/scsp_3D_hemisphere_2.cuh"
 # include "../Apps/scsp_3D_hemisphere_3.cuh"
 # include "../Apps/scsp_3D_bulge.cuh"
+# include "../Apps/scsp_3D_capsule.cuh"
 # include "../Apps/scsp_3D_swell_ibm.cuh"
 # include "../Apps/scsp_3D_leftvent_ibm.cuh"
+# include "../Apps/mcmp_3D_capbridge_dip.cuh"
 
 
 
@@ -35,7 +38,7 @@
 FlowBase* FlowBase::FlowObjectFactory(string specifier)
 {
 
-	// -----------------------------------
+	// ----------------------------------- 
 	// return the requested object:
 	// -----------------------------------
 
@@ -49,6 +52,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "mcmp_2D_particle_dip") return new mcmp_2D_particle_dip();
 	if (specifier == "mcmp_2D_capbridge_psm") return new mcmp_2D_capbridge_psm();
 	if (specifier == "mcmp_2D_capbridge_dip") return new mcmp_2D_capbridge_dip();
+	if (specifier == "mcmp_2D_drag_dip") return new mcmp_2D_drag_dip();
 	if (specifier == "scsp_2D_obstacle") return new scsp_2D_obstacle();
 	if (specifier == "scsp_2D_expand") return new scsp_2D_expand();
 	if (specifier == "scsp_2D_expand_2") return new scsp_2D_expand_2();
@@ -56,8 +60,10 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_hemisphere_2") return new scsp_3D_hemisphere_2();
 	if (specifier == "scsp_3D_hemisphere_3") return new scsp_3D_hemisphere_3();
 	if (specifier == "scsp_3D_bulge") return new scsp_3D_bulge();
+	if (specifier == "scsp_3D_capsule") return new scsp_3D_capsule();
 	if (specifier == "scsp_3D_swell_ibm") return new scsp_3D_swell_ibm();
 	if (specifier == "scsp_3D_leftvent_ibm") return new scsp_3D_leftvent_ibm();
+	if (specifier == "mcmp_3D_capbridge_dip") return new mcmp_3D_capbridge_dip();
    
 	// -----------------------------------
 	// if input file doesn't have a 

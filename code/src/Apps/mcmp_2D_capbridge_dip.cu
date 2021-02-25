@@ -225,7 +225,7 @@ void mcmp_2D_capbridge_dip::cycleForward(int stepsPerCycle, int currentCycle)
 		// ------------------------------ 
 		
 		lbm.compute_SC_forces_dip(nBlocks,nThreads);
-		lbm.compute_velocity_dip(nBlocks,nThreads);
+		lbm.compute_velocity_dip_2(nBlocks,nThreads);
 		lbm.collide_stream_dip(nBlocks,nThreads);  		
 		lbm.swap_populations();	
 		
