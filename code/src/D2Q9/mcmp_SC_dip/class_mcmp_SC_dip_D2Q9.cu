@@ -59,6 +59,8 @@ void class_mcmp_SC_dip_D2Q9::allocate()
 	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));	
 	ioletsH = (iolet2D*)malloc(numIolets*sizeof(iolet2D));
 	ptH = (particle2D_dip*)malloc(nParts*sizeof(particle2D_dip));
+    pfxH = (float*)malloc(nVoxels*sizeof(float));
+	pfyH = (float*)malloc(nVoxels*sizeof(float));
 			
 	// allocate array memory (device):
 	cudaMalloc((void **) &u, nVoxels*sizeof(float));
@@ -82,6 +84,10 @@ void class_mcmp_SC_dip_D2Q9::allocate()
 	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));	
 	cudaMalloc((void **) &iolets, numIolets*sizeof(iolet2D));
 	cudaMalloc((void **) &pt, nParts*sizeof(particle2D_dip));	
+	cudaMalloc((void **) &pfx, nVoxels*sizeof(float));
+	cudaMalloc((void **) &pfy, nVoxels*sizeof(float));
+	
+	
 }
 
 
@@ -162,6 +168,8 @@ void class_mcmp_SC_dip_D2Q9::memcopy_device_to_host()
 	cudaMemcpy(rAH, rA, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(rBH, rB, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(ptH, pt, sizeof(particle2D_dip)*nParts, cudaMemcpyDeviceToHost);
+    cudaMemcpy(pfxH, pfx, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(pfyH, pfy, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 }
 
 
@@ -337,6 +345,16 @@ void class_mcmp_SC_dip_D2Q9::setPry(int i, float val)
 	ptH[i].r.y = val;
 }
 
+void class_mcmp_SC_dip_D2Q9::setPvx(int i, float val)
+{
+	ptH[i].v.x = val;
+}
+
+void class_mcmp_SC_dip_D2Q9::setPvy(int i, float val)
+{
+	ptH[i].v.y = val;
+}
+
 void class_mcmp_SC_dip_D2Q9::setPrInner(int i, float val)
 {
 	ptH[i].rInner = val;
@@ -430,7 +448,7 @@ void class_mcmp_SC_dip_D2Q9::map_particles_to_lattice_dip(int nBlocks, int nThre
 void class_mcmp_SC_dip_D2Q9::compute_SC_forces_dip(int nBlocks, int nThreads)
 {
 	mcmp_compute_SC_forces_dip_D2Q9 
-	<<<nBlocks,nThreads>>> (rA,rB,rS,FxA,FxB,FyA,FyB,pt,nList,pIDgrid,gAB,gAS,gBS,omega,nVoxels);	
+	<<<nBlocks,nThreads>>> (rA,rB,rS,FxA,FxB,FyA,FyB,pfx,pfy,pt,nList,pIDgrid,gAB,gAS,gBS,omega,nVoxels);	
 }
 
 void class_mcmp_SC_dip_D2Q9::compute_velocity_dip(int nBlocks, int nThreads)
@@ -483,7 +501,8 @@ void class_mcmp_SC_dip_D2Q9::zero_particle_forces_dip(int nBlocks, int nThreads)
 
 void class_mcmp_SC_dip_D2Q9::write_output(std::string tagname, int step)
 {
-	write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH);
+	//write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH);
+	write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,pfxH,pfyH);
 	//write_vtk_structured_grid_2D("rA",step,Nx,Ny,Nz,rAH,uH,vH);
 	//write_vtk_structured_grid_2D("rB",step,Nx,Ny,Nz,rBH,uH,vH);
 }

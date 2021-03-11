@@ -15,6 +15,7 @@
 # include "../Apps/mcmp_2D_capbridge_psm.cuh"
 # include "../Apps/mcmp_2D_capbridge_dip.cuh"
 # include "../Apps/mcmp_2D_drag_dip.cuh"
+# include "../Apps/mcmp_2D_drag_bb.cuh"
 # include "../Apps/scsp_2D_obstacle.cuh"
 # include "../Apps/scsp_2D_expand.cuh"
 # include "../Apps/scsp_2D_expand_2.cuh"
@@ -53,6 +54,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "mcmp_2D_capbridge_psm") return new mcmp_2D_capbridge_psm();
 	if (specifier == "mcmp_2D_capbridge_dip") return new mcmp_2D_capbridge_dip();
 	if (specifier == "mcmp_2D_drag_dip") return new mcmp_2D_drag_dip();
+	if (specifier == "mcmp_2D_drag_bb") return new mcmp_2D_drag_bb();
 	if (specifier == "scsp_2D_obstacle") return new scsp_2D_obstacle();
 	if (specifier == "scsp_2D_expand") return new scsp_2D_expand();
 	if (specifier == "scsp_2D_expand_2") return new scsp_2D_expand_2();

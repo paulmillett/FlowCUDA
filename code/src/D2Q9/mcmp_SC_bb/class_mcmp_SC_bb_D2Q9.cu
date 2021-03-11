@@ -20,6 +20,7 @@ class_mcmp_SC_bb_D2Q9::class_mcmp_SC_bb_D2Q9()
 	Nz = 1;
 	if (nVoxels != Nx*Ny*Nz) cout << "nVoxels does not match Nx, Ny, Nz!" << endl;
 	numIolets = inputParams("Lattice/numIolets",0);
+	nParts = inputParams("Particles/nParts",0);
 	nu = inputParams("LBM/nu",0.1666666);
 	gAB = inputParams("LBM/gAB",6.0);
 	gAS = inputParams("LBM/gAS",6.0);
@@ -57,6 +58,7 @@ void class_mcmp_SC_bb_D2Q9::allocate()
 	voxelTypeH = (int*)malloc(nVoxels*sizeof(int));
 	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));	
 	ioletsH = (iolet2D*)malloc(numIolets*sizeof(iolet2D));
+	ptH = (particle2D_bb*)malloc(nParts*sizeof(particle2D_bb));
 			
 	// allocate array memory (device):
 	cudaMalloc((void **) &u, nVoxels*sizeof(float));
@@ -71,13 +73,16 @@ void class_mcmp_SC_bb_D2Q9::allocate()
 	cudaMalloc((void **) &FxB, nVoxels*sizeof(float));
 	cudaMalloc((void **) &FyA, nVoxels*sizeof(float));
 	cudaMalloc((void **) &FyB, nVoxels*sizeof(float));
-	cudaMalloc((void **) &s, nVoxels*sizeof(int));	
+	cudaMalloc((void **) &s, nVoxels*sizeof(int));
+	cudaMalloc((void **) &sprev, nVoxels*sizeof(int));	
 	cudaMalloc((void **) &x, nVoxels*sizeof(int));	
 	cudaMalloc((void **) &y, nVoxels*sizeof(int));	
 	cudaMalloc((void **) &nList, nVoxels*Q*sizeof(int));	
 	cudaMalloc((void **) &voxelType, nVoxels*sizeof(int));
+	cudaMalloc((void **) &pIDgrid, nVoxels*sizeof(int));
 	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));	
 	cudaMalloc((void **) &iolets, numIolets*sizeof(iolet2D));	
+	cudaMalloc((void **) &pt, nParts*sizeof(particle2D_bb));
 }
 
 
@@ -99,7 +104,8 @@ void class_mcmp_SC_bb_D2Q9::deallocate()
 	free(nListH);
 	free(voxelTypeH);
 	free(streamIndexH);	
-	free(ioletsH);	
+	free(ioletsH);
+	free(ptH);	
 		
 	// free array memory (device):
 	cudaFree(u);
@@ -121,6 +127,7 @@ void class_mcmp_SC_bb_D2Q9::deallocate()
 	cudaFree(voxelType);
 	cudaFree(streamIndex);
 	cudaFree(iolets);
+	cudaFree(pt);
 }
 
 
@@ -142,6 +149,7 @@ void class_mcmp_SC_bb_D2Q9::memcopy_host_to_device()
 	cudaMemcpy(voxelType, voxelTypeH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
 	cudaMemcpy(streamIndex, streamIndexH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
 	cudaMemcpy(iolets, ioletsH, sizeof(iolet2D)*numIolets, cudaMemcpyHostToDevice);
+	cudaMemcpy(pt, ptH, sizeof(particle2D_bb)*nParts, cudaMemcpyHostToDevice);
 }
 
 
@@ -156,6 +164,18 @@ void class_mcmp_SC_bb_D2Q9::memcopy_device_to_host()
 	cudaMemcpy(vH, v, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(rAH, rA, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(rBH, rB, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(ptH, pt, sizeof(particle2D_bb)*nParts, cudaMemcpyDeviceToHost);
+}
+
+
+
+// --------------------------------------------------------
+// Copy arrays from device to host:
+// --------------------------------------------------------
+
+void class_mcmp_SC_bb_D2Q9::memcopy_device_to_host_particles()
+{
+    cudaMemcpy(ptH, pt, sizeof(particle2D_bb)*nParts, cudaMemcpyDeviceToHost);
 }
 
 
@@ -326,6 +346,36 @@ void class_mcmp_SC_bb_D2Q9::setVoxelType(int i, int val)
 	voxelTypeH[i] = val;
 }
 
+void class_mcmp_SC_bb_D2Q9::setPrx(int i, float val)
+{
+	ptH[i].r.x = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::setPry(int i, float val)
+{
+	ptH[i].r.y = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::setPvx(int i, float val)
+{
+	ptH[i].v.x = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::setPvy(int i, float val)
+{
+	ptH[i].v.y = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::setPrad(int i, float val)
+{
+	ptH[i].rad = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::setPmass(int i, float val)
+{
+	ptH[i].mass = val;
+}
+
 
 
 // --------------------------------------------------------
@@ -357,6 +407,36 @@ float class_mcmp_SC_bb_D2Q9::getRB(int i)
 	return rBH[i];
 }
 
+float class_mcmp_SC_bb_D2Q9::getPrx(int i)
+{
+	return ptH[i].r.x;
+}
+
+float class_mcmp_SC_bb_D2Q9::getPry(int i)
+{
+	return ptH[i].r.y;
+}
+
+float class_mcmp_SC_bb_D2Q9::getPfx(int i)
+{
+	return ptH[i].f.x;
+}
+
+float class_mcmp_SC_bb_D2Q9::getPfy(int i)
+{
+	return ptH[i].f.y;
+}
+
+float class_mcmp_SC_bb_D2Q9::getPrad(int i)
+{
+	return ptH[i].rad;
+}
+
+float class_mcmp_SC_bb_D2Q9::getPmass(int i)
+{
+	return ptH[i].mass;
+}
+
 
 
 // --------------------------------------------------------
@@ -369,11 +449,11 @@ void class_mcmp_SC_bb_D2Q9::initial_equilibrium_bb(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,u,v,nVoxels);	
 }
 
-void class_mcmp_SC_bb_D2Q9::initial_particles_on_lattice(float* prx, float* pry, float* prad, int* pIDgrid, 
-	int nParts, int nBlocks, int nThreads)
+void class_mcmp_SC_bb_D2Q9::map_particles_on_lattice_bb(int nBlocks, int nThreads)
 {
-	mcmp_initial_particles_on_lattice_D2Q9 
-	<<<nBlocks,nThreads>>> (prx,pry,prad,x,y,s,pIDgrid,nVoxels,nParts);	
+	sprev = s;
+	mcmp_map_particles_on_lattice_bb_D2Q9 
+	<<<nBlocks,nThreads>>> (pt,x,y,s,pIDgrid,nVoxels,nParts);	
 }
 
 void class_mcmp_SC_bb_D2Q9::compute_density_bb(int nBlocks, int nThreads)
@@ -382,11 +462,10 @@ void class_mcmp_SC_bb_D2Q9::compute_density_bb(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,nVoxels);
 }
 
-void class_mcmp_SC_bb_D2Q9::update_particles_on_lattice(float* prx, float* pry, float* pvx, float* pvy,
-	float* prad, int* pIDgrid, int nParts, int nBlocks, int nThreads)
+void class_mcmp_SC_bb_D2Q9::update_particles_on_lattice_bb(int nBlocks, int nThreads)
 {
 	mcmp_update_particles_on_lattice_D2Q9
-	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,u,v,prx,pry,pvx,pvy,prad,x,y,s,pIDgrid,nList,nVoxels,nParts);
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,u,v,pt,x,y,s,pIDgrid,nList,nVoxels,nParts);
 }
 
 void class_mcmp_SC_bb_D2Q9::compute_SC_forces_bb(int nBlocks, int nThreads)
@@ -399,6 +478,12 @@ void class_mcmp_SC_bb_D2Q9::compute_velocity_bb(int nBlocks, int nThreads)
 {
 	mcmp_compute_velocity_bb_D2Q9 
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,FxA,FxB,FyA,FyB,u,v,s,nVoxels);
+}
+
+void class_mcmp_SC_bb_D2Q9::set_boundary_velocity_bb(float uBC, float vBC, int nBlocks, int nThreads)
+{
+	mcmp_set_boundary_velocity_bb_D2Q9 
+	<<<nBlocks,nThreads>>> (uBC,vBC,rA,rB,FxA,FxB,FyA,FyB,u,v,y,Ny,nVoxels);
 }
 
 void class_mcmp_SC_bb_D2Q9::collide_stream_bb(int nBlocks, int nThreads)
@@ -416,7 +501,25 @@ void class_mcmp_SC_bb_D2Q9::bounce_back(int nBlocks, int nThreads)
 void class_mcmp_SC_bb_D2Q9::bounce_back_moving(int nBlocks, int nThreads)
 {
 	mcmp_bounce_back_moving_D2Q9
-	<<<nBlocks,nThreads>>> (f2A,f2B,rA,rB,u,v,s,nList,streamIndex,nVoxels);
+	<<<nBlocks,nThreads>>> (f2A,f2B,rA,rB,u,v,pt,pIDgrid,s,nList,streamIndex,nVoxels);
+}
+
+void class_mcmp_SC_bb_D2Q9::move_particles_bb(int nBlocks, int nThreads)
+{
+	mcmp_move_particles_bb_D2Q9
+	<<<nBlocks,nThreads>>> (pt,nParts);
+}
+
+void class_mcmp_SC_bb_D2Q9::fix_particle_velocity_bb(float pvel, int nBlocks, int nThreads)
+{
+	mcmp_fix_particle_velocity_bb_D2Q9
+	<<<nBlocks,nThreads>>> (pt,pvel,nParts);
+}
+
+void class_mcmp_SC_bb_D2Q9::zero_particle_forces_bb(int nBlocks, int nThreads)
+{
+	mcmp_zero_particle_forces_bb_D2Q9
+	<<<nBlocks,nThreads>>> (pt,nParts);
 }
 
 
@@ -428,8 +531,8 @@ void class_mcmp_SC_bb_D2Q9::bounce_back_moving(int nBlocks, int nThreads)
 void class_mcmp_SC_bb_D2Q9::write_output(std::string tagname, int step)
 {
 	write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH);
-	write_vtk_structured_grid_2D("rA",step,Nx,Ny,Nz,rAH,uH,vH);
-	write_vtk_structured_grid_2D("rB",step,Nx,Ny,Nz,rBH,uH,vH);
+	//write_vtk_structured_grid_2D("rA",step,Nx,Ny,Nz,rAH,uH,vH);
+	//write_vtk_structured_grid_2D("rB",step,Nx,Ny,Nz,rBH,uH,vH);
 }
 
 

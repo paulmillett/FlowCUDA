@@ -186,6 +186,22 @@ void mcmp_2D_basic::initSystem()
 		}
 	}
 	
+	if (initType == "layers") {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = j*Nx + i;
+				if (i < Nx/2) {
+					rAH[ndx] = 1.0;
+					rBH[ndx] = 0.0;					
+				}
+				if (i >= Nx/2) {
+					rAH[ndx] = 0.0;
+					rBH[ndx] = 1.0;	
+				}
+			}
+		}
+	}
+	
 	if (initType == "droplet") {
 		float rInner = inputParams("LBM/rInner",10.0);	
 		float rOuter = inputParams("LBM/rOuter",15.0);	
@@ -309,6 +325,7 @@ void mcmp_2D_basic::cycleForward(int stepsPerCycle, int currentCycle)
     cudaMemcpy(uH, u, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(vH, v, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(rAH, rA, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(rBH, rB, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(prH, pr, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	
 	// ----------------------------------------------
@@ -335,8 +352,9 @@ void mcmp_2D_basic::writeOutput(std::string tagname, int step)
 	// ----------------------------------------------
 	
 	if (vtkFormat == "structured") {
-		write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,prH,uH,vH);
-		//write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH);
+		write_vtk_structured_grid_2D("pressure",step,Nx,Ny,Nz,prH,uH,vH);
+		write_vtk_structured_grid_2D("rA",step,Nx,Ny,Nz,rAH,uH,vH);
+		write_vtk_structured_grid_2D("rB",step,Nx,Ny,Nz,rBH,uH,vH);
 	}
 	
 }

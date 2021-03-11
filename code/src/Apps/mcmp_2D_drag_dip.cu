@@ -65,7 +65,7 @@ mcmp_2D_drag_dip::mcmp_2D_drag_dip() : lbm()
 	lbm.allocate();
 	
 	// ----------------------------------------------
-	// delete "drag.dat" file from previous simulations:
+	// delete "drag.txt" file from previous simulations:
 	// ----------------------------------------------
 	
 	std::system("exec rm -rf drag.txt"); 
@@ -268,7 +268,7 @@ void mcmp_2D_drag_dip::cycleForward(int stepsPerCycle, int currentCycle)
 	writeOutput("macros",cummulativeSteps);	
 	
 	// ----------------------------------------------
-	// open file that stores drag force data:
+	// close file that stores drag force data:
 	// ----------------------------------------------
 	
 	outfile.close();

@@ -125,6 +125,8 @@ __global__ void mcmp_compute_SC_forces_dip_D2Q9(
 	float*,
 	float*,
 	float*,
+	float*,
+	float*,
 	particle2D_dip*,
 	int*,
 	int*,

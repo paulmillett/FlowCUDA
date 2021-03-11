@@ -18,8 +18,9 @@ __global__ void move_particles_2D(float* x,
 	// define voxel:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nParts) {		
+		
 		/*
-		if (i==1) printf("fx = %f \n",fx[i]); 
+		//if (i==1) printf("fx = %f \n",fx[i]); 
 		float pvel = 0.005;
 		if (i == 0) {
 			vx[i] = -pvel;
@@ -28,8 +29,10 @@ __global__ void move_particles_2D(float* x,
 		if (i == 1) {
 			vx[i] = pvel;
 			vy[i] = 0.00;
-		}	
+		}
 		*/	
+		vx[i] = 0.005;
+		vy[i] = 0.00;
 		x[i] += vx[i];  // assume dt = 1
 		y[i] += vy[i];
 	}

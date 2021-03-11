@@ -6,7 +6,66 @@
 
 
 // --------------------------------------------------------
-// D2Q9 initialize kernel: 
+// Zero particle forces:
+// --------------------------------------------------------
+
+__global__ void mcmp_zero_particle_forces_bb_D2Q9(particle2D_bb* pt,
+							                      int nParts)
+{
+	// define particle:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nParts) {		
+		pt[i].f = make_float2(0.0);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Update particle velocities and positions:
+// --------------------------------------------------------
+
+__global__ void mcmp_move_particles_bb_D2Q9(particle2D_bb* pt,
+   								            int nParts)
+{
+	// define particle:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nParts) {		
+		float2 a = pt[i].f/pt[i].mass;
+		pt[i].r += pt[i].v + 0.5*a;  // assume dt = 1
+		pt[i].v += a;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Fix particle velocity:
+// --------------------------------------------------------
+
+__global__ void mcmp_fix_particle_velocity_bb_D2Q9(particle2D_bb* pt,
+                                                   float pvel,
+   								                   int nParts)
+{
+	// define particle:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nParts) {	
+		pt[i].f = make_float2(0.0);
+		if (i == 0) {
+			pt[i].v.x = -pvel;
+			pt[i].v.y = 0.00;
+		}
+		if (i == 1) {
+			pt[i].v.x = pvel;
+			pt[i].v.y = 0.00;
+		}		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 initialize populations to equilibrium values: 
 // --------------------------------------------------------
 
 __global__ void mcmp_initial_equilibrium_bb_D2Q9(float* fA,
@@ -19,120 +78,102 @@ __global__ void mcmp_initial_equilibrium_bb_D2Q9(float* fA,
 {
 	// define current voxel:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
-	
-	// initialize populations to equilibrium values:
-	if (i < nVoxels) {	
-		
+	if (i < nVoxels) {			
 		int offst = 9*i;
-		const float w0 = 4.0/9.0;
-		const float ws = 1.0/9.0;
-		const float wd = 1.0/36.0;
-		const float omusq = 1.0 - 1.5*(u[i]*u[i] + v[i]*v[i]);
-		
-		// dir 0
-		float feq = w0*omusq;
-		fA[offst+0] = feq*rA[i];
-		fB[offst+0] = feq*rB[i];
-		
-		// dir 1
-		float evel = u[i];
-		feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-		fA[offst+1] = feq*rA[i];
-		fB[offst+1] = feq*rB[i];
-		
-		// dir 2
-		evel = v[i];
-		feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-		fA[offst+2] = feq*rA[i];
-		fB[offst+2] = feq*rB[i];
-		
-		// dir 3
-		evel = -u[i];
-		feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-		fA[offst+3] = feq*rA[i];
-		fB[offst+3] = feq*rB[i];
-		
-		// dir 4
-		evel = -v[i];
-		feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-		fA[offst+4] = feq*rA[i];
-		fB[offst+4] = feq*rB[i];
-		
-		// dir 5
-		evel = u[i] + v[i];
-		feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-		fA[offst+5] = feq*rA[i];
-		fB[offst+5] = feq*rB[i];
-		
-		// dir 6
-		evel = -u[i] + v[i];
-		feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-		fA[offst+6] = feq*rA[i];
-		fB[offst+6] = feq*rB[i];
-		
-		// dir 7
-		evel = -u[i] - v[i];
-		feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-		fA[offst+7] = feq*rA[i];
-		fB[offst+7] = feq*rB[i];
-		
-		// dir 8
-		evel = u[i] - v[i];
-		feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-		fA[offst+8] = feq*rA[i];
-		fB[offst+8] = feq*rB[i];
-				
+		equilibrium_populations_bb_D2Q9(fA,fB,rA[i],rB[i],u[i],v[i],offst);		
 	}
 }
 
 
 
 // --------------------------------------------------------
-// Map particles to grid by updating rS[] and pID[] arrays:
+// D2Q9 equilibirium populations: 
 // --------------------------------------------------------
 
-__global__ void mcmp_initial_particles_on_lattice_D2Q9(float* prx,
-                                                       float* pry,
-					  								   float* prad,
-                                                       int* x,
-										               int* y,
-													   int* s,									   
-										               int* pIDgrid,										   
-										               int nVoxels,
-										               int nParts)
+__device__ void equilibrium_populations_bb_D2Q9(float* fA,
+                                                float* fB,
+										        float rA,
+											    float rB,
+										        float u,
+										        float v,
+												int offst)
 {
+	const float w0 = 4.0/9.0;
+	const float ws = 1.0/9.0;
+	const float wd = 1.0/36.0;
+	const float omusq = 1.0 - 1.5*(u*u + v*v);	
+	// dir 0
+	float feq = w0*omusq;
+	fA[offst+0] = feq*rA;
+	fB[offst+0] = feq*rB;	
+	// dir 1
+	float evel = u;
+	feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
+	fA[offst+1] = feq*rA;
+	fB[offst+1] = feq*rB;	
+	// dir 2
+	evel = v;
+	feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
+	fA[offst+2] = feq*rA;
+	fB[offst+2] = feq*rB;	
+	// dir 3
+	evel = -u;
+	feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
+	fA[offst+3] = feq*rA;
+	fB[offst+3] = feq*rB;	
+	// dir 4
+	evel = -v;
+	feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
+	fA[offst+4] = feq*rA;
+	fB[offst+4] = feq*rB;	
+	// dir 5
+	evel = u + v;
+	feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
+	fA[offst+5] = feq*rA;
+	fB[offst+5] = feq*rB;	
+	// dir 6
+	evel = -u + v;
+	feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
+	fA[offst+6] = feq*rA;
+	fB[offst+6] = feq*rB;	
+	// dir 7
+	evel = -u - v;
+	feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
+	fA[offst+7] = feq*rA;
+	fB[offst+7] = feq*rB;	
+	// dir 8
+	evel = u - v;
+	feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
+	fA[offst+8] = feq*rA;
+	fB[offst+8] = feq*rB;
+}
 
+
+
+// --------------------------------------------------------
+// Map particles to grid by updating s[] and pIDgrid[]:
+// --------------------------------------------------------
+
+__global__ void mcmp_map_particles_on_lattice_bb_D2Q9(particle2D_bb* pt,
+                                                      int* x,
+						    		                  int* y,
+												      int* s,									   
+									                  int* pIDgrid,										   
+									                  int nVoxels,
+									                  int nParts)
+{
 	// define voxel:
-	int i = blockIdx.x*blockDim.x + threadIdx.x;
-		
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nVoxels) {
-		
-		// --------------------------------------------------	
 		// default values:
-		// --------------------------------------------------
-				
 		s[i] = 0;
 		pIDgrid[i] = -1;
-		
-		// --------------------------------------------------	
 		// loop over particles:
-		// --------------------------------------------------
-		
 		for (int j=0; j<nParts; j++) {
-			
-			// ---------------------------	
-			// distance to particle c.o.m:
-			// ---------------------------
-			
-			float dx = float(x[i]) - prx[j];
-			float dy = float(y[i]) - pry[j];
+			float dx = float(x[i]) - pt[j].r.x;
+			float dy = float(y[i]) - pt[j].r.y; 
 			float rr = sqrt(dx*dx + dy*dy);
-			
-			// ---------------------------	
-			// assign values:
-			// ---------------------------
-			
-			if (rr <= prad[j]) {
+			if (rr <= pt[j].rad) {
 				s[i] = 1;
 				pIDgrid[i] = j;	
 			}		
@@ -152,11 +193,7 @@ __global__ void mcmp_update_particles_on_lattice_D2Q9(float* fA,
 											          float* rB,
 										              float* u,
 										              float* v,
-													  float* prx,
-													  float* pry,
-													  float* pvx,
-													  float* pvy,
-													  float* prad,
+													  particle2D_bb* pt,
 													  int* x,
 													  int* y,
 													  int* s,
@@ -183,18 +220,18 @@ __global__ void mcmp_update_particles_on_lattice_D2Q9(float* fA,
 		// --------------------------------------------
 				
 		int s1 = 0;
-		int pID = 0;
+		int pID = -1;
 		float partvx = 0.0;
 		float partvy = 0.0;
 		for (int p=0; p<nParts; p++) {
-			float dx = float(x[i]) - prx[p];
-			float dy = float(y[i]) - pry[p];
+			float dx = float(x[i]) - pt[p].r.x;
+			float dy = float(y[i]) - pt[p].r.y;
 			float rp = sqrt(dx*dx + dy*dy);
-			if (rp <= prad[p]) {
+			if (rp <= pt[p].rad) {
 				s1 = 1;
 				pID = p;
-				partvx = pvx[p];
-				partvy = pvy[p];
+				partvx = pt[p].v.x;
+				partvy = pt[p].v.y;
 			}		
 		}
 		s[i] = s1;
@@ -236,8 +273,9 @@ __global__ void mcmp_update_particles_on_lattice_D2Q9(float* fA,
 		// particle site becomes fluid site (UNCOVERING)
 		else if (s0 == 1 && s1 == 0) {				
 			// assign voxel velocity with particle velocity
-			u[i] = pvx[pIDgrid[i]]; 
-			v[i] = pvy[pIDgrid[i]];
+			int pID = pIDgrid[i];
+			u[i] = pt[pID].v.x; 
+			v[i] = pt[pID].v.y;
 			pIDgrid[i] = -1;
 			// get average density of surrounding fluid sites:
 			int num_fluid_nabors = 0;
@@ -257,54 +295,8 @@ __global__ void mcmp_update_particles_on_lattice_D2Q9(float* fA,
 			}
 			// set populations to the equilibrium for the given
 			// velocity and density:
-			const float w0 = 4.0/9.0;
-			const float ws = 1.0/9.0;
-			const float wd = 1.0/36.0;
-			const float omusq = 1.0 - 1.5*(u[i]*u[i] + v[i]*v[i]);		
-			// dir 0
-			float feq = w0*omusq;
-			fA[offst+0] = feq*rA[i];
-			fB[offst+0] = feq*rB[i];		
-			// dir 1
-			float evel = u[i];
-			feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-			fA[offst+1] = feq*rA[i];
-			fB[offst+1] = feq*rB[i];		
-			// dir 2
-			evel = v[i];
-			feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-			fA[offst+2] = feq*rA[i];
-			fB[offst+2] = feq*rB[i];		
-			// dir 3
-			evel = -u[i];
-			feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-			fA[offst+3] = feq*rA[i];
-			fB[offst+3] = feq*rB[i];		
-			// dir 4
-			evel = -v[i];
-			feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-			fA[offst+4] = feq*rA[i];
-			fB[offst+4] = feq*rB[i];		
-			// dir 5
-			evel = u[i] + v[i];
-			feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-			fA[offst+5] = feq*rA[i];
-			fB[offst+5] = feq*rB[i];		
-			// dir 6
-			evel = -u[i] + v[i];
-			feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-			fA[offst+6] = feq*rA[i];
-			fB[offst+6] = feq*rB[i];		
-			// dir 7
-			evel = -u[i] - v[i];
-			feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-			fA[offst+7] = feq*rA[i];
-			fB[offst+7] = feq*rB[i];		
-			// dir 8
-			evel = u[i] - v[i];
-			feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-			fA[offst+8] = feq*rA[i];
-			fB[offst+8] = feq*rB[i];
+			equilibrium_populations_bb_D2Q9(fA,fB,rA[i],rB[i],u[i],v[i],offst);
+			
 		}				
 	}
 }
@@ -353,10 +345,48 @@ __global__ void mcmp_compute_velocity_bb_D2Q9(float* fA,
 		// --------------------------------------------------
 		
 		else if (s[i] == 1) {
-			//u[i] = 0.0;  // later, fill in with particle velocity
+			//u[i] = 0.005;  // later, fill in with particle velocity
 			//v[i] = 0.0;  
 		}
 					
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 set velocity on the y=0 and y=Ny-1 boundaries: 
+// --------------------------------------------------------
+
+__global__ void mcmp_set_boundary_velocity_bb_D2Q9(float uBC,
+                                                   float vBC,
+	                                               float* rA,
+										           float* rB,
+										           float* FxA,
+										           float* FxB,
+										           float* FyA,
+										           float* FyB,
+										           float* u,
+										           float* v,
+												   int* y,											        
+											       int Ny,
+										           int nVoxels) 
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {
+		if (y[i] == 0 || y[i] == Ny-1) {
+			float rTotal = rA[i] + rB[i];
+			float fxBC = (uBC - u[i])*2.0*rTotal;
+			float fyBC = (vBC - v[i])*2.0*rTotal;
+			u[i] += 0.5*fxBC/rTotal;
+			v[i] += 0.5*fyBC/rTotal;
+			FxA[i] += fxBC*(rA[i]/rTotal);
+			FxB[i] += fxBC*(rB[i]/rTotal);
+			FyA[i] += fyBC*(rA[i]/rTotal);
+			FyB[i] += fyBC*(rB[i]/rTotal);
+		}		
 	}
 }
 
@@ -741,6 +771,8 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 											 float* rB,
 											 float* u,
 											 float* v,
+											 particle2D_bb* pt,
+											 int* pIDgrid,
 									         int* s,
 									         int* nList,									  
 									         int* streamIndex,
@@ -759,79 +791,155 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 		// --------------------------------------------------
 		
 		if (s[i] == 1) {
-			
+						
 			int offst = 9*i;
+			int pID = pIDgrid[i];
 			const float ws = 1.0/9.0;
 			const float wd = 1.0/36.0;
+			float meF2S  = 0.0;  // momentum exchange fluid to solid
+			float meF2Sx = 0.0;  // momentum exchange fluid to solid (x)
+			float meF2Sy = 0.0;  // momentum exchange fluid to solid (y)
 						
 			// dir 1 bounce-back to nabor 3 as dir 3:
 			if (s[nList[offst+3]] == 0) {
+				// bounce-back
 				float evel = u[i];
 				f2A[streamIndex[offst+3]] = f2A[offst+1] - 6.0*ws*rA[nList[offst+3]]*evel;
 				f2B[streamIndex[offst+3]] = f2B[offst+1] - 6.0*ws*rB[nList[offst+3]]*evel;
+				// momentum exchange to particle
+				meF2S = 2.0*f2A[offst+1] - 6.0*ws*rA[nList[offst+3]]*evel + 
+					    2.0*f2B[offst+1] - 6.0*ws*rB[nList[offst+3]]*evel;
+				meF2Sx = meF2S;
+				meF2Sy = 0.0;
+				atomicAdd(&pt[pID].f.x, meF2Sx);
+				atomicAdd(&pt[pID].f.y, meF2Sy);
+				// zero populations inside particle				
 				f2A[offst+1] = 0.0;
-				f2B[offst+1] = 0.0;
+				f2B[offst+1] = 0.0;				
 			}
 			
 			// dir 2 bounce-back to nabor 4 as dir 4:
 			if (s[nList[offst+4]] == 0) {
+				// bounce-back
 				float evel = v[i];
 				f2A[streamIndex[offst+4]] = f2A[offst+2] - 6.0*ws*rA[nList[offst+4]]*evel;
 				f2B[streamIndex[offst+4]] = f2B[offst+2] - 6.0*ws*rB[nList[offst+4]]*evel;
+				// momentum exchange to particle
+				meF2S = 2.0*f2A[offst+2] - 6.0*ws*rA[nList[offst+4]]*evel + 
+					    2.0*f2B[offst+2] - 6.0*ws*rB[nList[offst+4]]*evel;
+				meF2Sx = 0.0;
+				meF2Sy = meF2S;
+				atomicAdd(&pt[pID].f.x, meF2Sx);
+				atomicAdd(&pt[pID].f.y, meF2Sy);
+				// zero populations inside particle	
 				f2A[offst+2] = 0.0;
 				f2B[offst+2] = 0.0;
 			}
 			
 			// dir 3 bounce-back to nabor 1 as dir 1:
 			if (s[nList[offst+1]] == 0) {
+				// bounce-back
 				float evel = -u[i];
 				f2A[streamIndex[offst+1]] = f2A[offst+3] - 6.0*ws*rA[nList[offst+1]]*evel;
 				f2B[streamIndex[offst+1]] = f2B[offst+3] - 6.0*ws*rB[nList[offst+1]]*evel;
+				// momentum exchange to particle
+				meF2S = 2.0*f2A[offst+3] - 6.0*ws*rA[nList[offst+1]]*evel + 
+					    2.0*f2B[offst+3] - 6.0*ws*rB[nList[offst+1]]*evel;
+				meF2Sx = -meF2S;
+				meF2Sy = 0.0;
+				atomicAdd(&pt[pID].f.x, meF2Sx);
+				atomicAdd(&pt[pID].f.y, meF2Sy);	
+				// zero populations inside particle
 				f2A[offst+3] = 0.0;
 				f2B[offst+3] = 0.0;
 			}
 			
 			// dir 4 bounce-back to nabor 2 as dir 2:
 			if (s[nList[offst+2]] == 0) {
+				// bounce-back
 				float evel = -v[i];
 				f2A[streamIndex[offst+2]] = f2A[offst+4] - 6.0*ws*rA[nList[offst+2]]*evel;
 				f2B[streamIndex[offst+2]] = f2B[offst+4] - 6.0*ws*rB[nList[offst+2]]*evel;
+				// momentum exchange to particle
+				meF2S = 2.0*f2A[offst+4] - 6.0*ws*rA[nList[offst+2]]*evel + 
+					    2.0*f2B[offst+4] - 6.0*ws*rB[nList[offst+2]]*evel;
+				meF2Sx = 0.0;  
+				meF2Sy = -meF2S;
+				atomicAdd(&pt[pID].f.x, meF2Sx);
+				atomicAdd(&pt[pID].f.y, meF2Sy);	
+				// zero populations inside particle
 				f2A[offst+4] = 0.0;
 				f2B[offst+4] = 0.0;
 			}
 			
 			// dir 5 bounce-back to nabor 7 as dir 7:
 			if (s[nList[offst+7]] == 0) {
+				// bounce-back
 				float evel = u[i] + v[i];
 				f2A[streamIndex[offst+7]] = f2A[offst+5] - 6.0*wd*rA[nList[offst+7]]*evel;
 				f2B[streamIndex[offst+7]] = f2B[offst+5] - 6.0*wd*rB[nList[offst+7]]*evel;
+				// momentum exchange to particle
+				meF2S = 2.0*f2A[offst+5] - 6.0*wd*rA[nList[offst+7]]*evel + 
+					    2.0*f2B[offst+5] - 6.0*wd*rB[nList[offst+7]]*evel;  
+				meF2Sx = meF2S;  
+				meF2Sy = meF2S;
+				atomicAdd(&pt[pID].f.x, meF2Sx);
+				atomicAdd(&pt[pID].f.y, meF2Sy);	
+				// zero populations inside particle
 				f2A[offst+5] = 0.0;
 				f2B[offst+5] = 0.0;
 			}
 			
 			// dir 6 bounce-back to nabor 8 as dir 8:
 			if (s[nList[offst+8]] == 0) {
+				// bounce-back
 				float evel = -u[i] + v[i];
 				f2A[streamIndex[offst+8]] = f2A[offst+6] - 6.0*wd*rA[nList[offst+8]]*evel;
 				f2B[streamIndex[offst+8]] = f2B[offst+6] - 6.0*wd*rB[nList[offst+8]]*evel;
+				// momentum exchange to particle
+				meF2S = 2.0*f2A[offst+6] - 6.0*wd*rA[nList[offst+8]]*evel + 
+					    2.0*f2B[offst+6] - 6.0*wd*rB[nList[offst+8]]*evel;  
+				meF2Sx = -meF2S;  
+				meF2Sy = meF2S;
+				atomicAdd(&pt[pID].f.x, meF2Sx);
+				atomicAdd(&pt[pID].f.y, meF2Sy);	
+				// zero populations inside particle
 				f2A[offst+6] = 0.0;
 				f2B[offst+6] = 0.0;
 			}
 			
 			// dir 7 bounce-back to nabor 5 as dir 5:
 			if (s[nList[offst+5]] == 0) {
+				// bounce-back
 				float evel = -u[i] - v[i];
 				f2A[streamIndex[offst+5]] = f2A[offst+7] - 6.0*wd*rA[nList[offst+5]]*evel;
 				f2B[streamIndex[offst+5]] = f2B[offst+7] - 6.0*wd*rB[nList[offst+5]]*evel;
+				// momentum exchange to particle
+				meF2S = 2.0*f2A[offst+7] - 6.0*wd*rA[nList[offst+5]]*evel + 
+					    2.0*f2B[offst+7] - 6.0*wd*rB[nList[offst+5]]*evel;  
+				meF2Sx = -meF2S;  
+				meF2Sy = -meF2S;
+				atomicAdd(&pt[pID].f.x, meF2Sx);
+				atomicAdd(&pt[pID].f.y, meF2Sy);
+				// zero populations inside particle	
 				f2A[offst+7] = 0.0;
 				f2B[offst+7] = 0.0;
 			}
 			
 			// dir 8 bounce-back to nabor 6 as dir 6:
 			if (s[nList[offst+6]] == 0) {
+				// bounce-back
 				float evel = u[i] - v[i];
 				f2A[streamIndex[offst+6]] = f2A[offst+8] - 6.0*wd*rA[nList[offst+6]]*evel;
 				f2B[streamIndex[offst+6]] = f2B[offst+8] - 6.0*wd*rB[nList[offst+6]]*evel;
+				// momentum exchange to particle
+				meF2S = 2.0*f2A[offst+8] - 6.0*wd*rA[nList[offst+6]]*evel + 
+					    2.0*f2B[offst+8] - 6.0*wd*rB[nList[offst+6]]*evel;  
+				meF2Sx = meF2S;  
+				meF2Sy = -meF2S;
+				atomicAdd(&pt[pID].f.x, meF2Sx);
+				atomicAdd(&pt[pID].f.y, meF2Sy);
+				// zero populations inside particle	
 				f2A[offst+8] = 0.0;
 				f2B[offst+8] = 0.0;
 			}

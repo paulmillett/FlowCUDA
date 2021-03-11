@@ -33,6 +33,8 @@ private:
 	float* vH;
 	float* rAH;
 	float* rBH;	
+	float* pfxH;
+	float* pfyH;
 	int* xH;
 	int* yH;
 	int* nListH;
@@ -55,6 +57,8 @@ private:
 	float* FxB;
 	float* FyA;
 	float* FyB;
+	float* pfx;
+	float* pfy;
 	int* x;
 	int* y;	
 	int* nList;
@@ -88,6 +92,8 @@ public:
 	void setVoxelType(int,int);
 	void setPrx(int,float);
 	void setPry(int,float);
+	void setPvx(int,float);
+	void setPvy(int,float);
 	void setPrInner(int,float);
 	void setPrOuter(int,float);
 	float getU(int);

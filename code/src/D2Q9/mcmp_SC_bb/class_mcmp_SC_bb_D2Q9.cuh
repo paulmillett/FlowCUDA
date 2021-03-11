@@ -21,6 +21,7 @@ private:
 	int nVoxels;	
 	int Nx,Ny,Nz;
 	int numIolets;
+	int nParts;
 	float nu;
 	float gAB;
 	float gAS;
@@ -38,6 +39,7 @@ private:
 	int* voxelTypeH;
 	int* streamIndexH;
 	iolet2D* ioletsH;
+	particle2D_bb* ptH;
 	
 	// device arrays:
 	float* u;
@@ -53,12 +55,15 @@ private:
 	float* FxB;
 	float* FyB;
 	int* s;
+	int* sprev;
 	int* x;
 	int* y;
 	int* nList;
 	int* voxelType;
 	int* streamIndex;
+	int* pIDgrid;
 	iolet2D* iolets;
+	particle2D_bb* pt;
 	
 public:
 
@@ -68,6 +73,7 @@ public:
 	void deallocate();
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
+	void memcopy_device_to_host_particles();
 	void create_lattice_box();
 	void create_lattice_box_periodic();
 	void create_lattice_file();
@@ -83,23 +89,37 @@ public:
 	void setRA(int,float);
 	void setRB(int,float);
 	void setVoxelType(int,int);
+	void setPrx(int,float);
+	void setPry(int,float);
+	void setPvx(int,float);
+	void setPvy(int,float);
+	void setPrad(int,float);
+	void setPmass(int,float);	
 	float getU(int);
 	float getV(int);
 	int   getS(int);
 	float getRA(int);
 	float getRB(int);
+	float getPrx(int);
+	float getPry(int);
+	float getPfx(int);
+	float getPfy(int);
+	float getPrad(int);
+	float getPmass(int);
+	void zero_particle_forces_bb(int,int);
+	void move_particles_bb(int,int);
+	void fix_particle_velocity_bb(float,int,int);
 	void initial_equilibrium_bb(int,int);
-	void initial_equilibrium_psm(int,int);
-	void initial_particles_on_lattice(float*,float*,float*,int*,int,int,int);
+	void map_particles_on_lattice_bb(int,int);
 	void compute_density_bb(int,int);
-	void update_particles_on_lattice(float*,float*,float*,float*,float*,int*,int,int,int);
+	void update_particles_on_lattice_bb(int,int);
 	void compute_SC_forces_bb(int,int);
 	void compute_velocity_bb(int,int);
+	void set_boundary_velocity_bb(float,float,int,int);
 	void collide_stream_bb(int,int);
 	void bounce_back(int,int);
 	void bounce_back_moving(int,int);
-	void swap_populations();	
-	
+	void swap_populations();		
 	void write_output(std::string,int);
 
 };

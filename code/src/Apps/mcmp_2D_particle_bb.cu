@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-mcmp_2D_particle_bb::mcmp_2D_particle_bb() : lbm(), parts()
+mcmp_2D_particle_bb::mcmp_2D_particle_bb() : lbm()
 {	
 	
 	// ----------------------------------------------
@@ -62,7 +62,6 @@ mcmp_2D_particle_bb::mcmp_2D_particle_bb() : lbm(), parts()
 	// ----------------------------------------------
 	
 	lbm.allocate();
-	parts.allocate();	
 	
 }
 
@@ -75,7 +74,6 @@ mcmp_2D_particle_bb::mcmp_2D_particle_bb() : lbm(), parts()
 mcmp_2D_particle_bb::~mcmp_2D_particle_bb()
 {
 	lbm.deallocate();
-	parts.deallocate();	
 }
 
 
@@ -99,37 +97,41 @@ void mcmp_2D_particle_bb::initSystem()
 	// ----------------------------------------------	
 	
 	lbm.create_lattice_box_periodic();	
+	
+	// ----------------------------------------------
+	// particle's initial information:
+	// ----------------------------------------------
+	
+	lbm.setPrx(0,100.0);
+	lbm.setPry(0,75.0);
+	lbm.setPrad(0,20.0);
+	lbm.setPmass(0,1256.64);
 			
 	// ----------------------------------------------			
 	// initialize macros: 
-	// ----------------------------------------------
+	// ----------------------------------------------	
 	
-	// particle's initial position:
-	parts.xH[0] = 100.0;
-	parts.yH[0] = 75.0;
-	parts.radH[0] = 20.0;
-	
-	// initialize solid field:
+	// initialize solid field:	
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {		
 			int ndx = j*Nx + i;	
 			lbm.setX(ndx,i);
 			lbm.setY(ndx,j);
 			lbm.setS(ndx,0);
-			float dx = float(i) - parts.xH[0];
-			float dy = float(j) - parts.yH[0];
+			float dx = float(i) - lbm.getPrx(0);
+			float dy = float(j) - lbm.getPry(0);
 			float rr = sqrt(dx*dx + dy*dy);
-			if (rr <= parts.radH[0]) lbm.setS(ndx,1); 
+			if (rr <= lbm.getPrad(0)) lbm.setS(ndx,1); 
 		}
 	}
-	
+		
 	// initialize density fields: 
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {
 			int ndx = j*Nx + i;
 			int sij = lbm.getS(ndx);			
-			float rhoA = 0.99;
-			float rhoB = 0.01;					
+			float rhoA = 1.00;
+			float rhoB = 0.00;					
 			lbm.setRA(ndx,rhoA*float(1 - sij));
 			lbm.setRB(ndx,rhoB*float(1 - sij));						
 		}
@@ -158,14 +160,13 @@ void mcmp_2D_particle_bb::initSystem()
 	// ----------------------------------------------
 	
 	lbm.memcopy_host_to_device();
-	parts.memcopy_host_to_device();
 	
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
 	lbm.initial_equilibrium_bb(nBlocks,nThreads);
-	lbm.initial_particles_on_lattice(parts.x,parts.y,parts.rad,parts.pIDgrid,nParts,nBlocks,nThreads);
+	lbm.map_particles_on_lattice_bb(nBlocks,nThreads);
 		
 }
 
@@ -196,11 +197,16 @@ void mcmp_2D_particle_bb::cycleForward(int stepsPerCycle, int currentCycle)
 		cummulativeSteps++;
 		
 		// ------------------------------
+		// zero particle forces:
+		// ------------------------------
+		
+		lbm.zero_particle_forces_bb(nBlocks,nThreads);
+		
+		// ------------------------------
 		// update density fields:
 		// ------------------------------
 		
-		lbm.update_particles_on_lattice(parts.x,parts.y,parts.vx,parts.vy,parts.rad,
-		                                parts.pIDgrid,nParts,nBlocks,nThreads);
+		lbm.update_particles_on_lattice_bb(nBlocks,nThreads);
 		lbm.compute_density_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 		
@@ -213,7 +219,13 @@ void mcmp_2D_particle_bb::cycleForward(int stepsPerCycle, int currentCycle)
 		lbm.collide_stream_bb(nBlocks,nThreads);
 		lbm.bounce_back_moving(nBlocks,nThreads);
 		lbm.swap_populations();	
-		parts.move_particles(nBlocks,nThreads);			
+		
+		// ------------------------------
+		// update particles:											   
+		// ------------------------------ 
+		
+		lbm.fix_particle_velocity_bb(-0.005,nBlocks,nThreads);
+		lbm.move_particles_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 				
 	}

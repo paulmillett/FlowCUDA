@@ -394,6 +394,8 @@ __global__ void mcmp_compute_SC_forces_dip_D2Q9(float* rA,
 										        float* FxB,
 										        float* FyA,
 										        float* FyB,
+												float* pfx,
+												float* pfy,
 												particle2D_dip* pt,
 											    int* nList,
 												int* pIDgrid,												
@@ -481,12 +483,16 @@ __global__ void mcmp_compute_SC_forces_dip_D2Q9(float* rA,
 		FyB[i] = -p0B*(gAB*sumNbrPsiAy + gBS*sumNbrPsiSBy);
 		
 		// particle forces
+		pfx[i] = 0.0;
+		pfy[i] = 0.0;
 		int pID = pIDgrid[i];
 		if (pID > -1) {
 			float FxS = -(p0SA*gAS*sumNbrPsiAx + p0SB*gBS*sumNbrPsiBx);
 			float FyS = -(p0SA*gAS*sumNbrPsiAy + p0SB*gBS*sumNbrPsiBy);
 			atomicAdd(&pt[pID].f.x, FxS);
 			atomicAdd(&pt[pID].f.y, FyS);
+			pfx[i] = FxS;
+			pfy[i] = FyS;
 		}
 								
 	}

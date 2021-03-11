@@ -1,6 +1,6 @@
 
-# ifndef MCMP_2D_PARTICLE_BB_H
-# define MCMP_2D_PARTICLE_BB_H
+# ifndef MCMP_2D_DRAG_BB_H
+# define MCMP_2D_DRAG_BB_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D2Q9/mcmp_SC_bb/class_mcmp_SC_bb_D2Q9.cuh"
@@ -9,7 +9,7 @@
 
 
 
-class mcmp_2D_particle_bb : public FlowBase {
+class mcmp_2D_drag_bb : public FlowBase {
 	
 private:
 
@@ -25,6 +25,7 @@ private:
 	float gAB;
 	float gAS;
 	float gBS;
+	float pvel;
 	std::string vtkFormat;
 	
 	// objects
@@ -32,12 +33,12 @@ private:
 		
 public:
 
-	mcmp_2D_particle_bb();
-	~mcmp_2D_particle_bb();
+	mcmp_2D_drag_bb();
+	~mcmp_2D_drag_bb();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 
 };
 
-# endif  // MCMP_2D_PARTICLE_BB_H
+# endif  // MCMP_2D_DRAG_BB_H

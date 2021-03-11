@@ -3,6 +3,10 @@
 # include "../IO/GetPot"
 # include <math.h>
 # include <string> 
+# include <iostream>
+# include <iomanip>
+# include <fstream>
+# include <sstream>
 using namespace std;   
 
 
@@ -101,15 +105,19 @@ void mcmp_2D_capbridge_dip::initSystem()
 	// initialize particles: 
 	// ----------------------------------------------
 	
-	lbm.setPrx(0,420.0);
+	lbm.setPrx(0,450.0);
 	lbm.setPry(0,250.0);
+	lbm.setPvx(0,0.0);
+	lbm.setPvy(0,0.0);
 	lbm.setPrInner(0,40.0);
 	lbm.setPrOuter(0,45.0);
 	
-	lbm.setPrx(1,580.0);
+	lbm.setPrx(1,550.0);
 	lbm.setPry(1,250.0);
-	lbm.setPrInner(1,70.0);
-	lbm.setPrOuter(1,75.0);
+	lbm.setPvx(1,0.0);
+	lbm.setPvy(1,0.0);
+	lbm.setPrInner(1,40.0);
+	lbm.setPrOuter(1,45.0);
 			
 	// ----------------------------------------------			
 	// initialize macros: 
@@ -136,13 +144,13 @@ void mcmp_2D_capbridge_dip::initSystem()
 					}
 				}	
 			}			
-			if (i > 400 && i < 600 && j > 220 && j < 280) {
-				lbm.setRA(ndx,1.0*(1.0-Bi) + rApart*Bi);
+			if (i > 450 && i < 550 && j > 220 && j < 280) {
+				lbm.setRA(ndx,1.01*(1.0-Bi) + rApart*Bi);
 				lbm.setRB(ndx,0.02*(1.0-Bi) + rBpart*Bi);				
 			}
 			else {
-				lbm.setRA(ndx,0.02*(1.0-Bi) + rApart*Bi);
-				lbm.setRB(ndx,1.0*(1.0-Bi) + rBpart*Bi);
+				lbm.setRA(ndx,0.03*(1.0-Bi) + rApart*Bi);
+				lbm.setRB(ndx,0.98*(1.0-Bi) + rBpart*Bi);
 				
 			}		 
 		}
@@ -230,10 +238,17 @@ void mcmp_2D_capbridge_dip::cycleForward(int stepsPerCycle, int currentCycle)
 		lbm.swap_populations();	
 		
 		// ------------------------------
+		// write particle drag force to file:											   
+		// ------------------------------ 
+		
+		lbm.memcopy_device_to_host_particles();		
+		cout << fixed << setprecision(3) << lbm.getPfx(0) << "   " << lbm.getPfx(1) << endl;	
+		
+		// ------------------------------
 		// update particles:											   
 		// ------------------------------ 
 		
-		lbm.fix_particle_velocity_dip(0.005,nBlocks,nThreads);
+		lbm.fix_particle_velocity_dip(0.00,nBlocks,nThreads);   // used to be 0.005 
 		lbm.move_particles_dip(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 				
