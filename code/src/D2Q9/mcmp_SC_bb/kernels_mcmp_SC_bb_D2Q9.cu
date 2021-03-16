@@ -157,7 +157,8 @@ __device__ void equilibrium_populations_bb_D2Q9(float* fA,
 __global__ void mcmp_map_particles_on_lattice_bb_D2Q9(particle2D_bb* pt,
                                                       int* x,
 						    		                  int* y,
-												      int* s,									   
+												      int* s,
+													  int* sprev,									   
 									                  int* pIDgrid,										   
 									                  int nVoxels,
 									                  int nParts)
@@ -165,7 +166,9 @@ __global__ void mcmp_map_particles_on_lattice_bb_D2Q9(particle2D_bb* pt,
 	// define voxel:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nVoxels) {
-		// default values:
+		// set previous "s" value:
+		sprev[i] = s[i];
+		// default values:		
 		s[i] = 0;
 		pIDgrid[i] = -1;
 		// loop over particles:
@@ -417,16 +420,92 @@ __global__ void mcmp_compute_density_bb_D2Q9(float* fA,
 
 
 // --------------------------------------------------------
+// D2Q9 compute density for each component: 
+// --------------------------------------------------------
+
+__global__ void mcmp_compute_virtual_density_bb_D2Q9(float* rAvirt,
+                                        	         float* rBvirt,
+										             float* rA,
+										             float* rB,
+													 int* s,
+													 int* nList,
+													 float omega,
+										             int nVoxels)
+{
+	// define current voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {
+		
+		int offst = i*9;
+		
+		// fluid node:
+		if (s[i] == 0) {
+			rAvirt[i] = 0.0;
+			rBvirt[i] = 0.0;
+		}
+		
+		// solid node:
+		if (s[i] == 1) {			
+			float r1A = rA[nList[offst+1]];
+			float r2A = rA[nList[offst+2]];
+			float r3A = rA[nList[offst+3]];
+			float r4A = rA[nList[offst+4]];
+			float r5A = rA[nList[offst+5]];
+			float r6A = rA[nList[offst+6]];
+			float r7A = rA[nList[offst+7]];
+			float r8A = rA[nList[offst+8]];	
+			float r1B = rB[nList[offst+1]];
+			float r2B = rB[nList[offst+2]];
+			float r3B = rB[nList[offst+3]];
+			float r4B = rB[nList[offst+4]];
+			float r5B = rB[nList[offst+5]];
+			float r6B = rB[nList[offst+6]];
+			float r7B = rB[nList[offst+7]];
+			float r8B = rB[nList[offst+8]];			
+			const float ws = 1.0/9.0;
+			const float wd = 1.0/36.0;
+			float s1 = ws*(1 - s[nList[offst+1]]);
+			float s2 = ws*(1 - s[nList[offst+2]]);
+			float s3 = ws*(1 - s[nList[offst+3]]);
+			float s4 = ws*(1 - s[nList[offst+4]]);
+			float s5 = wd*(1 - s[nList[offst+5]]);
+			float s6 = wd*(1 - s[nList[offst+6]]);
+			float s7 = wd*(1 - s[nList[offst+7]]);
+			float s8 = wd*(1 - s[nList[offst+8]]);			
+			float sumRA = s1*r1A + s2*r2A + s3*r3A + s4*r4A + 
+				          s5*r5A + s6*r6A + s7*r7A + s8*r8A;
+			float sumRB = s1*r1B + s2*r2B + s3*r3B + s4*r4B + 
+				          s5*r5B + s6*r6B + s7*r7B + s8*r8B;
+			float sumWS = s1+s2+s3+s4+s5+s6+s7+s8;		
+			if (sumWS > 0.0) {
+				rAvirt[i] = sumRA/sumWS*(1.0+omega);
+				rBvirt[i] = sumRB/sumWS*(1.0-omega);	
+			}	
+			else {
+				rAvirt[i] = 0.0;
+				rBvirt[i] = 0.0;	
+			}
+					
+		}		
+	}
+}
+
+
+
+// --------------------------------------------------------
 // D2Q9 compute Shan-Chen forces for the components
 // using pseudo-potential, psi = rho_0(1-exp(-rho/rho_o))
 // --------------------------------------------------------
 
 __global__ void mcmp_compute_SC_forces_bb_D2Q9(float* rA,
-										       float* rB,
+										       float* rB,											   
 										       float* FxA,
 										       float* FxB,
 										       float* FyA,
 										       float* FyB,
+											   particle2D_bb* pt,
+											   int* pIDgrid,
 											   int* s,
 											   int* nList,
 											   float gAB,
@@ -438,59 +517,178 @@ __global__ void mcmp_compute_SC_forces_bb_D2Q9(float* rA,
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	
 	if (i < nVoxels) {
+							
+		int offst = i*9;
+		
+		float r0A = psi(rA[i]);	
+		float r1A = psi(rA[nList[offst+1]]);
+		float r2A = psi(rA[nList[offst+2]]);
+		float r3A = psi(rA[nList[offst+3]]);
+		float r4A = psi(rA[nList[offst+4]]);
+		float r5A = psi(rA[nList[offst+5]]);
+		float r6A = psi(rA[nList[offst+6]]);
+		float r7A = psi(rA[nList[offst+7]]);
+		float r8A = psi(rA[nList[offst+8]]);
+	
+		float r0B = psi(rB[i]);		
+		float r1B = psi(rB[nList[offst+1]]);
+		float r2B = psi(rB[nList[offst+2]]);
+		float r3B = psi(rB[nList[offst+3]]);
+		float r4B = psi(rB[nList[offst+4]]);
+		float r5B = psi(rB[nList[offst+5]]);
+		float r6B = psi(rB[nList[offst+6]]);
+		float r7B = psi(rB[nList[offst+7]]);
+		float r8B = psi(rB[nList[offst+8]]);
+		
+		float s1 = float(s[nList[offst+1]]);
+		float s2 = float(s[nList[offst+2]]);
+		float s3 = float(s[nList[offst+3]]);
+		float s4 = float(s[nList[offst+4]]);
+		float s5 = float(s[nList[offst+5]]);
+		float s6 = float(s[nList[offst+6]]);
+		float s7 = float(s[nList[offst+7]]);
+		float s8 = float(s[nList[offst+8]]);
+	
+		const float ws = 1.0/9.0;
+		const float wd = 1.0/36.0;		
+		float sumNbrRhoAx = ws*r1A + wd*r5A + wd*r8A - (ws*r3A + wd*r6A + wd*r7A);
+		float sumNbrRhoAy = ws*r2A + wd*r5A + wd*r6A - (ws*r4A + wd*r7A + wd*r8A);
+		float sumNbrRhoBx = ws*r1B + wd*r5B + wd*r8B - (ws*r3B + wd*r6B + wd*r7B);
+		float sumNbrRhoBy = ws*r2B + wd*r5B + wd*r6B - (ws*r4B + wd*r7B + wd*r8B);
+		float sumNbrSx = ws*s1 + wd*s5 + wd*s8 - (ws*s3 + wd*s6 + wd*s7);
+		float sumNbrSy = ws*s2 + wd*s5 + wd*s6 - (ws*s4 + wd*s7 + wd*s8);
 		
 		// --------------------------------------------	
 		// if this is a fluid site:
 		// --------------------------------------------
 		
-		if (s[i] == 0) {
-			
-			int offst = i*9;
-			
-			float r0A = psi(rA[i]);	 			
-			float r1A = psi(rA[nList[offst+1]]);
-			float r2A = psi(rA[nList[offst+2]]);
-			float r3A = psi(rA[nList[offst+3]]);
-			float r4A = psi(rA[nList[offst+4]]);
-			float r5A = psi(rA[nList[offst+5]]);
-			float r6A = psi(rA[nList[offst+6]]);
-			float r7A = psi(rA[nList[offst+7]]);
-			float r8A = psi(rA[nList[offst+8]]);
-		
-			float r0B = psi(rB[i]);		
-			float r1B = psi(rB[nList[offst+1]]);
-			float r2B = psi(rB[nList[offst+2]]);
-			float r3B = psi(rB[nList[offst+3]]);
-			float r4B = psi(rB[nList[offst+4]]);
-			float r5B = psi(rB[nList[offst+5]]);
-			float r6B = psi(rB[nList[offst+6]]);
-			float r7B = psi(rB[nList[offst+7]]);
-			float r8B = psi(rB[nList[offst+8]]);
-			
-			float s1 = float(s[nList[offst+1]]);
-			float s2 = float(s[nList[offst+2]]);
-			float s3 = float(s[nList[offst+3]]);
-			float s4 = float(s[nList[offst+4]]);
-			float s5 = float(s[nList[offst+5]]);
-			float s6 = float(s[nList[offst+6]]);
-			float s7 = float(s[nList[offst+7]]);
-			float s8 = float(s[nList[offst+8]]);
-		
-			float ws = 1.0/9.0;
-			float wd = 1.0/36.0;		
-			float sumNbrRhoAx = ws*r1A + wd*r5A + wd*r8A - (ws*r3A + wd*r6A + wd*r7A);
-			float sumNbrRhoAy = ws*r2A + wd*r5A + wd*r6A - (ws*r4A + wd*r7A + wd*r8A);
-			float sumNbrRhoBx = ws*r1B + wd*r5B + wd*r8B - (ws*r3B + wd*r6B + wd*r7B);
-			float sumNbrRhoBy = ws*r2B + wd*r5B + wd*r6B - (ws*r4B + wd*r7B + wd*r8B);
-			float sumNbrSx = ws*s1 + wd*s5 + wd*s8 - (ws*s3 + wd*s6 + wd*s7);
-			float sumNbrSy = ws*s2 + wd*s5 + wd*s6 - (ws*s4 + wd*s7 + wd*s8);
-			
+		if (s[i] == 0) {				
 			FxA[i] = -r0A*(gAB*sumNbrRhoBx + gAS*sumNbrSx);
 			FxB[i] = -r0B*(gAB*sumNbrRhoAx + gBS*sumNbrSx);
 			FyA[i] = -r0A*(gAB*sumNbrRhoBy + gAS*sumNbrSy);
-			FyB[i] = -r0B*(gAB*sumNbrRhoAy + gBS*sumNbrSy);
-						
-		}		
+			FyB[i] = -r0B*(gAB*sumNbrRhoAy + gBS*sumNbrSy);						
+		}
+		
+		// --------------------------------------------	
+		// if this is a solid site:
+		// --------------------------------------------
+		
+		if (s[i] == 1) {			
+			float fxFS = -(gAS*sumNbrRhoAx + gBS*sumNbrRhoBx);
+			float fyFS = -(gAS*sumNbrRhoAy + gBS*sumNbrRhoBy);
+			int pID = pIDgrid[i];
+			atomicAdd(&pt[pID].f.x, fxFS);
+			atomicAdd(&pt[pID].f.y, fyFS);							
+		}
+		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 compute Shan-Chen forces for the components
+// using pseudo-potential, psi = rho_0(1-exp(-rho/rho_o))
+// --------------------------------------------------------
+
+__global__ void mcmp_compute_SC_forces_bb_2_D2Q9(float* rA,
+										         float* rB,	
+												 float* rAvirt,
+												 float* rBvirt,										   
+										         float* FxA,
+										         float* FxB,
+										         float* FyA,
+										         float* FyB,
+											     particle2D_bb* pt,
+											     int* pIDgrid,
+											     int* s,
+											     int* nList,
+											     float gAB,											     
+										         int nVoxels)
+{
+	// define current voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {
+							
+		int offst = i*9;
+		
+		float r0A = psi(rA[i]);	
+		float r1A = psi(rA[nList[offst+1]]);
+		float r2A = psi(rA[nList[offst+2]]);
+		float r3A = psi(rA[nList[offst+3]]);
+		float r4A = psi(rA[nList[offst+4]]);
+		float r5A = psi(rA[nList[offst+5]]);
+		float r6A = psi(rA[nList[offst+6]]);
+		float r7A = psi(rA[nList[offst+7]]);
+		float r8A = psi(rA[nList[offst+8]]);
+	
+		float r0B = psi(rB[i]);		
+		float r1B = psi(rB[nList[offst+1]]);
+		float r2B = psi(rB[nList[offst+2]]);
+		float r3B = psi(rB[nList[offst+3]]);
+		float r4B = psi(rB[nList[offst+4]]);
+		float r5B = psi(rB[nList[offst+5]]);
+		float r6B = psi(rB[nList[offst+6]]);
+		float r7B = psi(rB[nList[offst+7]]);
+		float r8B = psi(rB[nList[offst+8]]);
+		
+		float r0AV = psi(rAvirt[i]);	
+		float r1AV = psi(rAvirt[nList[offst+1]]);
+		float r2AV = psi(rAvirt[nList[offst+2]]);
+		float r3AV = psi(rAvirt[nList[offst+3]]);
+		float r4AV = psi(rAvirt[nList[offst+4]]);
+		float r5AV = psi(rAvirt[nList[offst+5]]);
+		float r6AV = psi(rAvirt[nList[offst+6]]);
+		float r7AV = psi(rAvirt[nList[offst+7]]);
+		float r8AV = psi(rAvirt[nList[offst+8]]);
+	
+		float r0BV = psi(rBvirt[i]);		
+		float r1BV = psi(rBvirt[nList[offst+1]]);
+		float r2BV = psi(rBvirt[nList[offst+2]]);
+		float r3BV = psi(rBvirt[nList[offst+3]]);
+		float r4BV = psi(rBvirt[nList[offst+4]]);
+		float r5BV = psi(rBvirt[nList[offst+5]]);
+		float r6BV = psi(rBvirt[nList[offst+6]]);
+		float r7BV = psi(rBvirt[nList[offst+7]]);
+		float r8BV = psi(rBvirt[nList[offst+8]]);
+	
+		const float ws = 1.0/9.0;
+		const float wd = 1.0/36.0;		
+		float sumNbrRhoAx = ws*r1A + wd*r5A + wd*r8A - (ws*r3A + wd*r6A + wd*r7A);
+		float sumNbrRhoAy = ws*r2A + wd*r5A + wd*r6A - (ws*r4A + wd*r7A + wd*r8A);
+		float sumNbrRhoBx = ws*r1B + wd*r5B + wd*r8B - (ws*r3B + wd*r6B + wd*r7B);
+		float sumNbrRhoBy = ws*r2B + wd*r5B + wd*r6B - (ws*r4B + wd*r7B + wd*r8B);		
+		
+		// --------------------------------------------	
+		// if this is a fluid site:
+		// --------------------------------------------
+		
+		if (s[i] == 0) {	
+			float sumNbrRhoAVx = ws*r1AV + wd*r5AV + wd*r8AV - (ws*r3AV + wd*r6AV + wd*r7AV);
+			float sumNbrRhoAVy = ws*r2AV + wd*r5AV + wd*r6AV - (ws*r4AV + wd*r7AV + wd*r8AV);
+			float sumNbrRhoBVx = ws*r1BV + wd*r5BV + wd*r8BV - (ws*r3BV + wd*r6BV + wd*r7BV);
+			float sumNbrRhoBVy = ws*r2BV + wd*r5BV + wd*r6BV - (ws*r4BV + wd*r7BV + wd*r8BV);				
+			FxA[i] = -r0A*gAB*(sumNbrRhoBx + sumNbrRhoBVx);
+			FxB[i] = -r0B*gAB*(sumNbrRhoAx + sumNbrRhoAVx);
+			FyA[i] = -r0A*gAB*(sumNbrRhoBy + sumNbrRhoBVy);
+			FyB[i] = -r0B*gAB*(sumNbrRhoAy + sumNbrRhoAVy);						
+		}
+		
+		// --------------------------------------------	
+		// if this is a solid site:
+		// --------------------------------------------
+		
+		if (s[i] == 1) {
+			float fxAV = -r0AV*gAB*(sumNbrRhoBx);
+			float fxBV = -r0BV*gAB*(sumNbrRhoAx);
+			float fyAV = -r0AV*gAB*(sumNbrRhoBy);
+			float fyBV = -r0BV*gAB*(sumNbrRhoAy);		
+			int pID = pIDgrid[i];
+			atomicAdd(&pt[pID].f.x, fxAV + fxBV);
+			atomicAdd(&pt[pID].f.y, fyAV + fyBV);							
+		}
+		
 	}
 }
 
@@ -530,132 +728,114 @@ __global__ void mcmp_collide_stream_bb_D2Q9(float* f1A,
 		if (s[i] == 0) {
 			
 			// --------------------------------------------------	
-			// FORCING - this step includes the Guo forcing
-			//           scheme applied to the Shan-Chen
-			//           MCMP model according to Kruger et al.
-			// --------------------------------------------------
-		
-			float w0 = 4.0/9.0;
-			float ws = 1.0/9.0;
-			float wd = 1.0/36.0;
-		
-			float evel = 0.0;       // e dot velocity
-			float emiu = 0.0-u[i];  // e minus u
-			float emiv = 0.0-v[i];  // e minus v
-			float frc0A = w0*( FxA[i]*(3.0*emiu) + FyA[i]*(3.0*emiv) );
-			float frc0B = w0*( FxB[i]*(3.0*emiu) + FyB[i]*(3.0*emiv) );
-		
-			evel = u[i];
-			emiu = 1.0-u[i];
-			emiv = 0.0-v[i];
-			float frc1A = ws*( FxA[i]*(3.0*emiu + 9.0*evel) + FyA[i]*(3.0*emiv) );
-			float frc1B = ws*( FxB[i]*(3.0*emiu + 9.0*evel) + FyB[i]*(3.0*emiv) );
-		
-			evel = v[i]; 
-			emiu = 0.0-u[i];
-			emiv = 1.0-v[i];
-			float frc2A = ws*( FxA[i]*(3.0*emiu) + FyA[i]*(3.0*emiv + 9.0*evel) );
-			float frc2B = ws*( FxB[i]*(3.0*emiu) + FyB[i]*(3.0*emiv + 9.0*evel) );
-		
-			evel = -u[i];
-			emiu = -1.0-u[i];
-			emiv =  0.0-v[i];
-			float frc3A = ws*( FxA[i]*(3.0*emiu - 9.0*evel) + FyA[i]*(3.0*emiv) );
-			float frc3B = ws*( FxB[i]*(3.0*emiu - 9.0*evel) + FyB[i]*(3.0*emiv) );
-		
-			evel = -v[i];
-			emiu =  0.0-u[i];
-			emiv = -1.0-v[i];
-			float frc4A = ws*( FxA[i]*(3.0*emiu) + FyA[i]*(3.0*emiv - 9.0*evel) );
-			float frc4B = ws*( FxB[i]*(3.0*emiu) + FyB[i]*(3.0*emiv - 9.0*evel) );
-		
-			evel = u[i] + v[i];
-			emiu = 1.0-u[i];
-			emiv = 1.0-v[i];
-			float frc5A = wd*( FxA[i]*(3.0*emiu + 9.0*evel) + FyA[i]*(3.0*emiv + 9.0*evel) );
-			float frc5B = wd*( FxB[i]*(3.0*emiu + 9.0*evel) + FyB[i]*(3.0*emiv + 9.0*evel) );
-		
-			evel = -u[i] + v[i];
-			emiu = -1.0-u[i];
-			emiv =  1.0-v[i];
-			float frc6A = wd*( FxA[i]*(3.0*emiu - 9.0*evel) + FyA[i]*(3.0*emiv + 9.0*evel) );
-			float frc6B = wd*( FxB[i]*(3.0*emiu - 9.0*evel) + FyB[i]*(3.0*emiv + 9.0*evel) );
-				
-			evel = -u[i] - v[i];
-			emiu = -1.0-u[i];
-			emiv = -1.0-v[i];
-			float frc7A = wd*( FxA[i]*(3.0*emiu - 9.0*evel) + FyA[i]*(3.0*emiv - 9.0*evel) );
-			float frc7B = wd*( FxB[i]*(3.0*emiu - 9.0*evel) + FyB[i]*(3.0*emiv - 9.0*evel) );
-		
-			evel = u[i] - v[i];
-			emiu =  1.0-u[i];
-			emiv = -1.0-v[i];
-			float frc8A = wd*( FxA[i]*(3.0*emiu + 9.0*evel) + FyA[i]*(3.0*emiv - 9.0*evel) );
-			float frc8B = wd*( FxB[i]*(3.0*emiu + 9.0*evel) + FyB[i]*(3.0*emiv - 9.0*evel) );
-				
-			// --------------------------------------------------	
 			// COLLISION & STREAMING - standard BGK operator with
-			//                         a PUSH propagator.
+			//                         a PUSH propagator.  This step
+			//                         includes the Guo forcing
+			//                         scheme applied to the Shan-Chen
+			//                         MCMP model according to Kruger et al.
 			// --------------------------------------------------
-		
+				
+			// useful constants
 			int offst = 9*i;
+			const float w0 = 4.0/9.0;
+			const float ws = 1.0/9.0;
+			const float wd = 1.0/36.0;		
 			const float omega = 2.0/(6.0*nu + 1.0);   // 1/tau
 			const float omomega = 1.0 - omega;        // 1 - 1/tau
 			const float omomega2 = 1.0 - 0.5*omega;   // 1 - 1/(2tau)
 			const float omusq = 1.0 - 1.5*(u[i]*u[i] + v[i]*v[i]);
-		
-			// dir 0
+			const float ux = u[i];
+			const float vy = v[i];
+										
+			// direction 0
+			float evel = 0.0;       // e dot velocity
+			float emiu = 0.0-ux;    // e minus u
+			float emiv = 0.0-vy;    // e minus v
 			float feq = w0*omusq;
-			f2A[streamIndex[offst+0]] = omomega*f1A[offst+0] + omega*feq*rA[i] + omomega2*frc0A;
-			f2B[streamIndex[offst+0]] = omomega*f1B[offst+0] + omega*feq*rB[i] + omomega2*frc0B;
-		
-			// dir 1
-			evel = u[i];
+			float frcA = w0*( FxA[i]*(3.0*emiu) + FyA[i]*(3.0*emiv) );
+			float frcB = w0*( FxB[i]*(3.0*emiu) + FyB[i]*(3.0*emiv) );		
+			f2A[streamIndex[offst+0]] = omomega*f1A[offst+0] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+0]] = omomega*f1B[offst+0] + omega*feq*rB[i] + omomega2*frcB;
+				
+			// direction 1
+			evel = ux;
+			emiu = 1.0-ux;
+			emiv = 0.0-vy;
 			feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-			f2A[streamIndex[offst+1]] = omomega*f1A[offst+1] + omega*feq*rA[i] + omomega2*frc1A;
-			f2B[streamIndex[offst+1]] = omomega*f1B[offst+1] + omega*feq*rB[i] + omomega2*frc1B;
+			frcA = ws*( FxA[i]*(3.0*emiu + 9.0*evel) + FyA[i]*(3.0*emiv) );
+			frcB = ws*( FxB[i]*(3.0*emiu + 9.0*evel) + FyB[i]*(3.0*emiv) );
+			f2A[streamIndex[offst+1]] = omomega*f1A[offst+1] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+1]] = omomega*f1B[offst+1] + omega*feq*rB[i] + omomega2*frcB;
 		
-			// dir 2
-			evel = v[i];
+			// direction 2
+			evel = vy; 
+			emiu = 0.0-ux;
+			emiv = 1.0-vy;
 			feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-			f2A[streamIndex[offst+2]] = omomega*f1A[offst+2] + omega*feq*rA[i] + omomega2*frc2A;
-			f2B[streamIndex[offst+2]] = omomega*f1B[offst+2] + omega*feq*rB[i] + omomega2*frc2B;
-		
-			// dir 3
-			evel = -u[i];
+			frcA = ws*( FxA[i]*(3.0*emiu) + FyA[i]*(3.0*emiv + 9.0*evel) );
+			frcB = ws*( FxB[i]*(3.0*emiu) + FyB[i]*(3.0*emiv + 9.0*evel) );
+			f2A[streamIndex[offst+2]] = omomega*f1A[offst+2] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+2]] = omomega*f1B[offst+2] + omega*feq*rB[i] + omomega2*frcB;
+				
+			// direction 3
+			evel = -ux;
+			emiu = -1.0-ux;
+			emiv =  0.0-vy;
 			feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-			f2A[streamIndex[offst+3]] = omomega*f1A[offst+3] + omega*feq*rA[i] + omomega2*frc3A;
-			f2B[streamIndex[offst+3]] = omomega*f1B[offst+3] + omega*feq*rB[i] + omomega2*frc3B;
+			frcA = ws*( FxA[i]*(3.0*emiu - 9.0*evel) + FyA[i]*(3.0*emiv) );
+			frcB = ws*( FxB[i]*(3.0*emiu - 9.0*evel) + FyB[i]*(3.0*emiv) );		
+			f2A[streamIndex[offst+3]] = omomega*f1A[offst+3] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+3]] = omomega*f1B[offst+3] + omega*feq*rB[i] + omomega2*frcB;
 		
-			// dir 4
-			evel = -v[i];
+			// direction 4
+			evel = -vy;
+			emiu =  0.0-ux;
+			emiv = -1.0-vy;
 			feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
-			f2A[streamIndex[offst+4]] = omomega*f1A[offst+4] + omega*feq*rA[i] + omomega2*frc4A;
-			f2B[streamIndex[offst+4]] = omomega*f1B[offst+4] + omega*feq*rB[i] + omomega2*frc4B;
+			frcA = ws*( FxA[i]*(3.0*emiu) + FyA[i]*(3.0*emiv - 9.0*evel) );
+			frcB = ws*( FxB[i]*(3.0*emiu) + FyB[i]*(3.0*emiv - 9.0*evel) );
+			f2A[streamIndex[offst+4]] = omomega*f1A[offst+4] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+4]] = omomega*f1B[offst+4] + omega*feq*rB[i] + omomega2*frcB;
 		
-			// dir 5
-			evel = u[i] + v[i];
+			// direction 5
+			evel = ux + vy;
+			emiu = 1.0-ux;
+			emiv = 1.0-vy;
 			feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-			f2A[streamIndex[offst+5]] = omomega*f1A[offst+5] + omega*feq*rA[i] + omomega2*frc5A;
-			f2B[streamIndex[offst+5]] = omomega*f1B[offst+5] + omega*feq*rB[i] + omomega2*frc5B;
+			frcA = wd*( FxA[i]*(3.0*emiu + 9.0*evel) + FyA[i]*(3.0*emiv + 9.0*evel) );
+			frcB = wd*( FxB[i]*(3.0*emiu + 9.0*evel) + FyB[i]*(3.0*emiv + 9.0*evel) );
+			f2A[streamIndex[offst+5]] = omomega*f1A[offst+5] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+5]] = omomega*f1B[offst+5] + omega*feq*rB[i] + omomega2*frcB;
 		
-			// dir 6
-			evel = -u[i] + v[i];
+			// direction 6
+			evel = -ux + vy;
+			emiu = -1.0-ux;
+			emiv =  1.0-vy;
 			feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-			f2A[streamIndex[offst+6]] = omomega*f1A[offst+6] + omega*feq*rA[i] + omomega2*frc6A;
-			f2B[streamIndex[offst+6]] = omomega*f1B[offst+6] + omega*feq*rB[i] + omomega2*frc6B;
+			frcA = wd*( FxA[i]*(3.0*emiu - 9.0*evel) + FyA[i]*(3.0*emiv + 9.0*evel) );
+			frcB = wd*( FxB[i]*(3.0*emiu - 9.0*evel) + FyB[i]*(3.0*emiv + 9.0*evel) );		
+			f2A[streamIndex[offst+6]] = omomega*f1A[offst+6] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+6]] = omomega*f1B[offst+6] + omega*feq*rB[i] + omomega2*frcB;
 		
-			// dir 7
-			evel = -u[i] - v[i];
+			// direction 7
+			evel = -ux - vy;
+			emiu = -1.0-ux;
+			emiv = -1.0-vy;
 			feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-			f2A[streamIndex[offst+7]] = omomega*f1A[offst+7] + omega*feq*rA[i] + omomega2*frc7A;
-			f2B[streamIndex[offst+7]] = omomega*f1B[offst+7] + omega*feq*rB[i] + omomega2*frc7B;
+			frcA = wd*( FxA[i]*(3.0*emiu - 9.0*evel) + FyA[i]*(3.0*emiv - 9.0*evel) );
+			frcB = wd*( FxB[i]*(3.0*emiu - 9.0*evel) + FyB[i]*(3.0*emiv - 9.0*evel) );		
+			f2A[streamIndex[offst+7]] = omomega*f1A[offst+7] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+7]] = omomega*f1B[offst+7] + omega*feq*rB[i] + omomega2*frcB;
 		
-			// dir 8
-			evel = u[i] - v[i];
+			// direction 8
+			evel = ux - vy;
+			emiu =  1.0-ux;
+			emiv = -1.0-vy;
 			feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
-			f2A[streamIndex[offst+8]] = omomega*f1A[offst+8] + omega*feq*rA[i] + omomega2*frc8A;
-			f2B[streamIndex[offst+8]] = omomega*f1B[offst+8] + omega*feq*rB[i] + omomega2*frc8B;
+			frcA = wd*( FxA[i]*(3.0*emiu + 9.0*evel) + FyA[i]*(3.0*emiv - 9.0*evel) );
+			frcB = wd*( FxB[i]*(3.0*emiu + 9.0*evel) + FyB[i]*(3.0*emiv - 9.0*evel) );		
+			f2A[streamIndex[offst+8]] = omomega*f1A[offst+8] + omega*feq*rA[i] + omomega2*frcA;
+			f2B[streamIndex[offst+8]] = omomega*f1B[offst+8] + omega*feq*rB[i] + omomega2*frcB;			
 			
 		}					
 	}

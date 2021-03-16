@@ -64,6 +64,7 @@ __global__ void mcmp_map_particles_on_lattice_bb_D2Q9(
 	int*,
 	int*,
 	int*,
+	int*,
 	int,
 	int);
 
@@ -122,6 +123,17 @@ __global__ void mcmp_compute_density_bb_D2Q9(
 	float*,
 	float*,
 	int);
+	
+	
+__global__ void mcmp_compute_virtual_density_bb_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	int*,
+	int*,
+	float,
+	int);
 
 
 __global__ void mcmp_compute_SC_forces_bb_D2Q9(
@@ -131,10 +143,29 @@ __global__ void mcmp_compute_SC_forces_bb_D2Q9(
 	float*,
 	float*,
 	float*,
+	particle2D_bb* pt,
+	int*,
 	int*,
 	int*,
 	float,
 	float,
+	float,
+	int);
+	
+	
+__global__ void mcmp_compute_SC_forces_bb_2_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	particle2D_bb* pt,
+	int*,
+	int*,
+	int*,
 	float,
 	int);
 

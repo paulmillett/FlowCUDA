@@ -6,7 +6,7 @@
 
 
 // --------------------------------------------------------
-// Struct containing 2D particle data for a diffuse-
+// Struct containing 3D particle data for a diffuse-
 // interface particle (dip):
 // --------------------------------------------------------
 
