@@ -91,6 +91,7 @@ public:
 	void setX(int,int);
 	void setY(int,int);
 	void setZ(int,int);
+	void setS(int,int);
 	void setRA(int,float);
 	void setRB(int,float);
 	void setVoxelType(int,int);
@@ -105,6 +106,7 @@ public:
 	float getU(int);
 	float getV(int);
 	float getW(int);
+	int getS(int);
 	float getRA(int);
 	float getRB(int);
 	float getPrx(int);
@@ -120,12 +122,16 @@ public:
 	float getPrad(int);
 	void initial_equilibrium_bb(int,int);
 	void compute_density_bb(int,int);
+	void compute_virtual_density_bb(int,int);
 	void map_particles_to_lattice_bb(int,int);
+	void update_particles_on_lattice_bb(int,int);
 	void compute_SC_forces_bb(int,int);
 	void compute_velocity_bb(int,int);
 	void compute_velocity_bb_2(int,int);
 	void set_boundary_velocity_bb(float,float,float,int,int);
 	void collide_stream_bb(int,int);
+	void bounce_back(int,int);
+	void bounce_back_moving(int,int);
 	void zero_particle_forces_bb(int,int);
 	void move_particles_bb(int,int);
 	void fix_particle_velocity_bb(float,int,int);

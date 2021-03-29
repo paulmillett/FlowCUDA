@@ -49,6 +49,25 @@ __global__ void mcmp_map_particles_to_lattice_bb_D3Q19(
     int);
 
 
+__global__ void mcmp_update_particles_on_lattice_bb_D3Q19(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	particle3D_bb*,
+	int*,
+	int*,
+	int*,
+	int*,
+	int*,
+	int*,													  
+	int,
+	int);
+
+
 __global__ void mcmp_set_boundary_velocity_bb_D3Q19(
 	float,
 	float,
@@ -119,11 +138,22 @@ __global__ void mcmp_compute_density_bb_D3Q19(
 	int);
 
 
+__global__ void mcmp_compute_virtual_density_bb_D3Q19(
+	float*,
+	float*,
+	float*,
+	float*,
+	const int*,
+	const int*,
+	float,
+	int);
+
+
 __global__ void mcmp_compute_SC_forces_bb_D3Q19(
 	float*,
 	float*,
 	float*,
-	float*,
+	float*,	
 	float*,
 	float*,
 	float*,
@@ -131,7 +161,7 @@ __global__ void mcmp_compute_SC_forces_bb_D3Q19(
 	float*,
 	float*,
 	particle3D_bb*,
-	int*,
+	const int*,
 	int*,
 	int*,
 	float,											    

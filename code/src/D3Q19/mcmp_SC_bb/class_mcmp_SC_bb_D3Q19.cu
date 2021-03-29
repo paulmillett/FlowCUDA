@@ -352,6 +352,11 @@ void class_mcmp_SC_bb_D3Q19::setZ(int i, int val)
 	zH[i] = val;
 }
 
+void class_mcmp_SC_bb_D3Q19::setS(int i, int val)
+{
+	sH[i] = val;
+}
+
 void class_mcmp_SC_bb_D3Q19::setRA(int i, float val)
 {
 	rAH[i] = val;
@@ -426,6 +431,11 @@ float class_mcmp_SC_bb_D3Q19::getV(int i)
 float class_mcmp_SC_bb_D3Q19::getW(int i)
 {
 	return wH[i];
+}
+
+int class_mcmp_SC_bb_D3Q19::getS(int i)
+{
+	return sH[i];
 }
 
 float class_mcmp_SC_bb_D3Q19::getRA(int i)
@@ -511,16 +521,31 @@ void class_mcmp_SC_bb_D3Q19::compute_density_bb(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,nVoxels);
 }
 
+void class_mcmp_SC_bb_D3Q19::compute_virtual_density_bb(int nBlocks, int nThreads)
+{
+	mcmp_compute_virtual_density_bb_D3Q19
+	<<<nBlocks,nThreads>>> (rAvirt,rBvirt,rA,rB,s,nList,omega,nVoxels);	
+}
+
 void class_mcmp_SC_bb_D3Q19::map_particles_to_lattice_bb(int nBlocks, int nThreads)
 {
 	mcmp_map_particles_to_lattice_bb_D3Q19
 	<<<nBlocks,nThreads>>> (pt,x,y,z,s,sprev,pIDgrid,nVoxels,nParts);
+}
+
+void class_mcmp_SC_bb_D3Q19::update_particles_on_lattice_bb(int nBlocks, int nThreads)
+{
+	mcmp_update_particles_on_lattice_bb_D3Q19
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,u,v,w,pt,x,y,z,s,pIDgrid,nList,nVoxels,nParts);
 } 
 
 void class_mcmp_SC_bb_D3Q19::compute_SC_forces_bb(int nBlocks, int nThreads)
 {
 	mcmp_compute_SC_forces_bb_D3Q19 
-	<<<nBlocks,nThreads>>> (rA,rB,rAvirt,rBvirt,FxA,FxB,FyA,FyB,FzA,FzB,pt,nList,pIDgrid,s,gAB,nVoxels);	
+	<<<nBlocks,nThreads>>> (rAvirt,rBvirt,rA,rB,FxA,FxB,FyA,FyB,FzA,FzB,pt,nList,pIDgrid,s,gAB,nVoxels);	
+	cudaError_t err = cudaGetLastError();
+	if (err != cudaSuccess)
+		printf("Error: %s\n", cudaGetErrorString(err));
 }
 
 void class_mcmp_SC_bb_D3Q19::compute_velocity_bb(int nBlocks, int nThreads)
@@ -539,6 +564,18 @@ void class_mcmp_SC_bb_D3Q19::collide_stream_bb(int nBlocks, int nThreads)
 {
 	mcmp_collide_stream_bb_D3Q19 
 	<<<nBlocks,nThreads>>> (f1A,f1B,f2A,f2B,rA,rB,u,v,w,FxA,FxB,FyA,FyB,FzA,FzB,streamIndex,nu,nVoxels);
+}
+
+void class_mcmp_SC_bb_D3Q19::bounce_back(int nBlocks, int nThreads)
+{
+	mcmp_bounce_back_D3Q19
+	<<<nBlocks,nThreads>>> (f2A,f2B,s,nList,streamIndex,nVoxels);
+}
+
+void class_mcmp_SC_bb_D3Q19::bounce_back_moving(int nBlocks, int nThreads)
+{
+	mcmp_bounce_back_moving_D3Q19
+	<<<nBlocks,nThreads>>> (f2A,f2B,rA,rB,u,v,w,pt,pIDgrid,s,nList,streamIndex,nVoxels);
 }
 
 void class_mcmp_SC_bb_D3Q19::move_particles_bb(int nBlocks, int nThreads)
@@ -569,6 +606,7 @@ void class_mcmp_SC_bb_D3Q19::write_output(std::string tagname, int step,
                                            int iskip, int jskip, int kskip)
 {
 	write_vtk_structured_grid(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH,wH,iskip,jskip,kskip);
+	write_vtk_particles("parts",step,ptH,nParts);
 }
 
 

@@ -883,6 +883,66 @@ void write_vtk_unstructured_grid(std::string tagname, int tagnum, int nVoxels, i
 	outfile.close();	
 	*/
 }
+
+
+
+// -------------------------------------------------------------------------
+// Write VTK file for particles:
+// -------------------------------------------------------------------------
+
+void write_vtk_particles(std::string tagname, int tagnum, particle3D_bb* pt, int N)
+{
+
+    // -----------------------------------
+    //	Define the file location and name:
+    // -----------------------------------
+
+    ofstream outfile;
+    std::stringstream filenamecombine;
+    filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+    string filename = filenamecombine.str();
+    outfile.open(filename.c_str(), ios::out | ios::app);
+
+    // -----------------------------------
+    //	Write the 'vtk' file header:
+    // -----------------------------------
+
+    string d = "   ";
+    outfile << "# vtk DataFile Version 3.1" << endl;
+    outfile << "VTK file containing particle data" << endl;
+    outfile << "ASCII" << endl;
+    outfile << " " << endl;
+    outfile << "DATASET POLYDATA" << endl;
+    outfile << " " << endl;
+    outfile << "POINTS" << d << N << d << " float" << endl;
+
+    // -----------------------------------
+    //	Write the position data:
+    // -----------------------------------
+
+    for (int i=0; i<N; i++) {
+        outfile << fixed << setprecision(3) << pt[i].r.x << d << pt[i].r.y << d << pt[i].r.z << endl;
+    }
+
+    // -----------------------------------
+    //	write the radius data
+    // -----------------------------------
+
+    outfile << "POINT_DATA\t" << d << N << endl;
+    outfile << "SCALARS radius float\n";
+    outfile << "LOOKUP_TABLE default\n";
+
+    for (int i=0; i<N; i++) {
+        outfile << fixed << setprecision(3) << pt[i].rad << endl;
+    }
+
+    // -----------------------------------
+    //	Close the file:
+    // -----------------------------------
+
+    outfile.close();
+	
+}
 		
 
 

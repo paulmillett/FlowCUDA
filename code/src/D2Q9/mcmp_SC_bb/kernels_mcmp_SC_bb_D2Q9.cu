@@ -420,7 +420,7 @@ __global__ void mcmp_compute_density_bb_D2Q9(float* fA,
 
 
 // --------------------------------------------------------
-// D2Q9 compute density for each component: 
+// D2Q9 compute virtual density for each component: 
 // --------------------------------------------------------
 
 __global__ void mcmp_compute_virtual_density_bb_D2Q9(float* rAvirt,

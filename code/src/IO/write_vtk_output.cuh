@@ -2,6 +2,7 @@
 # define WRITE_VTK_OUTPUT_H
 
 # include "../IBM/3D/membrane_data.h"
+# include "../D3Q19/mcmp_SC_bb/kernels_mcmp_SC_bb_D3Q19.cuh"
 # include <string>
 
 
@@ -36,5 +37,8 @@ void write_vtk_polydata(std::string,int,int,int*,int*,int*,float*,
                         float*,float*,float*);
 
 void write_vtk_unstructured_grid(std::string,int,int,int*,int*,int*);
-							   
+
+void write_vtk_particles(std::string,int,particle3D_bb*,int);
+
+
 # endif  // WRITE_VTK_OUTPUT_H
