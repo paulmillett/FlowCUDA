@@ -120,6 +120,7 @@ public:
 	float getPfz(int);
 	float getPmass(int);
 	float getPrad(int);
+	float calculate_fluid_A_volume();
 	void initial_equilibrium_bb(int,int);
 	void compute_density_bb(int,int);
 	void compute_virtual_density_bb(int,int);

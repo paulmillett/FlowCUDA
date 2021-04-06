@@ -160,13 +160,7 @@ void mcmp_3D_capbridge_bb::initSystem()
 			for (int i=0; i<Nx; i++) {		
 				int ndx = k*Nx*Ny + j*Nx + i;	
 				float sij = float(lbm.getS(ndx));
-				/*
-				float ranA = (float)rand()/RAND_MAX;
-				float ranB = (float)rand()/RAND_MAX;
-				lbm.setRA(ndx,0.5 + 0.1*(ranA-0.5));
-				lbm.setRB(ndx,0.5 + 0.1*(ranB-0.5));
-				*/				
-				if (i > 60 && i < 139 && j > 30 && j < 70 && k > 30 && k < 70) {			
+				if (i > 96 && i < 104 && j > 22 && j < 78 && k > 22 && k < 78) {			
 					lbm.setRA(ndx,1.00*(1.0-sij));
 					lbm.setRB(ndx,0.02*(1.0-sij));				
 				}
@@ -324,6 +318,8 @@ void mcmp_3D_capbridge_bb::writeOutput(std::string tagname, int step)
 	// ----------------------------------------------
 	
 	lbm.write_output(tagname,step,1,1,1); 
+	float rATotal = lbm.calculate_fluid_A_volume();
+	cout << rATotal << endl;
 
 }
 

@@ -506,6 +506,21 @@ float class_mcmp_SC_bb_D3Q19::getPrad(int i)
 
 
 // --------------------------------------------------------
+// Calculate fluid "A" volume:
+// --------------------------------------------------------
+
+float class_mcmp_SC_bb_D3Q19::calculate_fluid_A_volume() 
+{
+	float sum = 0.0;
+	for (int i=0; i<nVoxels; i++) {
+		if (rAH[i] > 0.5) sum += 1.0; 
+	}
+	return sum;
+}
+
+
+
+// --------------------------------------------------------
 // Calls to Kernels:
 // --------------------------------------------------------
 

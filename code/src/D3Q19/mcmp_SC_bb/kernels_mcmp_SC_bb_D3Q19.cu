@@ -570,8 +570,10 @@ __global__ void mcmp_compute_virtual_density_bb_D3Q19(float* rAvirt,
 			float sumWS = s1+s2+s3+s4+s5+s6+s7+s8+s9+s10+s11+s12+s13+s14+s15+s16+s17+s18;	
 				
 			if (sumWS > 0.0) {
-				rAvirt[i] = sumRA/sumWS*(1.0+omega);
-				rBvirt[i] = sumRB/sumWS*(1.0-omega);	
+				//rAvirt[i] = sumRA/sumWS*(1.0+omega);
+				//rBvirt[i] = sumRB/sumWS*(1.0-omega);	
+				rAvirt[i] = sumRA/sumWS + omega; 
+				rBvirt[i] = sumRB/sumWS; // - omega; 	
 			}	
 			else {
 				rAvirt[i] = 0.0;
