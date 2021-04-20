@@ -1,6 +1,7 @@
 
 # include "class_mcmp_SC_bb_D2Q9.cuh"
 # include "../../IO/GetPot"
+# include "../../Utils/gpu_parallel_reduction.h"
 # include <math.h>
 using namespace std;  
 
@@ -216,6 +217,18 @@ void class_mcmp_SC_bb_D2Q9::create_lattice_box_periodic()
 
 
 // --------------------------------------------------------
+// Initialize lattice as a "box" set up for shear flow
+// in the x-direction:
+// --------------------------------------------------------
+
+void class_mcmp_SC_bb_D2Q9::create_lattice_box_shear()
+{
+	build_box_lattice_shear_D2Q9(nVoxels,Nx,Ny,voxelTypeH,nListH);
+}
+
+
+
+// --------------------------------------------------------
 // Initialize lattice from "file":
 // --------------------------------------------------------
 
@@ -254,7 +267,8 @@ void class_mcmp_SC_bb_D2Q9::stream_index_pull()
 
 void class_mcmp_SC_bb_D2Q9::stream_index_push_bb()
 {
-	stream_index_push_bb_D2Q9(nVoxels,nListH,sH,streamIndexH);
+	stream_index_push_bb_D2Q9(nVoxels,nListH,streamIndexH);
+	//stream_index_push_bb_D2Q9(nVoxels,nListH,sH,streamIndexH);
 }
 
 
@@ -460,6 +474,12 @@ void class_mcmp_SC_bb_D2Q9::map_particles_on_lattice_bb(int nBlocks, int nThread
 	<<<nBlocks,nThreads>>> (pt,x,y,s,sprev,pIDgrid,nVoxels,nParts);	
 }
 
+void class_mcmp_SC_bb_D2Q9::cover_uncover_bb(int nBlocks, int nThreads)
+{
+	mcmp_cover_uncover_bb_D2Q9 
+	<<<nBlocks,nThreads>>> (s,sprev,nList,u,v,rA,rB,f1A,f1B,nVoxels);	
+}
+
 void class_mcmp_SC_bb_D2Q9::compute_density_bb(int nBlocks, int nThreads)
 {
 	mcmp_compute_density_bb_D2Q9
@@ -493,13 +513,19 @@ void class_mcmp_SC_bb_D2Q9::compute_SC_forces_bb_2(int nBlocks, int nThreads)
 void class_mcmp_SC_bb_D2Q9::compute_velocity_bb(int nBlocks, int nThreads)
 {
 	mcmp_compute_velocity_bb_D2Q9 
-	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,FxA,FxB,FyA,FyB,u,v,s,nVoxels);
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,FxA,FxB,FyA,FyB,u,v,s,pIDgrid,pt,nVoxels);
 }
 
 void class_mcmp_SC_bb_D2Q9::set_boundary_velocity_bb(float uBC, float vBC, int nBlocks, int nThreads)
 {
 	mcmp_set_boundary_velocity_bb_D2Q9 
 	<<<nBlocks,nThreads>>> (uBC,vBC,rA,rB,FxA,FxB,FyA,FyB,u,v,y,Ny,nVoxels);
+}
+
+void class_mcmp_SC_bb_D2Q9::set_boundary_shear_velocity_bb(float uBot, float uTop, int nBlocks, int nThreads)
+{
+	mcmp_set_boundary_shear_velocity_bb_D2Q9 
+	<<<nBlocks,nThreads>>> (uBot,uTop,rA,rB,FxA,FxB,FyA,FyB,u,v,y,Ny,nVoxels);
 }
 
 void class_mcmp_SC_bb_D2Q9::collide_stream_bb(int nBlocks, int nThreads)
@@ -538,6 +564,37 @@ void class_mcmp_SC_bb_D2Q9::zero_particle_forces_bb(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (pt,nParts);
 }
 
+void class_mcmp_SC_bb_D2Q9::particle_particle_forces_bb(float K, float halo, int nBlocks, int nThreads)
+{
+	mcmp_particle_particle_forces_bb_D2Q9
+	<<<nBlocks,nThreads>>> (pt,K,halo,nParts);
+}
+
+
+
+// --------------------------------------------------------
+// Calls to Kernels: sum fluid density
+// --------------------------------------------------------
+
+void class_mcmp_SC_bb_D2Q9::sum_fluid_densities_bb(int nBlocks, int nThreads)
+{
+	// allocate memory for partialSum array:
+	float* partialSum;
+	cudaMalloc((void**)&partialSum, sizeof(float)*nBlocks);
+	// fluid A:
+	add_array_elements<<<nBlocks,nThreads,nThreads*sizeof(float)>>>(rA,        nVoxels,partialSum);
+	add_array_elements<<<1,      nThreads,nThreads*sizeof(float)>>>(partialSum,nBlocks,partialSum);
+	cudaDeviceSynchronize();
+	cudaMemcpy(&rAsum, partialSum, sizeof(float), cudaMemcpyDeviceToHost);
+	// fluid B:
+	add_array_elements<<<nBlocks,nThreads,nThreads*sizeof(float)>>>(rB,        nVoxels,partialSum);
+	add_array_elements<<<1,      nThreads,nThreads*sizeof(float)>>>(partialSum,nBlocks,partialSum);
+	cudaDeviceSynchronize();
+	cudaMemcpy(&rBsum, partialSum, sizeof(float), cudaMemcpyDeviceToHost);
+	// deallocate memory:
+	cudaFree(partialSum);
+}
+
 
 
 // --------------------------------------------------------
@@ -549,6 +606,11 @@ void class_mcmp_SC_bb_D2Q9::write_output(std::string tagname, int step)
 	write_vtk_structured_grid_2D(tagname,step,Nx,Ny,Nz,rAH,rBH,uH,vH);
 	//write_vtk_structured_grid_2D("rA",step,Nx,Ny,Nz,rAH,uH,vH);
 	//write_vtk_structured_grid_2D("rB",step,Nx,Ny,Nz,rBH,uH,vH);
+}
+
+void class_mcmp_SC_bb_D2Q9::write_density_sums(int step)
+{
+	cout << step << "  " << rAsum << "  " << rBsum << endl;
 }
 
 

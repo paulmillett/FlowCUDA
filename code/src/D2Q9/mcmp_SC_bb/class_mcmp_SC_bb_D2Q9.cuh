@@ -27,6 +27,8 @@ private:
 	float gAS;
 	float gBS;
 	float omega;
+	float rAsum,rAsum0;
+	float rBsum,rBsum0;
 			
 	// host arrays:
 	float* uH;
@@ -79,6 +81,7 @@ public:
 	void memcopy_device_to_host_particles();
 	void create_lattice_box();
 	void create_lattice_box_periodic();
+	void create_lattice_box_shear();
 	void create_lattice_file();
 	void stream_index_push();
 	void stream_index_pull();
@@ -112,8 +115,10 @@ public:
 	void zero_particle_forces_bb(int,int);
 	void move_particles_bb(int,int);
 	void fix_particle_velocity_bb(float,int,int);
+	void particle_particle_forces_bb(float,float,int,int);
 	void initial_equilibrium_bb(int,int);
 	void map_particles_on_lattice_bb(int,int);
+	void cover_uncover_bb(int,int);
 	void compute_density_bb(int,int);
 	void compute_virtual_density_bb(int,int);
 	void update_particles_on_lattice_bb(int,int);
@@ -121,12 +126,15 @@ public:
 	void compute_SC_forces_bb_2(int,int);
 	void compute_velocity_bb(int,int);
 	void set_boundary_velocity_bb(float,float,int,int);
+	void set_boundary_shear_velocity_bb(float,float,int,int);
 	void collide_stream_bb(int,int);
 	void bounce_back(int,int);
 	void bounce_back_moving(int,int);
-	void swap_populations();		
+	void swap_populations();
+	void sum_fluid_densities_bb(int,int);		
 	void write_output(std::string,int);
-
+	void write_density_sums(int);
+	
 };
 
 # endif  // CLASS_MCMP_SC_BB_D2Q9_H

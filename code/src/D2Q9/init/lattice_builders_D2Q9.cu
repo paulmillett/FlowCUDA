@@ -67,6 +67,67 @@ void build_box_lattice_D2Q9(int nVoxels,
 
 // --------------------------------------------------------
 // Build a rectilinear simulation box:
+// NOTE: Here, we assume shear flow in the x-direction,
+//       so we have bounce-back conditions on the y-walls
+// --------------------------------------------------------
+
+void build_box_lattice_shear_D2Q9(int nVoxels,
+                                  int Nx, int Ny,
+                                  int* voxelType, int* nList)
+{
+	
+	// -----------------------------------------------
+	// make sure dimensions match array sizes:
+	// -----------------------------------------------
+	
+	if (Nx*Ny != nVoxels) {
+		std::cout << "box size does not match nVoxels" << std::endl;
+		return;
+	}
+	
+	// -----------------------------------------------
+	// build voxelType[] array...
+	// -----------------------------------------------
+	
+	for (int j=0; j<Ny; j++) {
+		for (int i=0; i<Nx; i++) {
+			int ndx = j*Nx+i;
+			voxelType[ndx] = 0;		
+		}
+	}	
+		
+	// -----------------------------------------------
+	// build the nList[] array:
+	// (note: periodic boundaries are assumed)
+	// -----------------------------------------------
+		
+	int Q = 9;
+	for (int j=0; j<Ny; j++) {
+		for (int i=0; i<Nx; i++) {
+			int ndx = voxel_index(i,j,Nx,Ny); 
+			int offst = Q*ndx;
+			int ip1 = (i+1)%Nx;			
+			int jp1 = j+1;         //(j+1)%Ny;
+			int im1 = (Nx+i-1)%Nx;
+			int jm1 = j-1;         //(Ny+j-1)%Ny;	
+			nList[offst+0] = ndx;
+			nList[offst+1] = voxel_index(ip1, j,   Nx, Ny);	
+			nList[offst+2] = voxel_index(i,   jp1, Nx, Ny);	
+			nList[offst+3] = voxel_index(im1, j,   Nx, Ny);  	
+			nList[offst+4] = voxel_index(i,   jm1, Nx, Ny);	
+			nList[offst+5] = voxel_index(ip1, jp1, Nx, Ny);	
+			nList[offst+6] = voxel_index(im1, jp1, Nx, Ny);	
+			nList[offst+7] = voxel_index(im1, jm1, Nx, Ny);	
+			nList[offst+8] = voxel_index(ip1, jm1, Nx, Ny);			
+		}
+	}
+	
+}
+
+
+
+// --------------------------------------------------------
+// Build a rectilinear simulation box:
 // NOTE: Here, we assume an inlet and outlet in one of the
 //       directions!
 // --------------------------------------------------------

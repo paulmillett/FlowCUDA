@@ -30,7 +30,8 @@ __global__ void mcmp_move_particles_bb_D2Q9(particle2D_bb* pt,
 {
 	// define particle:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nParts) {		
+	if (i < nParts) {	
+		printf("particle force-x = %f \n",pt[i].f.x); 
 		float2 a = pt[i].f/pt[i].mass;
 		pt[i].r += pt[i].v + 0.5*a;  // assume dt = 1
 		pt[i].v += a;
@@ -58,6 +59,34 @@ __global__ void mcmp_fix_particle_velocity_bb_D2Q9(particle2D_bb* pt,
 		if (i == 1) {
 			pt[i].v.x = pvel;
 			pt[i].v.y = 0.00;
+		}		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Calculate particle-particle forces:
+// --------------------------------------------------------
+
+__global__ void mcmp_particle_particle_forces_bb_D2Q9(particle2D_bb* pt,
+                                                      float K,
+													  float halo,
+   								                      int nParts)
+{
+	// define particle:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nParts) {	
+		for (int j=0; j<nParts; j++) {
+			if (i==j) continue;
+			float2 rij = pt[i].r - pt[j].r;
+			float rr = length(rij);
+			// Hertz contact force:
+			float twoRadii = pt[i].rad + pt[j].rad + halo;
+			if (rr < twoRadii) {
+				float fmag = 2.5*K*pow(twoRadii - rr,1.5);
+				pt[i].f += fmag*(rij/rr);
+			}
 		}		
 	}
 }
@@ -159,7 +188,7 @@ __global__ void mcmp_map_particles_on_lattice_bb_D2Q9(particle2D_bb* pt,
 						    		                  int* y,
 												      int* s,
 													  int* sprev,									   
-									                  int* pIDgrid,										   
+									                  int* pIDgrid,													   
 									                  int nVoxels,
 									                  int nParts)
 {
@@ -178,10 +207,246 @@ __global__ void mcmp_map_particles_on_lattice_bb_D2Q9(particle2D_bb* pt,
 			float rr = sqrt(dx*dx + dy*dy);
 			if (rr <= pt[j].rad) {
 				s[i] = 1;
-				pIDgrid[i] = j;	
+				pIDgrid[i] = j;					
 			}		
 		}							
 	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 kernel to cover/uncover voxels as particles move: 
+// --------------------------------------------------------
+
+__global__ void mcmp_cover_uncover_bb_D2Q9(int* s,
+                                           int* sprev,
+										   int* nList,
+										   float* u,
+										   float* v,
+										   float* rA,
+										   float* rB,
+										   float* fA,
+										   float* fB,
+										   int nVoxels)
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nVoxels) {
+		if (sprev[i] == 1 && s[i] == 1) stay_covered_D2Q9(i,fA,fB);		
+		if (sprev[i] == 0 && s[i] == 1) cover_voxel_D2Q9(i,s,sprev,nList,u,v,rA,rB,fA,fB);
+		if (sprev[i] == 1 && s[i] == 0) uncover_voxel_D2Q9(i,s,sprev,nList,u,v,rA,rB,fA,fB);			
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 kernel to keep solid site populations zero: 
+// --------------------------------------------------------
+	
+__device__ void stay_covered_D2Q9(int i,
+                                  float* fA,
+								  float* fB)
+{
+	int offst = 9*i;		
+	for (int n=0; n<9; n++) {
+		fA[offst+n] = 0.0;
+		fB[offst+n] = 0.0;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 kernel to cover lattice site: 
+// --------------------------------------------------------
+
+__device__ void cover_voxel_D2Q9(int i,
+                                 int* s,
+								 int* sprev,
+								 int* nList,
+								 float* u,
+								 float* v,
+								 float* rA,
+								 float* rB,
+								 float* fA,
+								 float* fB)
+{
+	
+	// --------------------------------------------	
+	// sum up all the neighbors that are fluid:
+	// --------------------------------------------
+	
+	int offst = 9*i;
+	
+	/*
+	int nfn = 0;	
+	for (int n=1; n<9; n++) {
+		int nabor = nList[offst+n];
+		if (sprev[nabor] == 0 && s[nabor] == 0) nfn++;
+	}
+	
+	// --------------------------------------------	
+	// determine the density to distribute to each
+	// neighbor:
+	// --------------------------------------------
+	
+	float rAdist = 0.0;
+	float rBdist = 0.0;
+	if (nfn > 0) {
+		rAdist = rA[i]/float(nfn);
+		rBdist = rB[i]/float(nfn);
+	}
+	
+	// --------------------------------------------	
+	// add current voxel's density to neighboring
+	// fluid voxel densities:
+	// --------------------------------------------
+		
+	for (int n=1; n<9; n++) {
+		int nabor = nList[offst+n];
+		if (sprev[nabor] == 0 && s[nabor] == 0) {
+			add_density_to_populations_D2Q9(nabor,rAdist,rBdist,u[nabor],v[nabor],fA,fB);
+		}
+	}
+	*/
+	
+	// --------------------------------------------	
+	// zero the populations for this voxel:
+	// --------------------------------------------
+	
+	for (int n=0; n<9; n++) {
+		fA[offst+n] = 0.0;
+		fB[offst+n] = 0.0;
+	}
+		
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 kernel to cover lattice site: 
+// --------------------------------------------------------
+
+__device__ void uncover_voxel_D2Q9(int i,
+                                   int* s,
+								   int* sprev,
+								   int* nList,
+								   float* u,
+								   float* v,
+								   float* rA,
+								   float* rB,
+								   float* fA,
+								   float* fB)
+{
+	
+	// --------------------------------------------	
+	// sum up all the neighbors that are fluid:
+	// --------------------------------------------
+	
+	int nfn = 0;
+	int offst = 9*i;
+	float avenbrRA = 0.0;
+	float avenbrRB = 0.0;
+	for (int n=1; n<9; n++) {
+		int nabor = nList[offst+n];
+		if (sprev[nabor] == 0 && s[nabor] == 0) {
+			nfn++;
+			avenbrRA += rA[nabor];
+			avenbrRB += rB[nabor];
+		}
+	}
+	avenbrRA /= float(nfn);
+	avenbrRB /= float(nfn);
+	
+	// --------------------------------------------	
+	// assign the equilibrium populations:
+	// --------------------------------------------
+	
+	equilibrium_populations_bb_D2Q9(fA,fB,avenbrRA,avenbrRB,u[i],v[i],offst);
+	
+	// --------------------------------------------	
+	// reduce neighboring fluid densities to
+	// conserve mass:
+	// --------------------------------------------
+	
+	/*
+	float rAdist = -avenbrRA/float(nfn);
+	float rBdist = -avenbrRB/float(nfn);
+	for (int n=1; n<9; n++) {
+		int nabor = nList[offst+n];
+		if (sprev[nabor] == 0 && s[nabor] == 0) {
+			add_density_to_populations_D2Q9(nabor,rAdist,rBdist,u[nabor],v[nabor],fA,fB);
+		}
+	}
+	*/
+	
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 kernel to add density to populations: 
+// --------------------------------------------------------
+
+__device__ void add_density_to_populations_D2Q9(int i,
+                                                float rAdist,
+												float rBdist,
+												float u,
+												float v,
+												float* fA,
+												float* fB)
+{
+	const int offst = 9*i;
+	const float w0 = 4.0/9.0;
+	const float ws = 1.0/9.0;
+	const float wd = 1.0/36.0;	
+	const float omusq = 1.0 - 1.5*(u*u + v*v);
+	// dir 0
+	float feq = w0*omusq;
+	atomicAdd(&fA[offst+0], feq*rAdist);
+	atomicAdd(&fB[offst+0], feq*rBdist);
+	// dir 1
+	float evel = u;
+	feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
+	atomicAdd(&fA[offst+1], feq*rAdist);
+	atomicAdd(&fB[offst+1], feq*rBdist);
+	// dir 2
+	evel = v;
+	feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
+	atomicAdd(&fA[offst+2], feq*rAdist);
+	atomicAdd(&fB[offst+2], feq*rBdist);
+	// dir 3
+	evel = -u;
+	feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
+	atomicAdd(&fA[offst+3], feq*rAdist);
+	atomicAdd(&fB[offst+3], feq*rBdist);
+	// dir 4
+	evel = -v;
+	feq = ws*(omusq + 3.0*evel + 4.5*evel*evel);
+	atomicAdd(&fA[offst+4], feq*rAdist);
+	atomicAdd(&fB[offst+4], feq*rBdist);
+	// dir 5
+	evel = u + v;
+	feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
+	atomicAdd(&fA[offst+5], feq*rAdist);
+	atomicAdd(&fB[offst+5], feq*rBdist);
+	// dir 6
+	evel = -u + v;
+	feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
+	atomicAdd(&fA[offst+6], feq*rAdist);
+	atomicAdd(&fB[offst+6], feq*rBdist);
+	// dir 7
+	evel = -u - v;
+	feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
+	atomicAdd(&fA[offst+7], feq*rAdist);
+	atomicAdd(&fB[offst+7], feq*rBdist);
+	// dir 8
+	evel = u - v;
+	feq = wd*(omusq + 3.0*evel + 4.5*evel*evel);
+	atomicAdd(&fA[offst+8], feq*rAdist);	
+	atomicAdd(&fB[offst+8], feq*rBdist);
 }
 
 
@@ -321,6 +586,8 @@ __global__ void mcmp_compute_velocity_bb_D2Q9(float* fA,
 										      float* u,
 										      float* v,
 											  int* s,
+											  int* pIDgrid,
+											  particle2D_bb* pt,
 										      int nVoxels) 
 {
 	// define current voxel:
@@ -348,8 +615,9 @@ __global__ void mcmp_compute_velocity_bb_D2Q9(float* fA,
 		// --------------------------------------------------
 		
 		else if (s[i] == 1) {
-			//u[i] = 0.005;  // later, fill in with particle velocity
-			//v[i] = 0.0;  
+			int pID = pIDgrid[i];
+			u[i] = pt[pID].v.x;
+			v[i] = pt[pID].v.y;	
 		}
 					
 	}
@@ -396,13 +664,62 @@ __global__ void mcmp_set_boundary_velocity_bb_D2Q9(float uBC,
 
 
 // --------------------------------------------------------
+// D2Q9 set shear velocity on the y=0 and y=Ny-1 boundaries: 
+// --------------------------------------------------------
+
+__global__ void mcmp_set_boundary_shear_velocity_bb_D2Q9(float uBot,
+                                                         float uTop,
+	                                                     float* rA,
+										                 float* rB,
+										                 float* FxA,
+										                 float* FxB,
+										                 float* FyA,
+										                 float* FyB,
+										                 float* u,
+										                 float* v,
+												         int* y,											        
+											             int Ny,
+										                 int nVoxels) 
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {
+		if (y[i] == 0) {
+			float rTotal = rA[i] + rB[i];
+			float fxBC = (uBot - u[i])*2.0*rTotal;
+			float fyBC = (0.0  - v[i])*2.0*rTotal;
+			u[i] += 0.5*fxBC/rTotal;
+			v[i] += 0.5*fyBC/rTotal;
+			FxA[i] += fxBC*(rA[i]/rTotal);
+			FxB[i] += fxBC*(rB[i]/rTotal);
+			FyA[i] += fyBC*(rA[i]/rTotal);
+			FyB[i] += fyBC*(rB[i]/rTotal);
+		} 
+		if (y[i] == Ny-1) {
+			float rTotal = rA[i] + rB[i];
+			float fxBC = (uTop - u[i])*2.0*rTotal;
+			float fyBC = (0.0  - v[i])*2.0*rTotal;
+			u[i] += 0.5*fxBC/rTotal;
+			v[i] += 0.5*fyBC/rTotal;
+			FxA[i] += fxBC*(rA[i]/rTotal);
+			FxB[i] += fxBC*(rB[i]/rTotal);
+			FyA[i] += fyBC*(rA[i]/rTotal);
+			FyB[i] += fyBC*(rB[i]/rTotal);
+		}		
+	}
+}
+
+
+
+// --------------------------------------------------------
 // D2Q9 compute density for each component: 
 // --------------------------------------------------------
 
 __global__ void mcmp_compute_density_bb_D2Q9(float* fA,
                                         	 float* fB,
 										     float* rA,
-										     float* rB,
+										     float* rB,											 
 										     int nVoxels)
 {
 	// define current voxel:
@@ -413,7 +730,7 @@ __global__ void mcmp_compute_density_bb_D2Q9(float* fA,
 		rA[i] = fA[offst] + fA[offst+1] + fA[offst+2] + fA[offst+3] + fA[offst+4] + fA[offst+5] + fA[offst+6] +
 		        fA[offst+7] + fA[offst+8];
 		rB[i] = fB[offst] + fB[offst+1] + fB[offst+2] + fB[offst+3] + fB[offst+4] + fB[offst+5] + fB[offst+6] +
-		        fB[offst+7] + fB[offst+8];
+		        fB[offst+7] + fB[offst+8];		
 	}
 }
 
@@ -446,7 +763,9 @@ __global__ void mcmp_compute_virtual_density_bb_D2Q9(float* rAvirt,
 		}
 		
 		// solid node:
-		if (s[i] == 1) {			
+		if (s[i] == 1) {
+			const float ws = 1.0/9.0;
+			const float wd = 1.0/36.0;			
 			float r1A = rA[nList[offst+1]];
 			float r2A = rA[nList[offst+2]];
 			float r3A = rA[nList[offst+3]];
@@ -462,9 +781,7 @@ __global__ void mcmp_compute_virtual_density_bb_D2Q9(float* rAvirt,
 			float r5B = rB[nList[offst+5]];
 			float r6B = rB[nList[offst+6]];
 			float r7B = rB[nList[offst+7]];
-			float r8B = rB[nList[offst+8]];			
-			const float ws = 1.0/9.0;
-			const float wd = 1.0/36.0;
+			float r8B = rB[nList[offst+8]];				
 			float s1 = ws*(1 - s[nList[offst+1]]);
 			float s2 = ws*(1 - s[nList[offst+2]]);
 			float s3 = ws*(1 - s[nList[offst+3]]);
@@ -589,6 +906,10 @@ __global__ void mcmp_compute_SC_forces_bb_D2Q9(float* rA,
 // --------------------------------------------------------
 // D2Q9 compute Shan-Chen forces for the components
 // using pseudo-potential, psi = rho_0(1-exp(-rho/rho_o))
+//
+// Note: here we use the virtual fluid as described in
+//       Jansen & Harting, PRE, 83, 046707 (2011).
+//
 // --------------------------------------------------------
 
 __global__ void mcmp_compute_SC_forces_bb_2_D2Q9(float* rA,
