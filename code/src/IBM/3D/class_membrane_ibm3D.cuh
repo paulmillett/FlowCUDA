@@ -46,6 +46,7 @@ class class_membrane_ibm3D {
 	void memcopy_device_to_host();
 	void read_ibm_information(std::string);
 	void shift_node_positions(float,float,float);
+	void rest_geometries(int,int);
 	void write_output(std::string,int);
 	void update_node_positions(int,int);
 	void interpolate_velocity(float*,float*,float*,int,int,int,int);

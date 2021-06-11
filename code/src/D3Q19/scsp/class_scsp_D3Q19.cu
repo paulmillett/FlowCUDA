@@ -13,7 +13,10 @@ using namespace std;
 class_scsp_D3Q19::class_scsp_D3Q19()
 {
 	Q = 19;
-	GetPot inputParams("input.dat");	
+	GetPot inputParams("input.dat");
+	Nx = inputParams("Lattice/Nx",1);
+	Ny = inputParams("Lattice/Ny",1);
+	Nz = inputParams("Lattice/Nz",1);
 	nVoxels = inputParams("Lattice/nVoxels",0);
 	numIolets = inputParams("Lattice/numIolets",0);
 	nu = inputParams("LBM/nu",0.1666666);
@@ -240,10 +243,7 @@ void class_scsp_D3Q19::memcopy_device_to_host_inout()
 
 void class_scsp_D3Q19::create_lattice_box()
 {
-	GetPot inputParams("input.dat");	
-	Nx = inputParams("Lattice/Nx",1);
-	Ny = inputParams("Lattice/Ny",1);
-	Nz = inputParams("Lattice/Nz",1);
+	GetPot inputParams("input.dat");		
 	int flowDir = inputParams("Lattice/flowDir",0);
 	int xLBC = inputParams("Lattice/xLBC",0);
 	int xUBC = inputParams("Lattice/xUBC",0);
@@ -264,8 +264,19 @@ void class_scsp_D3Q19::create_lattice_box()
 
 void class_scsp_D3Q19::create_lattice_box_periodic()
 {
-	GetPot inputParams("input.dat");
-	// still need to add this...
+	build_box_lattice_D3Q19(nVoxels,Nx,Ny,Nz,voxelTypeH,nListH);
+}
+
+
+
+// --------------------------------------------------------
+// Initialize lattice as a "box" set up for shear flow
+// in the x-direction:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::create_lattice_box_shear()
+{
+	build_box_lattice_shear_D3Q19(nVoxels,Nx,Ny,Nz,voxelTypeH,nListH);
 }
 
 
@@ -500,17 +511,63 @@ void class_scsp_D3Q19::stream_collide_save_IBforcing(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "set_boundary_shear_velocity_D3Q19" kernel:
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::set_boundary_shear_velocity(float uBot, float uTop, int nBlocks, int nThreads)
+{
+	scsp_set_boundary_shear_velocity_D3Q19 
+	<<<nBlocks,nThreads>>> (uBot,uTop,f1,u,v,w,r,Nx,Ny,Nz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "extrapolate_velocity_IBM3D" kernel.  
 // Note: this kernel is in the IBM/3D folder, and one
 //       should use nBlocks as if calling an IBM kernel.
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::extrapolate_velocity_from_IBM(int nBlocks, int nThreads,
-	                                           float3* rIB, float3* vIB, int nNodes)
+	                                                 float3* rIB, float3* vIB, int nNodes)
 {
 	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
 	extrapolate_velocity_IBM3D
 	<<<nBlocks,nThreads>>> (rIB,vIB,uIBvox,vIBvox,wIBvox,weights,Nx,Ny,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "interpolate_velocity_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::interpolate_velocity_from_IBM(int nBlocks, int nThreads,
+	                                                 float3* rIB, float3* vIB, int nNodes)
+{
+	interpolate_velocity_IBM3D
+	<<<nBlocks,nThreads>>> (rIB,vIB,u,v,w,Nx,Ny,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "extrapolate_force_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::extrapolate_forces_from_IBM(int nBlocks, int nThreads,
+	                                               float3* rIB, float3* fIB, int nNodes)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	extrapolate_force_IBM3D
+	<<<nBlocks,nThreads>>> (rIB,fIB,Fx,Fy,Fz,Nx,Ny,nNodes);	
 }
 
 

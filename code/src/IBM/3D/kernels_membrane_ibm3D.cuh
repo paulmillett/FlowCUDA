@@ -5,6 +5,20 @@
 # include <cuda.h>
 
 
+
+__global__ void rest_edge_lengths_IBM3D(
+    float3*,
+	edge*,
+	int);
+
+
+__global__ void rest_edge_angles_IBM3D(
+	float3*,
+	edge*,
+	triangle*,
+	int);
+		
+	
 __global__ void compute_node_force_membrane_area_IBM3D(
 	triangle*,
     float3*,
@@ -38,22 +52,37 @@ __device__ inline float triangle_signed_volume(
 	const float3); 
 	
 	
+__device__ inline float3 triangle_normalvector(
+	const float3,
+	const float3,
+	const float3); 
+
+/*	
 __device__ inline void triangle_area_normalvector(
 	const float3,
 	const float3,
 	const float3,
 	float,
 	float3); 
-	
+*/	
 	
 __device__ inline float angle_between_faces(
 	const float3,
 	const float3,
 	const float3); 
-		
+
+
+__device__ inline int unique_triangle_vertex(
+	const int,
+	const int,
+	const int,
+	const int,
+	const int);
+					
 	
 __device__ inline void add_force_to_vertex(
-	float3,
+	int,
+	float3*,
 	const float3); 
 
 

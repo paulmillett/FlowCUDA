@@ -129,7 +129,17 @@ __device__ void add_density_to_populations_D2Q9(
 	float,
 	float*,
 	float*);
-												   
+
+
+__global__ void mcmp_correct_density_totals_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,												 
+	float,
+	float,
+	int);
+													   
 
 __global__ void mcmp_update_particles_on_lattice_D2Q9(
 	float*,

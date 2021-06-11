@@ -33,6 +33,29 @@ __global__ void scsp_initial_equilibrium_D3Q19(
 	int);
 
 
+__device__ void equilibrium_populations_bb_D3Q19(
+	float*,
+	const float,
+	const float,
+	const float,
+	const float,
+	const int);
+														 
+
+__global__ void scsp_set_boundary_shear_velocity_D3Q19(
+	float,
+	float,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,											  
+	int,
+	int,
+	int,
+	int);
+
+
 __global__ void scsp_stream_collide_save_D3Q19(
 	float*,
 	float*,

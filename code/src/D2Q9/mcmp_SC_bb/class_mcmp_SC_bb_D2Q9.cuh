@@ -100,7 +100,7 @@ public:
 	void setPvx(int,float);
 	void setPvy(int,float);
 	void setPrad(int,float);
-	void setPmass(int,float);	
+	void setPmass(int,float);
 	float getU(int);
 	float getV(int);
 	int   getS(int);
@@ -112,6 +112,7 @@ public:
 	float getPfy(int);
 	float getPrad(int);
 	float getPmass(int);
+	void calculate_initial_density_sums();
 	void zero_particle_forces_bb(int,int);
 	void move_particles_bb(int,int);
 	void fix_particle_velocity_bb(float,int,int);
@@ -120,6 +121,7 @@ public:
 	void map_particles_on_lattice_bb(int,int);
 	void cover_uncover_bb(int,int);
 	void compute_density_bb(int,int);
+	void correct_density_totals_bb(int,int);
 	void compute_virtual_density_bb(int,int);
 	void update_particles_on_lattice_bb(int,int);
 	void compute_SC_forces_bb(int,int);

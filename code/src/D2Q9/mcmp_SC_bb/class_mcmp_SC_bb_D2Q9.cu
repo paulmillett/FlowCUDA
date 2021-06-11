@@ -322,6 +322,22 @@ void class_mcmp_SC_bb_D2Q9::swap_populations()
 
 
 // --------------------------------------------------------
+// Calculate initial density sums for both A and B:
+// --------------------------------------------------------
+
+void class_mcmp_SC_bb_D2Q9::calculate_initial_density_sums()
+{
+	rAsum0 = 0.0;
+	rBsum0 = 0.0;
+	for (int i=0; i<nVoxels; i++) {
+		rAsum0 += rAH[i];
+		rBsum0 += rBH[i];
+	}
+}
+
+
+
+// --------------------------------------------------------
 // Setters for host arrays:
 // --------------------------------------------------------
 
@@ -484,6 +500,14 @@ void class_mcmp_SC_bb_D2Q9::compute_density_bb(int nBlocks, int nThreads)
 {
 	mcmp_compute_density_bb_D2Q9
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,nVoxels);
+}
+
+void class_mcmp_SC_bb_D2Q9::correct_density_totals_bb(int nBlocks, int nThreads)
+{
+	float delrA = rAsum - rAsum0;
+	float delrB = rBsum - rBsum0;
+	mcmp_correct_density_totals_D2Q9
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,delrA,delrB,nVoxels);
 }
 
 void class_mcmp_SC_bb_D2Q9::compute_virtual_density_bb(int nBlocks, int nThreads)

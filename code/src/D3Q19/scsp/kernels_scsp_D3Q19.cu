@@ -80,55 +80,111 @@ __global__ void scsp_initial_equilibrium_D3Q19(float* f1,
 	if (i < nVoxels) {			
 		// useful constants: 
 		const int offst = 19*i;
-		const float ux = u[i];
-		const float vy = v[i];
-		const float wz = w[i];
-		const float rho = r[i];
-		const float w0r = rho*1.0/3.0;
-		const float wsr = rho*1.0/18.0;
-		const float wdr = rho*1.0/36.0;
-		const float omusq = 1.0 - 1.5*(ux*ux + vy*vy + wz*wz);	
-		const float tux = 3.0*ux;
-		const float tvy = 3.0*vy;
-		const float twz = 3.0*wz;
-		// equilibrium populations:
-		f1[offst+0] = w0r*(omusq);				
-		float cidot3u = tux;
-		f1[offst+1] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -tux;
-		f1[offst+2] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tvy;
-		f1[offst+3] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -tvy;
-		f1[offst+4] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));	
-		cidot3u = twz;
-		f1[offst+5] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -twz;
-		f1[offst+6] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));		
-		cidot3u = tux+tvy;
-		f1[offst+7] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -(tux+tvy);
-		f1[offst+8] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tux+twz;
-		f1[offst+9] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -(tux+twz);
-		f1[offst+10] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tvy+twz;
-		f1[offst+11] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -(tvy+twz);
-		f1[offst+12] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tux-tvy;
-		f1[offst+13] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tvy-tux;
-		f1[offst+14] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tux-twz;
-		f1[offst+15] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = twz-tux;
-		f1[offst+16] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tvy-twz;
-		f1[offst+17] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = twz-tvy;
-		f1[offst+18] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+		equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 equilibrium populations:
+// --------------------------------------------------------
+
+__device__ void equilibrium_populations_bb_D3Q19(float* f1,
+										         const float r,
+										         const float u,
+										         const float v,
+												 const float w,
+												 const int offst)
+{
+	const float w0r = r*1.0/3.0;
+	const float wsr = r*1.0/18.0;
+	const float wdr = r*1.0/36.0;
+	const float omusq = 1.0 - 1.5*(u*u + v*v + w*w);	
+	const float tux = 3.0*u;
+	const float tvy = 3.0*v;
+	const float twz = 3.0*w;
+	// equilibrium populations:
+	f1[offst+0] = w0r*(omusq);				
+	float cidot3u = tux;
+	f1[offst+1] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -tux;
+	f1[offst+2] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tvy;
+	f1[offst+3] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -tvy;
+	f1[offst+4] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));	
+	cidot3u = twz;
+	f1[offst+5] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -twz;
+	f1[offst+6] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));		
+	cidot3u = tux+tvy;
+	f1[offst+7] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -(tux+tvy);
+	f1[offst+8] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tux+twz;
+	f1[offst+9] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -(tux+twz);
+	f1[offst+10] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tvy+twz;
+	f1[offst+11] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -(tvy+twz);
+	f1[offst+12] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tux-tvy;
+	f1[offst+13] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tvy-tux;
+	f1[offst+14] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tux-twz;
+	f1[offst+15] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = twz-tux;
+	f1[offst+16] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tvy-twz;
+	f1[offst+17] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = twz-tvy;
+	f1[offst+18] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to set shear velocities at the y=0 and
+// y=Ny-1 boundaries.  The shear direction is the x-dir.
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+__global__ void scsp_set_boundary_shear_velocity_D3Q19(float uBot,
+                                                       float uTop,
+													   float* f1,													   
+													   float* u,
+													   float* v,
+													   float* w,
+													   float* r,
+													   int Nx,
+													   int Ny,
+													   int Nz,
+													   int nVoxels)
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {		
+		int yi = (i/Nx)%Ny;	  // y-index assuming data is ordered first x, then y, then z
+		if (yi == 0) {
+			int offst = 19*i;
+			u[i] = uBot;
+			v[i] = 0.0;
+			w[i] = 0.0;
+			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
+		} 
+		if (yi == Ny-1) {
+			int offst = 19*i;
+			u[i] = uTop;
+			v[i] = 0.0;
+			w[i] = 0.0;
+			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
+		}		
 	}		
 }
 

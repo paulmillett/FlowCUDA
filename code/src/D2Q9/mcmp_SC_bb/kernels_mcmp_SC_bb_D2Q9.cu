@@ -455,6 +455,56 @@ __device__ void add_density_to_populations_D2Q9(int i,
 // D2Q9 kernel to update the particle fields on the lattice: 
 // --------------------------------------------------------
 
+__global__ void mcmp_correct_density_totals_D2Q9(float* fA,
+                                                 float* fB,
+												 float* rA,
+												 float* rB,												 
+												 float delrA,
+												 float delrB,
+												 int nVoxels)
+{
+	// define current voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {
+		const int offst = 9*i; 
+		const float w0 = 4.0/9.0;
+		const float ws = 1.0/9.0;
+		const float wd = 1.0/36.0;	
+		if (rA[i] > 0.5) {
+			float rAadd = -delrA/float(nVoxels);
+			rA[i] += rAadd;
+			fA[offst+0] += w0*rAadd;
+			fA[offst+1] += ws*rAadd;
+			fA[offst+2] += ws*rAadd;
+			fA[offst+3] += ws*rAadd;
+			fA[offst+4] += ws*rAadd;
+			fA[offst+5] += wd*rAadd;
+			fA[offst+6] += wd*rAadd;
+			fA[offst+7] += wd*rAadd;
+			fA[offst+8] += wd*rAadd;
+		}
+		if (rB[i] > 0.5) {
+			float rBadd = -delrB/float(nVoxels);
+			rB[i] += rBadd;
+			fB[offst+0] += w0*rBadd;
+			fB[offst+1] += ws*rBadd;
+			fB[offst+2] += ws*rBadd;
+			fB[offst+3] += ws*rBadd;
+			fB[offst+4] += ws*rBadd;
+			fB[offst+5] += wd*rBadd;
+			fB[offst+6] += wd*rBadd;
+			fB[offst+7] += wd*rBadd;
+			fB[offst+8] += wd*rBadd;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 kernel to update the particle fields on the lattice: 
+// --------------------------------------------------------
+
 __global__ void mcmp_update_particles_on_lattice_D2Q9(float* fA,
                                                       float* fB,
 										              float* rA,

@@ -156,7 +156,7 @@ void mcmp_2D_capbridge_shear_bb::initSystem()
 		for (int i=0; i<Nx; i++) {
 			int ndx = j*Nx + i;
 			float sij = float(lbm.getS(ndx));			
-			if (i > 230 && i < 370 && j > 130 && j < 170) {
+			if (i > 230 && i < 370 && j > 280 && j < 320) {
 				lbm.setRA(ndx,1.00*(1.0-sij));
 				lbm.setRB(ndx,0.02*(1.0-sij));				
 			}
@@ -173,6 +173,12 @@ void mcmp_2D_capbridge_shear_bb::initSystem()
 		lbm.setU(i,0.0);
 		lbm.setV(i,0.0);
 	}	
+	
+	// ----------------------------------------------		
+	// calculate initial density sums:  
+	// ----------------------------------------------
+	
+	lbm.calculate_initial_density_sums();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -255,6 +261,7 @@ void mcmp_2D_capbridge_shear_bb::cycleForward(int stepsPerCycle, int currentCycl
 		lbm.compute_virtual_density_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 		lbm.sum_fluid_densities_bb(nBlocks,nThreads);
+		lbm.correct_density_totals_bb(nBlocks,nThreads);
 		
 		// ------------------------------
 		// update fluid fields:											   
@@ -262,7 +269,7 @@ void mcmp_2D_capbridge_shear_bb::cycleForward(int stepsPerCycle, int currentCycl
 		
 		lbm.compute_SC_forces_bb_2(nBlocks,nThreads);
 		lbm.compute_velocity_bb(nBlocks,nThreads);
-		lbm.set_boundary_shear_velocity_bb(shearVel,shearVel,nBlocks,nThreads);
+		lbm.set_boundary_shear_velocity_bb(-shearVel,shearVel,nBlocks,nThreads);
 		lbm.collide_stream_bb(nBlocks,nThreads);
 		lbm.bounce_back_moving(nBlocks,nThreads);
 		lbm.swap_populations();	

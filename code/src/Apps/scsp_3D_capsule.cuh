@@ -27,6 +27,7 @@ private:
 	int iskip,jskip,kskip;
 	float tau;
 	float nu;
+	float shearVel;
 	std::string vtkFormat;
 	
 	// objects:

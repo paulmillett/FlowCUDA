@@ -14,8 +14,6 @@ using namespace std;
 scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
 {		
 	
-	cout << "starting with ctor" << endl; 
-	
 	// ----------------------------------------------
 	// 'GetPot' object containing input parameters:
 	// ----------------------------------------------
@@ -47,6 +45,7 @@ scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
+	shearVel = inputParams("LBM/shearVel",0.0);	
 	
 	// ----------------------------------------------
 	// Immersed-Boundary parameters:
@@ -78,9 +77,7 @@ scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
 	
 	lbm.allocate();
 	lbm.allocate_forces();
-	ibm.allocate();
-	
-	cout << "done with ctor" << endl;
+	ibm.allocate();	
 	
 }
 
@@ -113,14 +110,10 @@ void scsp_3D_capsule::initSystem()
 	string latticeSource = inputParams("Lattice/source","box");	
 	
 	// ----------------------------------------------
-	// create the lattice using "box" function.
-	// function location:
-	// "lattice/lattice_builders_D2Q9.cuh"	 
+	// create the lattice assuming shear flow.
 	// ----------------------------------------------	
 	
-	if (latticeSource == "box") {
-		lbm.create_lattice_box();
-	}	
+	lbm.create_lattice_box_shear();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -163,10 +156,14 @@ void scsp_3D_capsule::initSystem()
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
-	lbm.initial_equilibrium(nBlocks,nThreads);
+	lbm.initial_equilibrium(nBlocks,nThreads);	
 	
+	// ----------------------------------------------
+	// calculate rest geometries for membrane: 
+	// ----------------------------------------------
 	
-				
+	ibm.rest_geometries(nBlocks,nThreads);
+	
 }
 
 
@@ -191,16 +188,26 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 	// loop through this cycle:
 	// ----------------------------------------------
 	
-	/*
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
-		lbm.zero_forces_with_IBM(nBlocks,nThreads);
-		lbm.extrapolate_velocity_from_IBM(nBlocksIB,nThreads,ibm.r,ibm.v,ibm.nNodes);		
+		
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+		
+		// compute IBM node forces:
+		ibm.compute_node_forces(nBlocks,nThreads);
+		
+		// update fluid:
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
+		
+		// update membrane:
+		lbm.interpolate_velocity_from_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
 		ibm.update_node_positions(nBlocksIB,nThreads);
+		
 		cudaDeviceSynchronize();
 	}
-	*/
 	
 	cout << cummulativeSteps << endl;	
 		

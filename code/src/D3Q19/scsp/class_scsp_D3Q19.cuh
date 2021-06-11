@@ -81,6 +81,7 @@ public:
 	void memcopy_device_to_host_inout();
 	void create_lattice_box();
 	void create_lattice_box_periodic();
+	void create_lattice_box_shear();
 	void bounding_box_nList_construct();
 	void stream_index_push();
 	void stream_index_pull();
@@ -107,9 +108,12 @@ public:
 	void stream_collide_save(int,int,bool);	
 	void stream_collide_save_forcing(int,int);
 	void stream_collide_save_IBforcing(int,int);
+	void set_boundary_shear_velocity(float,float,int,int);
 	void zero_forces(int,int);
 	void zero_forces_with_IBM(int,int);	
 	void extrapolate_velocity_from_IBM(int,int,float3*,float3*,int);
+	void interpolate_velocity_from_IBM(int,int,float3*,float3*,int);
+	void extrapolate_forces_from_IBM(int,int,float3*,float3*,int);
 	void inside_hemisphere(int,int);
 	void read_lattice_geometry(int);
 	void vtk_structured_output_ruvw(std::string,int,int,int,int);
