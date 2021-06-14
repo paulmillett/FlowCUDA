@@ -17,8 +17,15 @@ __global__ void rest_edge_angles_IBM3D(
 	edge*,
 	triangle*,
 	int);
-		
-	
+
+
+__global__ void rest_triangle_areas_IBM3D(
+	float3*,
+	triangle*,
+	cell*,
+	int);
+
+
 __global__ void compute_node_force_membrane_area_IBM3D(
 	triangle*,
     float3*,

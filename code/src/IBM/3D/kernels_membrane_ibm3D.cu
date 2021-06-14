@@ -61,6 +61,37 @@ __global__ void rest_edge_angles_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to compute rest triangle areas:
+// --------------------------------------------------------
+
+__global__ void rest_triangle_areas_IBM3D(
+	float3* vertR,
+	triangle* faces,
+	cell* cells, 
+	int nFaces)
+{
+	// define face:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nFaces) {
+		int V0 = faces[i].v0;
+		int V1 = faces[i].v1;
+		int V2 = faces[i].v2;
+		float3 r0 = vertR[V0]; 
+		float3 r1 = vertR[V1];
+		float3 r2 = vertR[V2];
+		float3 norm = cross(r1 - r0, r2 - r0);
+		faces[i].area0 = 0.5*length(norm);
+		// calculate global cell geometries:
+		int cID = 0;
+		faces[i].cellID = cID;
+		float volFace = triangle_signed_volume(r0,r1,r2);
+		atomicAdd(&cells[cID].vol0,volFace); 		
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to compute force on node based on the 
 // membrane model of Zavodszky et al (Frontiers in Physiology
 // vol 8, p 563, 2017):
@@ -87,30 +118,30 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 		float3 r1 = vertR[V1];
 		float3 r2 = vertR[V2];
 		float3 norm = cross(r1 - r0, r2 - r0);
-		float  area = 0.5*length(norm);		
-		float  area0 = faces[i].area0;		
+		float  area = 0.5*length(norm);			
 		faces[i].area = area;
 		faces[i].norm = norm;
 		
 		// calculate local area dilation force:
-		/*
-		float areaRatio = (area-area0)/area0;
-		float areaForceMag = ka*(areaRatio + areaRatio/abs(0.09-areaRatio*areaRatio));
+		float area0 = faces[i].area0;	
+		float darea = area - area0;
+		//float areaRatio = (area-area0)/area0;
+		//float areaForceMag = ka*(areaRatio + areaRatio/abs(0.09-areaRatio*areaRatio));		
 		float3 centroid = (r0+r1+r2)/3.0;
 		float3 ar0 = centroid - r0;
 		float3 ar1 = centroid - r1;
 		float3 ar2 = centroid - r2;
-		//add_force_to_vertex(V0,vertF,areaForceMag*ar0);
-		//add_force_to_vertex(V1,vertF,areaForceMag*ar1);
-		//add_force_to_vertex(V2,vertF,areaForceMag*ar2);			
+		float areaForceMag = ka*darea/(length2(ar0) + length2(ar1) + length2(ar2));
+		add_force_to_vertex(V0,vertF,areaForceMag*ar0);
+		add_force_to_vertex(V1,vertF,areaForceMag*ar1);
+		add_force_to_vertex(V2,vertF,areaForceMag*ar2);			
 		
 		// calculate volume associated with this face,
 		// and add it to the volume of cell:
 		int cID = faces[i].cellID;
 		float volFace = triangle_signed_volume(r0,r1,r2);
 		atomicAdd(&cells[cID].vol,volFace); 
-		*/
-			
+					
 	}	
 }
 
@@ -183,8 +214,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		float3 FA = bendForceMag*(nC*dot(A-B,C-B)/BmA + nD*dot(A-B,D-B)/BmA);
 		float3 FB = bendForceMag*(nC*dot(A-B,A-C)/BmA + nD*dot(A-B,A-D)/BmA);
 		float3 FC = -bendForceMag*BmA*nC;
-		float3 FD = -bendForceMag*BmA*nD;
-		
+		float3 FD = -bendForceMag*BmA*nD;		
 		add_force_to_vertex(pA,vertF,FA);
 		add_force_to_vertex(pB,vertF,FB);
 		add_force_to_vertex(pC,vertF,FC);
@@ -211,24 +241,19 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 	// define face:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
-	if (i < nFaces) {
-		
-		// cell ID for this face:
+	if (i < nFaces) {				
+		// calculate volume conservation force:
 		int cID = faces[i].cellID;
-		
-		// vertex ID's for this face:
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		
-		// area and normal vector of this face:
 		int area = faces[i].area;
 		float3 norm = faces[i].norm;
-				
-		// calculate volume conservation force:
 		float volRatio = (cells[cID].vol - cells[cID].vol0)/cells[cID].vol0;
-		float volForceMag = -kv*(volRatio + volRatio/abs(0.01-volRatio*volRatio));
-		volForceMag *= area/cells[cID].areaAve;		
+		if (i==0) printf("volRatio is %f \n",volRatio);
+		float volForceMag = -kv*volRatio;  //-kv*(volRatio + volRatio/abs(0.01-volRatio*volRatio));
+		volForceMag *= area;  ///cells[cID].areaAve;	
+		volForceMag /= 3.0;	
 		add_force_to_vertex(V0,vertF,volForceMag*norm);
 		add_force_to_vertex(V1,vertF,volForceMag*norm);
 		add_force_to_vertex(V2,vertF,volForceMag*norm);					

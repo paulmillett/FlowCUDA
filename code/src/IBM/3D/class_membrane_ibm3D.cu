@@ -160,10 +160,8 @@ void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (r,edges,faces,nEdges);
 	
 	// rest triangle area:
-	
-	// rest cell area:	
-	
-	// rest cell volume:
+	rest_triangle_areas_IBM3D
+	<<<nBlocks,nThreads>>> (r,faces,cells,nFaces);
 }
 
 
@@ -213,7 +211,7 @@ void class_membrane_ibm3D::extrapolate_force(float* fxLBM, float* fyLBM,
 
 void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 {
-	// First, zero the nodes forces and the cell volumes:
+	// First, zero the node forces and the cell volumes:
 	zero_node_forces_IBM3D
 	<<<nBlocks,nThreads>>> (f,nNodes);
 			
@@ -222,19 +220,16 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 			
 	// Second, compute the area dilation force for each face:
 	compute_node_force_membrane_area_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,cells,ka,nFaces);
-	
+	<<<nBlocks,nThreads>>> (faces,r,f,cells,ka,nFaces);	
 		
 	// Third, compute the edge extension and bending force for each edge:
 	compute_node_force_membrane_edge_IBM3D
 	<<<nBlocks,nThreads>>> (faces,r,f,edges,ks,kb,nEdges);
-	
-	
+		
 	// Last, compute the volume expansion force for each face:
-	/*
 	compute_node_force_membrane_volume_IBM3D
 	<<<nBlocks,nThreads>>> (faces,f,cells,kv,nFaces);
-	*/
+	
 }
 
 
