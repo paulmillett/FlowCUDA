@@ -291,7 +291,6 @@ __global__ void compute_node_force_membrane_globalarea_IBM3D(
 		float area = cells[cID].area;
 		float area0 = cells[cID].area0;
 		float areaRatio = (area-area0)/area0;
-		if (i==0) printf("area = %f \n",area);
 		float3 centroid = (r0+r1+r2)/3.0;
 		float3 ar0 = centroid - r0;
 		float3 ar1 = centroid - r1;
