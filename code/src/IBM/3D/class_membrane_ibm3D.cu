@@ -20,6 +20,7 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	ks = inputParams("IBM/ks",0.0);
 	kb = inputParams("IBM/kb",0.0);
 	ka = inputParams("IBM/ka",0.0);
+	kag = inputParams("IBM/kag",0.0);
 	kv = inputParams("IBM/kv",0.0);
 }
 
@@ -226,9 +227,13 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 	compute_node_force_membrane_edge_IBM3D
 	<<<nBlocks,nThreads>>> (faces,r,f,edges,ks,kb,nEdges);
 		
-	// Last, compute the volume expansion force for each face:
+	// Forth, compute the volume conservation force for each face:
 	compute_node_force_membrane_volume_IBM3D
 	<<<nBlocks,nThreads>>> (faces,f,cells,kv,nFaces);
+	
+	// Fifth, compute the global area conservation force for each face:
+	compute_node_force_membrane_globalarea_IBM3D
+	<<<nBlocks,nThreads>>> (faces,r,f,cells,kag,nFaces);
 	
 }
 

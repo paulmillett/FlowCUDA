@@ -36,7 +36,8 @@ struct edge {
 struct cell {
 	float vol;
 	float vol0;
-	float areaAve;
+	float area;
+	float area0;
 	float3 com;
 };
 

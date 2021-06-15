@@ -21,7 +21,7 @@ class class_membrane_ibm3D {
 	int nFaces; 
 	int nEdges;
 	int nCells;
-	float ks,kb,ka,kv;	
+	float ks,kb,ka,kag,kv;	
 			
 	// host arrays:
 	float3* rH;	

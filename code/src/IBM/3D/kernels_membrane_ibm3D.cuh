@@ -51,7 +51,16 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 	cell*,
     float,
     int);
-		
+
+
+__global__ void compute_node_force_membrane_globalarea_IBM3D(
+	triangle*,
+	float3*,
+	float3*,
+	cell*,	
+	float,
+	int);
+
 
 __device__ inline float triangle_signed_volume(
 	const float3,

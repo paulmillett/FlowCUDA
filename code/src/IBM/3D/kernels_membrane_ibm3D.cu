@@ -85,7 +85,8 @@ __global__ void rest_triangle_areas_IBM3D(
 		int cID = 0;
 		faces[i].cellID = cID;
 		float volFace = triangle_signed_volume(r0,r1,r2);
-		atomicAdd(&cells[cID].vol0,volFace); 		
+		atomicAdd(&cells[cID].vol0,volFace); 
+		atomicAdd(&cells[cID].area0,faces[i].area0);		
 	}
 }
 
@@ -136,11 +137,11 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 		add_force_to_vertex(V1,vertF,areaForceMag*ar1);
 		add_force_to_vertex(V2,vertF,areaForceMag*ar2);			
 		
-		// calculate volume associated with this face,
-		// and add it to the volume of cell:
+		// add to global cell geometries:
 		int cID = faces[i].cellID;
 		float volFace = triangle_signed_volume(r0,r1,r2);
 		atomicAdd(&cells[cID].vol,volFace); 
+		atomicAdd(&cells[cID].area,area);
 					
 	}	
 }
@@ -247,16 +248,59 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		int area = faces[i].area;
-		float3 norm = faces[i].norm;
+		float area = faces[i].area;
+		float3 unitnorm = faces[i].norm/length(faces[i].norm);
 		float volRatio = (cells[cID].vol - cells[cID].vol0)/cells[cID].vol0;
-		if (i==0) printf("volRatio is %f \n",volRatio);
-		float volForceMag = -kv*volRatio;  //-kv*(volRatio + volRatio/abs(0.01-volRatio*volRatio));
-		volForceMag *= area;  ///cells[cID].areaAve;	
+		float volForceMag = -kv*volRatio;
+		volForceMag *= area;	
 		volForceMag /= 3.0;	
-		add_force_to_vertex(V0,vertF,volForceMag*norm);
-		add_force_to_vertex(V1,vertF,volForceMag*norm);
-		add_force_to_vertex(V2,vertF,volForceMag*norm);					
+		add_force_to_vertex(V0,vertF,volForceMag*unitnorm);
+		add_force_to_vertex(V1,vertF,volForceMag*unitnorm);
+		add_force_to_vertex(V2,vertF,volForceMag*unitnorm);					
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute force on node based on the 
+// membrane model of Zavodszky et al (Frontiers in Physiology
+// vol 8, p 563, 2017):
+// --------------------------------------------------------
+
+__global__ void compute_node_force_membrane_globalarea_IBM3D(
+	triangle* faces,
+	float3* vertR,
+	float3* vertF,
+	cell* cells,	
+	float kag,
+	int nFaces)
+{
+	// define face:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nFaces) {				
+		// calculate global area conservation force:
+		int cID = faces[i].cellID;
+		int V0 = faces[i].v0;
+		int V1 = faces[i].v1;
+		int V2 = faces[i].v2;
+		float3 r0 = vertR[V0]; 
+		float3 r1 = vertR[V1];
+		float3 r2 = vertR[V2];
+		float area = cells[cID].area;
+		float area0 = cells[cID].area0;
+		float areaRatio = (area-area0)/area0;
+		if (i==0) printf("area = %f \n",area);
+		float3 centroid = (r0+r1+r2)/3.0;
+		float3 ar0 = centroid - r0;
+		float3 ar1 = centroid - r1;
+		float3 ar2 = centroid - r2;
+		float areaForceMag = kag*faces[i].area*areaRatio;
+		areaForceMag /= length2(ar0) + length2(ar1) + length2(ar2);
+		add_force_to_vertex(V0,vertF,areaForceMag*ar0);
+		add_force_to_vertex(V1,vertF,areaForceMag*ar1);
+		add_force_to_vertex(V2,vertF,areaForceMag*ar2);			
 	}	
 }
 
@@ -394,7 +438,10 @@ __global__ void zero_cell_volumes_IBM3D(
 {
 	// define cell:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nCells) cells[i].vol = 0.0;
+	if (i < nCells) {
+		cells[i].vol = 0.0;
+		cells[i].area = 0.0;
+	}
 }
 
 
