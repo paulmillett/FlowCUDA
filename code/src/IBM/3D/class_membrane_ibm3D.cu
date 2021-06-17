@@ -239,6 +239,16 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 
 
 
+// --------------------------------------------------------
+// Calls to kernels that changes the default cell volume:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::change_cell_volume(float change, int nBlocks, int nThreads)
+{
+	change_cell_volumes_IBM3D
+	<<<nBlocks,nThreads>>> (cells,change,nCells);
+}
+
 
 
 

@@ -112,4 +112,10 @@ __global__ void zero_cell_volumes_IBM3D(
 	int);
 
 
+__global__ void change_cell_volumes_IBM3D(
+    cell*,
+	float,
+	int);
+		
+
 # endif  // KERNELS_MEMBRANE_IBM3D_H

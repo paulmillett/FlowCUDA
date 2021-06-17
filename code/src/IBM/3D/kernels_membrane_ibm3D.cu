@@ -94,8 +94,8 @@ __global__ void rest_triangle_areas_IBM3D(
 
 // --------------------------------------------------------
 // IBM3D kernel to compute force on node based on the 
-// membrane model of Zavodszky et al (Frontiers in Physiology
-// vol 8, p 563, 2017):
+// membrane model of Jancigova et al (Int. J. Numer. Meth.
+// Fluids, 92:1368 (2020)):
 // --------------------------------------------------------
 
 __global__ void compute_node_force_membrane_area_IBM3D(
@@ -150,8 +150,8 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 
 // --------------------------------------------------------
 // IBM3D kernel to compute force on node based on the 
-// membrane model of Zavodszky et al (Frontiers in Physiology
-// vol 8, p 563, 2017):
+// membrane model of Jancigova et al (Int. J. Numer. Meth.
+// Fluids, 92:1368 (2020)):
 // --------------------------------------------------------
 
 __global__ void compute_node_force_membrane_edge_IBM3D(
@@ -228,8 +228,8 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 
 // --------------------------------------------------------
 // IBM3D kernel to compute force on node based on the 
-// membrane model of Zavodszky et al (Frontiers in Physiology
-// vol 8, p 563, 2017):
+// membrane model of Jancigova et al (Int. J. Numer. Meth.
+// Fluids, 92:1368 (2020)):
 // --------------------------------------------------------
 
 __global__ void compute_node_force_membrane_volume_IBM3D(
@@ -264,8 +264,8 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 
 // --------------------------------------------------------
 // IBM3D kernel to compute force on node based on the 
-// membrane model of Zavodszky et al (Frontiers in Physiology
-// vol 8, p 563, 2017):
+// membrane model of Jancigova et al (Int. J. Numer. Meth.
+// Fluids, 92:1368 (2020)):
 // --------------------------------------------------------
 
 __global__ void compute_node_force_membrane_globalarea_IBM3D(
@@ -443,5 +443,20 @@ __global__ void zero_cell_volumes_IBM3D(
 	}
 }
 
+
+
+// --------------------------------------------------------
+// IBM3D kernel to reduce cell volume:
+// --------------------------------------------------------
+
+__global__ void change_cell_volumes_IBM3D(
+	cell* cells,
+	float change,
+	int nCells)
+{
+	// define cell:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nCells) cells[i].vol0 += change;
+}
 
 

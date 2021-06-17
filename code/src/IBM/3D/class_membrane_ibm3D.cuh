@@ -52,7 +52,7 @@ class class_membrane_ibm3D {
 	void interpolate_velocity(float*,float*,float*,int,int,int,int);
 	void extrapolate_force(float*,float*,float*,int,int,int,int);
 	void compute_node_forces(int,int);
-
+	void change_cell_volume(float,int,int);
 
 };
 
