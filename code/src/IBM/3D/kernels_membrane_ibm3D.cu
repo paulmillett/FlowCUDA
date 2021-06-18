@@ -364,13 +364,45 @@ __device__ inline float angle_between_faces(
 	const float3 n1,
 	const float3 r01)
 {
+	float3 n0xn1 = cross(n0,n1);
+	float3 r10 = make_float3(0.0,0.0,0.0) - r01;
+	return M_PI - std::atan2( dot(n0xn1,r10), dot(n0,n1) );
+	
+	/*
+	float cosine = dot(n0,n1)/(length(n0)*length(n1));
+	if (cosine > 1.0) cosine = 1.0;
+	if (cosine < -1.0) cosine = -1.0;
+	float theta = M_PI - std::acos(cosine);
+	if (theta > M_PI) return 2*M_PI - theta;
+	return theta;
+	*/
+}
+
+
+
+/*
+// --------------------------------------------------------
+// compute angle between normals of two faces defined by
+// points:
+// --------------------------------------------------------
+
+__device__ inline float angle_between_faces(
+	const float3 p1,
+	const float3 p2,
+	const float3 p3,
+	const float3 p4)
+{
+	const float3 n0 = triangle_normalvector(p1,p2)
 	//float3 n0xn1 = cross(n0,n1);
 	//return std::atan2( dot(n0xn1,r01), dot(n0,n1) );
 	float cosine = dot(n0,n1)/(length(n0)*length(n1));
 	if (cosine > 1.0) cosine = 1.0;
 	if (cosine < -1.0) cosine = -1.0;
-	return M_PI - std::acos(cosine);
+	float theta = M_PI - std::acos(cosine);
+	//if (theta > M_PI) return 2*M_PI - theta;
+	return theta;
 }
+*/
 
 
 

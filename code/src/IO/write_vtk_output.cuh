@@ -21,6 +21,8 @@ void write_vtk_immersed_boundary_3D(std::string,int,int,int,float3*,int*,int*,in
 
 void write_vtk_immersed_boundary_3D(std::string,int,int,int,float3*,triangle*);
 
+void write_vtk_immersed_boundary_normals_3D(std::string,int,int,int,int,float3*,triangle*,edge*);
+
 void write_vtk_structured_grid(std::string,int,int,int,int,float*,
                                float*,float*,float*);
 							   														  							   

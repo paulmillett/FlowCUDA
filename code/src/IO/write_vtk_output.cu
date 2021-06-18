@@ -842,6 +842,112 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 
 
 
+// -------------------------------------------------------------------------
+// Write IBM mesh to 'vtk' file:
+// -------------------------------------------------------------------------
+
+void write_vtk_immersed_boundary_normals_3D(std::string tagname, int tagnum, int nNodes, int nFaces,
+                                            int nEdges, float3* r, triangle* faces, edge* edges)
+{
+	
+	// -----------------------------------
+	//	Define the file location and name:
+	// -----------------------------------
+
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+
+	// -----------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------
+
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing IBM data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET POLYDATA" << endl;			
+	
+	// -----------------------------------
+	//	Write the node positions:
+	// -----------------------------------
+
+	outfile << " " << endl;	
+	outfile << "POINTS " << nNodes << " float" << endl;
+	for (int n=0; n<nNodes; n++) {
+		outfile << fixed << setprecision(3) << r[n].x << "  " << r[n].y << "  " << r[n].z << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the edge information:
+	// -----------------------------------------------
+	
+	outfile << " " << endl;
+	outfile << "LINES " << nEdges << " " << 3*nEdges << endl;
+	for (int i=0; i<nEdges; i++) {
+		outfile << 2 << " " << edges[i].v0 << " " << edges[i].v1 << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the edge information:
+	// -----------------------------------------------
+	
+	outfile << " " << endl;
+	outfile << "LINES " << nEdges << " " << 3*nEdges << endl;
+	for (int i=0; i<nEdges; i++) {
+		outfile << 2 << " " << edges[i].v0 << " " << edges[i].v1 << endl;
+	}
+			
+	// -----------------------------------------------
+	//	Write the polygon information:
+	// -----------------------------------------------
+	
+	/*
+	outfile << " " << endl;
+	outfile << "POLYGONS " << nFaces << " " << 4*nFaces << endl;
+	for (int i=0; i<nFaces; i++) {
+		outfile << 3 << " " << faces[i].v0 << " " << faces[i].v1 << " " << faces[i].v2 << endl;
+	}
+	*/
+			
+	// -----------------------------------------------
+	//	Write the normal vector information:
+	// -----------------------------------------------
+	
+	/*
+	outfile << " " << endl;
+	outfile << "CELL_DATA " << nFaces << endl;
+	outfile << "NORMALS " << "Face-normals " << "float" << endl;
+	for (int i=0; i<nFaces; i++) {
+		outfile << faces[i].norm.x << " " << faces[i].norm.y << " " << faces[i].norm.z << endl;
+	}
+	*/
+	
+	// -----------------------------------------------
+	//	Write the edge angle information:
+	// -----------------------------------------------
+	
+	outfile << " " << endl;
+	outfile << "CELL_DATA " << nEdges << endl;
+	outfile << "SCALARS " << "edge-angle " << "float " << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nEdges; i++) {
+		outfile << edges[i].theta0 << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+		
+	outfile.close();
+	
+}
+
+
+
 // -----------------------------------------------------------------------------------------
 // Write output in a VTK Unstructured Grid format:
 // -----------------------------------------------------------------------------------------

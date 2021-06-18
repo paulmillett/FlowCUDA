@@ -104,6 +104,8 @@ void class_membrane_ibm3D::memcopy_host_to_device()
 void class_membrane_ibm3D::memcopy_device_to_host()
 {
 	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);	
+	cudaMemcpy(facesH, faces, sizeof(triangle)*nFaces, cudaMemcpyDeviceToHost);
+	cudaMemcpy(edgesH, edges, sizeof(edge)*nEdges, cudaMemcpyDeviceToHost);
 }
 
 
@@ -140,8 +142,11 @@ void class_membrane_ibm3D::shift_node_positions(float xsh, float ysh, float zsh)
 
 void class_membrane_ibm3D::write_output(std::string tagname, int tagnum)
 {
-	write_vtk_immersed_boundary_3D(tagname,tagnum,
-	nNodes,nFaces,rH,facesH);
+	//write_vtk_immersed_boundary_3D(tagname,tagnum,
+	//nNodes,nFaces,rH,facesH);
+	
+	write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
+	nNodes,nFaces,nEdges,rH,facesH,edgesH);
 }
 
 
