@@ -73,14 +73,6 @@ __device__ inline float3 triangle_normalvector(
 	const float3,
 	const float3); 
 
-/*	
-__device__ inline void triangle_area_normalvector(
-	const float3,
-	const float3,
-	const float3,
-	float,
-	float3); 
-*/	
 	
 __device__ inline float angle_between_faces(
 	const float3,

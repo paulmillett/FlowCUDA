@@ -136,7 +136,7 @@ void scsp_3D_capsule::initSystem()
 	// initialize immersed boundary info: 
 	// ----------------------------------------------
 	
-	ibm.read_ibm_information("rbc.dat");
+	ibm.read_ibm_information("sphere.dat");
 	ibm.shift_node_positions(20.0,20.0,20.0);
 	
 	// ----------------------------------------------
@@ -205,6 +205,8 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 		// update membrane:
 		lbm.interpolate_velocity_from_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
 		ibm.update_node_positions(nBlocks,nThreads);
+		
+		if (cummulativeSteps <= 1508) ibm.change_cell_volume(-1.0,nBlocks,nThreads);
 				
 		cudaDeviceSynchronize();
 	}

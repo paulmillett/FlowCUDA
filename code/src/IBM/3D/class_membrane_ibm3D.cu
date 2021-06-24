@@ -12,6 +12,7 @@ using namespace std;
 
 class_membrane_ibm3D::class_membrane_ibm3D()
 {
+	// get some parameters:
 	GetPot inputParams("input.dat");	
 	nNodes = inputParams("IBM/nNodes",0);
 	nFaces = inputParams("IBM/nFaces",0);	
@@ -22,6 +23,20 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	ka = inputParams("IBM/ka",0.0);
 	kag = inputParams("IBM/kag",0.0);
 	kv = inputParams("IBM/kv",0.0);
+	binsFlag = inputParams("IBM/binsFlag",false);
+		
+	// if we need bins, do some calculations:
+	if (binsFlag) {
+		sizeBins = inputParams("IBM/sizeBins",0.0);
+		binMax = inputParams("IBM/binMax",0);
+		int Nx = inputParams("Lattice/Nx",1);
+		int Ny = inputParams("Lattice/Ny",1);
+		int Nz = inputParams("Lattice/Nz",1);
+		numBins.x = int(floor(Nx/sizeBins));
+	    numBins.y = int(floor(Ny/sizeBins));
+	    numBins.z = int(floor(Nz/sizeBins));
+		nBins = numBins.x*numBins.y*numBins.z;
+	}
 }
 
 
@@ -55,7 +70,12 @@ void class_membrane_ibm3D::allocate()
 	cudaMalloc((void **) &f, nNodes*sizeof(float3));
 	cudaMalloc((void **) &faces, nFaces*sizeof(triangle));
 	cudaMalloc((void **) &edges, nEdges*sizeof(edge));
-	cudaMalloc((void **) &cells, nCells*sizeof(cell));	
+	cudaMalloc((void **) &cells, nCells*sizeof(cell));
+	if (binsFlag) {
+		cudaMalloc((void **) &binMembers, nBins*binMax*sizeof(int));
+		cudaMalloc((void **) &binOccupancy, nBins*sizeof(int));
+		cudaMalloc((void **) &binMap, nBins*26*sizeof(int));
+	}	
 }
 
 
@@ -78,7 +98,12 @@ void class_membrane_ibm3D::deallocate()
 	cudaFree(f);
 	cudaFree(faces);
 	cudaFree(edges);
-	cudaFree(cells);		
+	cudaFree(cells);
+	if (binsFlag) {
+		cudaFree(binMembers);
+		cudaFree(binOccupancy);
+		cudaFree(binMap);
+	}		
 }
 
 
@@ -206,6 +231,54 @@ void class_membrane_ibm3D::extrapolate_force(float* fxLBM, float* fyLBM,
 {
 	extrapolate_force_IBM3D
 	<<<nBlocks,nThreads>>> (r,v,fxLBM,fyLBM,fzLBM,Nx,Ny,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that builds the binMap array:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::build_binMap(int nBlocks, int nThreads)
+{
+	build_binMap_IBM3D
+	<<<nBlocks,nThreads>>> (binMap,numBins,nnbins,nBins);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that resets bin lists:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
+{
+	reset_bin_lists_IBM3D
+	<<<nBlocks,nThreads>>> (binOccupancy,binMembers,binMax,nBins);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that builds bin lists:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::build_bin_lists(int nBlocks, int nThreads)
+{
+	build_bin_lists_IBM3D
+	<<<nBlocks,nThreads>>> (r,binOccupancy,binMembers,numBins,sizeBins,nNodes,binMax);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads)
+{
+	nonbonded_node_interactions_IBM3D
+	<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,numBins,sizeBins,nNodes,binMax,nnbins);
 }
 
 

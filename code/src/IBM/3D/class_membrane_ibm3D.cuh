@@ -7,6 +7,7 @@
 # include "../../Utils/helper_math.h"
 # include "kernels_ibm3D.cuh"
 # include "kernels_membrane_ibm3D.cuh"
+# include "kernels_nonbonded_ibm3D.cuh"
 # include "membrane_data.h"
 # include <cuda.h>
 # include <string>
@@ -21,7 +22,13 @@ class class_membrane_ibm3D {
 	int nFaces; 
 	int nEdges;
 	int nCells;
-	float ks,kb,ka,kag,kv;	
+	int binMax;
+	int nnbins;
+	int nBins;
+	int3 numBins;
+	float sizeBins;
+	float ks,kb,ka,kag,kv;
+	bool binsFlag;
 			
 	// host arrays:
 	float3* rH;	
@@ -35,7 +42,10 @@ class class_membrane_ibm3D {
 	float3* f;
 	triangle* faces;
 	edge* edges;
-	cell* cells;	
+	cell* cells;
+	int* binMembers;
+	int* binOccupancy;
+	int* binMap;	
 	
 	// methods:
 	class_membrane_ibm3D();
@@ -50,7 +60,11 @@ class class_membrane_ibm3D {
 	void write_output(std::string,int);
 	void update_node_positions(int,int);
 	void interpolate_velocity(float*,float*,float*,int,int,int,int);
-	void extrapolate_force(float*,float*,float*,int,int,int,int);
+	void extrapolate_force(float*,float*,float*,int,int,int,int);	
+	void build_binMap(int,int);
+	void reset_bin_lists(int,int);
+	void build_bin_lists(int,int);
+	void nonbonded_node_interactions(int,int);	
 	void compute_node_forces(int,int);
 	void change_cell_volume(float,int,int);
 

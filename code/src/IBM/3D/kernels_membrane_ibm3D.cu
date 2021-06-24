@@ -41,6 +41,7 @@ __global__ void rest_edge_angles_IBM3D(
 	if (i < nEdges) {
 		// calculate edge vector:
 		float3 r01 = vertR[edges[i].v1] - vertR[edges[i].v0];
+		r01 /= length(r01);
 		// calculate normal vector for face 0:
 		int f0 = edges[i].f0;  // face ID
 		float3 r0 = vertR[faces[f0].v0]; 
@@ -197,7 +198,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		int F1 = edges[i].f1;
 		float3 n0 = faces[F0].norm;  // normals were calculated above in
 		float3 n1 = faces[F1].norm;  // "compute_node_force_membrane_area_IBM3D()"
-		float dtheta = angle_between_faces(n0,n1,r01) - edges[i].theta0;
+		float dtheta = angle_between_faces(n0,n1,r01/edgeL) - edges[i].theta0;
 		float bendForceMag = kb*dtheta;  // = kb*(dtheta + dtheta/abs(2.467 - dtheta*dtheta));
 				
 		// apply to the four points:
@@ -335,28 +336,11 @@ __device__ inline float3 triangle_normalvector(
 
 
 // --------------------------------------------------------
-// compute area and normal vector of a triangle face:
-// --------------------------------------------------------
-
-/*
-__device__ inline void triangle_area_normalvector(
-	const float3 r0,
-	const float3 r1,
-	const float3 r2,
-	float area,
-	float3 norm)
-{
-	norm = cross(r1 - r0, r2 - r0);
-	float normL = length(norm);
-	area = 0.5*normL;
-	//norm /= normL;
-}
-*/
-
-
-
-// --------------------------------------------------------
 // compute angle between normals of two faces:
+// n0 is the normal vector to face 0.
+// n1 is the normal vector to face 1.
+// r01 is the unit vector between common points 0 and 1
+// shared by the two faces.
 // --------------------------------------------------------
 
 __device__ inline float angle_between_faces(
@@ -364,45 +348,14 @@ __device__ inline float angle_between_faces(
 	const float3 n1,
 	const float3 r01)
 {
-	float3 n0xn1 = cross(n0,n1);
-	float3 r10 = make_float3(0.0,0.0,0.0) - r01;
-	return M_PI - std::atan2( dot(n0xn1,r10), dot(n0,n1) );
-	
-	/*
-	float cosine = dot(n0,n1)/(length(n0)*length(n1));
-	if (cosine > 1.0) cosine = 1.0;
-	if (cosine < -1.0) cosine = -1.0;
-	float theta = M_PI - std::acos(cosine);
-	if (theta > M_PI) return 2*M_PI - theta;
-	return theta;
-	*/
-}
-
-
-
-/*
-// --------------------------------------------------------
-// compute angle between normals of two faces defined by
-// points:
-// --------------------------------------------------------
-
-__device__ inline float angle_between_faces(
-	const float3 p1,
-	const float3 p2,
-	const float3 p3,
-	const float3 p4)
-{
-	const float3 n0 = triangle_normalvector(p1,p2)
+	// left-handed:
+	float3 n1xn0 = cross(n1,n0);
+	return M_PI - std::atan2( dot(n1xn0,r01), dot(n0,n1) );
+	// right-handed:
 	//float3 n0xn1 = cross(n0,n1);
-	//return std::atan2( dot(n0xn1,r01), dot(n0,n1) );
-	float cosine = dot(n0,n1)/(length(n0)*length(n1));
-	if (cosine > 1.0) cosine = 1.0;
-	if (cosine < -1.0) cosine = -1.0;
-	float theta = M_PI - std::acos(cosine);
-	//if (theta > M_PI) return 2*M_PI - theta;
-	return theta;
+	//float3 r10 = make_float3(0.0,0.0,0.0) - r01;
+	//return M_PI - std::atan2( dot(n0xn1,r10), dot(n0,n1) );
 }
-*/
 
 
 
