@@ -83,8 +83,7 @@ __global__ void rest_triangle_areas_IBM3D(
 		float3 norm = cross(r1 - r0, r2 - r0);
 		faces[i].area0 = 0.5*length(norm);
 		// calculate global cell geometries:
-		int cID = 0;
-		faces[i].cellID = cID;
+		int cID = faces[i].cellID;
 		float volFace = triangle_signed_volume(r0,r1,r2);
 		atomicAdd(&cells[cID].vol0,volFace); 
 		atomicAdd(&cells[cID].area0,faces[i].area0);		

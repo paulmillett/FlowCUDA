@@ -17,18 +17,22 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	nNodes = inputParams("IBM/nNodes",0);
 	nFaces = inputParams("IBM/nFaces",0);	
 	nEdges = inputParams("IBM/nEdges",0);
-	nCells = inputParams("IBM/nCells",0);
+	nCells = inputParams("IBM/nCells",1);
 	ks = inputParams("IBM/ks",0.0);
 	kb = inputParams("IBM/kb",0.0);
 	ka = inputParams("IBM/ka",0.0);
 	kag = inputParams("IBM/kag",0.0);
 	kv = inputParams("IBM/kv",0.0);
-	binsFlag = inputParams("IBM/binsFlag",false);
+	nNodesPerCell = nNodes/nCells;
+	nFacesPerCell = nFaces/nCells;
+	nEdgesPerCell = nEdges/nCells;
+	binsFlag = false;
+	if (nCells > 1) binsFlag = true;
 		
 	// if we need bins, do some calculations:
 	if (binsFlag) {
-		sizeBins = inputParams("IBM/sizeBins",0.0);
-		binMax = inputParams("IBM/binMax",0);
+		sizeBins = inputParams("IBM/sizeBins",2.0);
+		binMax = inputParams("IBM/binMax",1);
 		int Nx = inputParams("Lattice/Nx",1);
 		int Ny = inputParams("Lattice/Ny",1);
 		int Nz = inputParams("Lattice/Nz",1);
@@ -63,6 +67,9 @@ void class_membrane_ibm3D::allocate()
 	facesH = (triangle*)malloc(nFaces*sizeof(triangle));
 	edgesH = (edge*)malloc(nEdges*sizeof(edge));
 	cellsH = (cell*)malloc(nCells*sizeof(cell));
+	if (binsFlag) {
+		cellIDsH = (int*)malloc(nNodes*sizeof(int));
+	}
 				
 	// allocate array memory (device):
 	cudaMalloc((void **) &r, nNodes*sizeof(float3));	
@@ -75,6 +82,7 @@ void class_membrane_ibm3D::allocate()
 		cudaMalloc((void **) &binMembers, nBins*binMax*sizeof(int));
 		cudaMalloc((void **) &binOccupancy, nBins*sizeof(int));
 		cudaMalloc((void **) &binMap, nBins*26*sizeof(int));
+		cudaMalloc((void **) &cellIDs, nNodes*sizeof(int));
 	}	
 }
 
@@ -91,6 +99,9 @@ void class_membrane_ibm3D::deallocate()
 	free(facesH);
 	free(edgesH);
 	free(cellsH);	
+	if (binsFlag) {
+		free(cellIDsH);
+	}
 			
 	// free array memory (device):
 	cudaFree(r);	
@@ -103,6 +114,7 @@ void class_membrane_ibm3D::deallocate()
 		cudaFree(binMembers);
 		cudaFree(binOccupancy);
 		cudaFree(binMap);
+		cudaFree(cellIDs);
 	}		
 }
 
@@ -118,6 +130,9 @@ void class_membrane_ibm3D::memcopy_host_to_device()
 	cudaMemcpy(faces, facesH, sizeof(triangle)*nFaces, cudaMemcpyHostToDevice);	
 	cudaMemcpy(edges, edgesH, sizeof(edge)*nEdges, cudaMemcpyHostToDevice);
 	cudaMemcpy(cells, cellsH, sizeof(cell)*nCells, cudaMemcpyHostToDevice);
+	if (binsFlag) {
+		cudaMemcpy(cellIDs, cellIDsH, sizeof(int)*nNodes, cudaMemcpyHostToDevice);
+	}
 }
 	
 
@@ -141,7 +156,61 @@ void class_membrane_ibm3D::memcopy_device_to_host()
 
 void class_membrane_ibm3D::read_ibm_information(std::string tagname)
 {
-	read_ibm_information_long(tagname,nNodes,nFaces,nEdges,rH,facesH,edgesH);
+	read_ibm_information_long(tagname,nNodesPerCell,nFacesPerCell,nEdgesPerCell,rH,facesH,edgesH);
+}
+
+
+
+// --------------------------------------------------------
+// Duplicate a cell mesh information a certain number
+// of times:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::assign_cellIDs_to_nodes()
+{
+	for (int c=0; c<nCells; c++) {
+		for (int i=0; i<nNodesPerCell; i++) {
+			int ii = i + c*nNodesPerCell;
+			cellIDsH[ii] = c;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Duplicate a cell mesh information a certain number
+// of times:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::duplicate_cells()
+{
+	if (nCells > 1) {
+		for (int c=1; c<nCells; c++) {
+			// copy node positions:
+			for (int i=0; i<nNodesPerCell; i++) {
+				int ii = i + c*nNodesPerCell;
+				rH[ii] = rH[i];
+			}
+			// copy edge info:
+			for (int i=0; i<nEdgesPerCell; i++) {
+				int ii = i + c*nEdgesPerCell;
+				edgesH[ii].v0 = edgesH[i].v0 + c*nNodesPerCell;
+				edgesH[ii].v1 = edgesH[i].v1 + c*nNodesPerCell;
+				edgesH[ii].f0 = edgesH[i].f0 + c*nFacesPerCell;
+				edgesH[ii].f1 = edgesH[i].f1 + c*nFacesPerCell;
+			}
+			// copy face info:
+			for (int i=0; i<nFacesPerCell; i++) {
+				int ii = i + c*nFacesPerCell;
+				facesH[ii].v0 = facesH[i].v0 + c*nNodesPerCell;
+				facesH[ii].v1 = facesH[i].v1 + c*nNodesPerCell;
+				facesH[ii].v2 = facesH[i].v2 + c*nNodesPerCell;
+				facesH[ii].cellID = c;								
+			}
+		}
+	}
+	
 }
 
 
@@ -150,12 +219,13 @@ void class_membrane_ibm3D::read_ibm_information(std::string tagname)
 // Shift IBM start positions by specified amount:
 // --------------------------------------------------------
 
-void class_membrane_ibm3D::shift_node_positions(float xsh, float ysh, float zsh)
+void class_membrane_ibm3D::shift_node_positions(int cellID, float xsh, float ysh, float zsh)
 {
-	for (int i=0; i<nNodes; i++) {
-		rH[i].x += xsh;
-		rH[i].y += ysh;
-		rH[i].z += zsh;
+	for (int i=0; i<nNodesPerCell; i++) {
+		int indx = i + cellID*nNodesPerCell;
+		rH[indx].x += xsh;
+		rH[indx].y += ysh;
+		rH[indx].z += zsh;
 	}
 }
 
@@ -167,11 +237,11 @@ void class_membrane_ibm3D::shift_node_positions(float xsh, float ysh, float zsh)
 
 void class_membrane_ibm3D::write_output(std::string tagname, int tagnum)
 {
-	//write_vtk_immersed_boundary_3D(tagname,tagnum,
-	//nNodes,nFaces,rH,facesH);
-	
-	write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
-	nNodes,nFaces,nEdges,rH,facesH,edgesH);
+	write_vtk_immersed_boundary_3D(tagname,tagnum,
+	nNodes,nFaces,rH,facesH);
+	// below writes out more information (edge angles)
+	//write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
+	//nNodes,nFaces,nEdges,rH,facesH,edgesH);
 }
 
 
@@ -278,7 +348,7 @@ void class_membrane_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 void class_membrane_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads)
 {
 	nonbonded_node_interactions_IBM3D
-	<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,numBins,sizeBins,nNodes,binMax,nnbins);
+	<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,numBins,sizeBins,nNodes,binMax,nnbins);
 }
 
 

@@ -1,5 +1,5 @@
 
-# include "scsp_3D_capsule.cuh"
+# include "scsp_3D_two_capsules.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
+scsp_3D_two_capsules::scsp_3D_two_capsules() : lbm(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -54,7 +54,6 @@ scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
 	nNodes = inputParams("IBM/nNodes",0);
 	nFaces = inputParams("IBM/nFaces",0);
 	nEdges = inputParams("IBM/nEdges",0);
-	nBlocksIB = (nNodes+(nThreads-1))/nThreads; // integer division	
 	
 	// ----------------------------------------------
 	// iolets parameters:
@@ -87,7 +86,7 @@ scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_capsule::~scsp_3D_capsule()
+scsp_3D_two_capsules::~scsp_3D_two_capsules()
 {
 	lbm.deallocate();
 	ibm.deallocate();	
@@ -99,7 +98,7 @@ scsp_3D_capsule::~scsp_3D_capsule()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_capsule::initSystem()
+void scsp_3D_two_capsules::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -137,7 +136,10 @@ void scsp_3D_capsule::initSystem()
 	// ----------------------------------------------
 	
 	ibm.read_ibm_information("sphere.dat");
-	ibm.shift_node_positions(0,20.0,19.5,20.0);
+	ibm.duplicate_cells();
+	ibm.assign_cellIDs_to_nodes();
+	ibm.shift_node_positions(0,20.0,25.0,20.0);
+	ibm.shift_node_positions(1,60.0,15.0,20.0);
 	
 	// ----------------------------------------------
 	// write initial output file:
@@ -164,6 +166,12 @@ void scsp_3D_capsule::initSystem()
 	
 	ibm.rest_geometries(nBlocks,nThreads);
 	
+	// ----------------------------------------------
+	// build the binMap array for neighbor lists: 
+	// ----------------------------------------------
+	
+	ibm.build_binMap(nBlocks,nThreads);
+	
 }
 
 
@@ -174,7 +182,7 @@ void scsp_3D_capsule::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_two_capsules::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -194,8 +202,13 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 		// zero fluid forces:
 		lbm.zero_forces(nBlocks,nThreads);
 		
+		// re-build bin lists for IBM nodes:
+		ibm.reset_bin_lists(nBlocks,nThreads);
+		ibm.build_bin_lists(nBlocks,nThreads);
+		
 		// compute IBM node forces:
 		ibm.compute_node_forces(nBlocks,nThreads);
+		ibm.nonbonded_node_interactions(nBlocks,nThreads);
 		
 		// update fluid:
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
@@ -205,8 +218,6 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 		// update membrane:
 		lbm.interpolate_velocity_from_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
 		ibm.update_node_positions(nBlocks,nThreads);
-		
-		//if (cummulativeSteps <= 1508) ibm.change_cell_volume(-1.0,nBlocks,nThreads);
 				
 		cudaDeviceSynchronize();
 	}
@@ -234,7 +245,7 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_capsule::writeOutput(std::string tagname, int step)
+void scsp_3D_two_capsules::writeOutput(std::string tagname, int step)
 {	
 	// ----------------------------------------------
 	// decide which VTK file format to use for output

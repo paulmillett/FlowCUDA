@@ -22,6 +22,9 @@ class class_membrane_ibm3D {
 	int nFaces; 
 	int nEdges;
 	int nCells;
+	int nNodesPerCell;
+	int nFacesPerCell; 
+	int nEdgesPerCell;
 	int binMax;
 	int nnbins;
 	int nBins;
@@ -35,6 +38,7 @@ class class_membrane_ibm3D {
 	triangle* facesH;
 	edge* edgesH;
 	cell* cellsH;
+	int* cellIDsH;
 		
 	// device arrays:
 	float3* r;
@@ -45,7 +49,8 @@ class class_membrane_ibm3D {
 	cell* cells;
 	int* binMembers;
 	int* binOccupancy;
-	int* binMap;	
+	int* binMap;
+	int* cellIDs;
 	
 	// methods:
 	class_membrane_ibm3D();
@@ -55,7 +60,9 @@ class class_membrane_ibm3D {
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
 	void read_ibm_information(std::string);
-	void shift_node_positions(float,float,float);
+	void assign_cellIDs_to_nodes();
+	void duplicate_cells();	
+	void shift_node_positions(int,float,float,float);
 	void rest_geometries(int,int);
 	void write_output(std::string,int);
 	void update_node_positions(int,int);

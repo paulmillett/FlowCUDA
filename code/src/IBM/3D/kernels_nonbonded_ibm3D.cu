@@ -86,6 +86,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	int* binOccupancy,
 	int* binMembers,
 	int* binMap,
+	int* cellIDs,
 	int3 numBins,	
 	float sizeBins,
 	int nNodes,
@@ -113,6 +114,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 		for (int k=offst; k<offst+occup; k++) {
 			int j = binMembers[k];
 			if (i==j) continue;
+			if (cellIDs[i]==cellIDs[j]) continue;
 			node_interaction_forces(i,j,vertR,vertF);			
 		}
 		
@@ -128,6 +130,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			// loop over nodes in this bin:
 			for (int k=offst; k<offst+occup; k++) {
 				int j = binMembers[k];
+				if (cellIDs[i]==cellIDs[j]) continue;
 				node_interaction_forces(i,j,vertR,vertF);			
 			}
 		}
@@ -147,7 +150,14 @@ __device__ inline void node_interaction_forces(
 	const float3* R,
 	float3* F)
 {
-	
+	const float d = 1.5;
+	const float A = 2.0;
+	const float3 rij = R[i] - R[j];
+	const float r = length(rij);
+	if (r < d) {
+		const float force = A/pow(r,2) - A/pow(d,2);
+		F[i] += force*(rij/r);
+	} 	
 }
 
 

@@ -112,9 +112,10 @@ void read_ibm_information_long(std::string fname, int nNodes, int nFaces, int nE
 		
 	for (int i=0; i<nFaces; i++) {
 		infile >> faces[i].v0 >> faces[i].v1 >> faces[i].v2;
-		faces[i].v0 -= 1;  // adjust from 1-based to 0-based indexing
-		faces[i].v1 -= 1;  // " "
-		faces[i].v2 -= 1;  // " " 
+		faces[i].v0 -= 1;     // adjust from 1-based to 0-based indexing
+		faces[i].v1 -= 1;     // " "
+		faces[i].v2 -= 1;     // " " 
+		faces[i].cellID = 0;  // assume this is the first cell
 	}
 	
 	// -----------------------------------------------

@@ -28,6 +28,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	int*,
 	int*,
 	int*,
+	int*,
 	int3,	
 	float,
 	int,
