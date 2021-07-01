@@ -23,6 +23,9 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	ka = inputParams("IBM/ka",0.0);
 	kag = inputParams("IBM/kag",0.0);
 	kv = inputParams("IBM/kv",0.0);
+	Nx = inputParams("Lattice/Nx",1);
+	Ny = inputParams("Lattice/Ny",1);
+	Nz = inputParams("Lattice/Nz",1);	
 	nNodesPerCell = nNodes/nCells;
 	nFacesPerCell = nFaces/nCells;
 	nEdgesPerCell = nEdges/nCells;
@@ -32,10 +35,7 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	// if we need bins, do some calculations:
 	if (binsFlag) {
 		sizeBins = inputParams("IBM/sizeBins",2.0);
-		binMax = inputParams("IBM/binMax",1);
-		int Nx = inputParams("Lattice/Nx",1);
-		int Ny = inputParams("Lattice/Ny",1);
-		int Nz = inputParams("Lattice/Nz",1);
+		binMax = inputParams("IBM/binMax",1);			
 		numBins.x = int(floor(Nx/sizeBins));
 	    numBins.y = int(floor(Ny/sizeBins));
 	    numBins.z = int(floor(Nz/sizeBins));
@@ -67,10 +67,8 @@ void class_membrane_ibm3D::allocate()
 	facesH = (triangle*)malloc(nFaces*sizeof(triangle));
 	edgesH = (edge*)malloc(nEdges*sizeof(edge));
 	cellsH = (cell*)malloc(nCells*sizeof(cell));
-	if (binsFlag) {
-		cellIDsH = (int*)malloc(nNodes*sizeof(int));
-	}
-				
+	cellIDsH = (int*)malloc(nNodes*sizeof(int));
+					
 	// allocate array memory (device):
 	cudaMalloc((void **) &r, nNodes*sizeof(float3));	
 	cudaMalloc((void **) &v, nNodes*sizeof(float3));	
@@ -78,11 +76,11 @@ void class_membrane_ibm3D::allocate()
 	cudaMalloc((void **) &faces, nFaces*sizeof(triangle));
 	cudaMalloc((void **) &edges, nEdges*sizeof(edge));
 	cudaMalloc((void **) &cells, nCells*sizeof(cell));
+	cudaMalloc((void **) &cellIDs, nNodes*sizeof(int));
 	if (binsFlag) {
 		cudaMalloc((void **) &binMembers, nBins*binMax*sizeof(int));
 		cudaMalloc((void **) &binOccupancy, nBins*sizeof(int));
-		cudaMalloc((void **) &binMap, nBins*26*sizeof(int));
-		cudaMalloc((void **) &cellIDs, nNodes*sizeof(int));
+		cudaMalloc((void **) &binMap, nBins*26*sizeof(int));		
 	}	
 }
 
@@ -98,11 +96,9 @@ void class_membrane_ibm3D::deallocate()
 	free(rH);	
 	free(facesH);
 	free(edgesH);
-	free(cellsH);	
-	if (binsFlag) {
-		free(cellIDsH);
-	}
-			
+	free(cellsH);
+	free(cellIDsH);	
+				
 	// free array memory (device):
 	cudaFree(r);	
 	cudaFree(v);	
@@ -110,11 +106,11 @@ void class_membrane_ibm3D::deallocate()
 	cudaFree(faces);
 	cudaFree(edges);
 	cudaFree(cells);
+	cudaFree(cellIDs);
 	if (binsFlag) {
 		cudaFree(binMembers);
 		cudaFree(binOccupancy);
-		cudaFree(binMap);
-		cudaFree(cellIDs);
+		cudaFree(binMap);		
 	}		
 }
 
@@ -130,9 +126,7 @@ void class_membrane_ibm3D::memcopy_host_to_device()
 	cudaMemcpy(faces, facesH, sizeof(triangle)*nFaces, cudaMemcpyHostToDevice);	
 	cudaMemcpy(edges, edgesH, sizeof(edge)*nEdges, cudaMemcpyHostToDevice);
 	cudaMemcpy(cells, cellsH, sizeof(cell)*nCells, cudaMemcpyHostToDevice);
-	if (binsFlag) {
-		cudaMemcpy(cellIDs, cellIDsH, sizeof(int)*nNodes, cudaMemcpyHostToDevice);
-	}
+	cudaMemcpy(cellIDs, cellIDsH, sizeof(int)*nNodes, cudaMemcpyHostToDevice);	
 }
 	
 
@@ -144,8 +138,8 @@ void class_membrane_ibm3D::memcopy_host_to_device()
 void class_membrane_ibm3D::memcopy_device_to_host()
 {
 	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);	
-	cudaMemcpy(facesH, faces, sizeof(triangle)*nFaces, cudaMemcpyDeviceToHost);
-	cudaMemcpy(edgesH, edges, sizeof(edge)*nEdges, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(facesH, faces, sizeof(triangle)*nFaces, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(edgesH, edges, sizeof(edge)*nEdges, cudaMemcpyDeviceToHost);
 }
 
 
@@ -162,8 +156,22 @@ void class_membrane_ibm3D::read_ibm_information(std::string tagname)
 
 
 // --------------------------------------------------------
-// Duplicate a cell mesh information a certain number
-// of times:
+// Assign the reference node to every cell.  The reference
+// node is arbitrary (here we use the first node), but it
+// is necessary for handling PBC's.
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::assign_refNode_to_cells()
+{
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].refNode = c*nNodesPerCell;
+	}
+}	
+
+
+
+// --------------------------------------------------------
+// Assign the cell ID to every node:
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::assign_cellIDs_to_nodes()
@@ -179,8 +187,7 @@ void class_membrane_ibm3D::assign_cellIDs_to_nodes()
 
 
 // --------------------------------------------------------
-// Duplicate a cell mesh information a certain number
-// of times:
+// Duplicate the first cell mesh information to all cells:
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::duplicate_cells()
@@ -237,6 +244,9 @@ void class_membrane_ibm3D::shift_node_positions(int cellID, float xsh, float ysh
 
 void class_membrane_ibm3D::write_output(std::string tagname, int tagnum)
 {
+	// first unwrap coordinate positions:
+	unwrap_node_coordinates();
+	// write ouput:
 	write_vtk_immersed_boundary_3D(tagname,tagnum,
 	nNodes,nFaces,rH,facesH);
 	// below writes out more information (edge angles)
@@ -274,7 +284,10 @@ void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 void class_membrane_ibm3D::update_node_positions(int nBlocks, int nThreads)
 {
 	update_node_position_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,nNodes);	
+	<<<nBlocks,nThreads>>> (r,v,nNodes);
+	
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Nx,Ny,Nz,nNodes);	
 }
 
 
@@ -366,22 +379,30 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 			
 	zero_cell_volumes_IBM3D
 	<<<nBlocks,nThreads>>> (cells,nCells);
+	
+	// Second, unwrap node coordinates:
+	unwrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Nx,Ny,Nz,nNodes);	
 			
-	// Second, compute the area dilation force for each face:
+	// Third, compute the area dilation force for each face:
 	compute_node_force_membrane_area_IBM3D
 	<<<nBlocks,nThreads>>> (faces,r,f,cells,ka,nFaces);	
 		
-	// Third, compute the edge extension and bending force for each edge:
+	// Forth, compute the edge extension and bending force for each edge:
 	compute_node_force_membrane_edge_IBM3D
 	<<<nBlocks,nThreads>>> (faces,r,f,edges,ks,kb,nEdges);
 		
-	// Forth, compute the volume conservation force for each face:
+	// Fifth, compute the volume conservation force for each face:
 	compute_node_force_membrane_volume_IBM3D
 	<<<nBlocks,nThreads>>> (faces,f,cells,kv,nFaces);
 	
-	// Fifth, compute the global area conservation force for each face:
+	// Sixth, compute the global area conservation force for each face:
 	compute_node_force_membrane_globalarea_IBM3D
 	<<<nBlocks,nThreads>>> (faces,r,f,cells,kag,nFaces);
+	
+	// Seventh, re-wrap node coordinates:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Nx,Ny,Nz,nNodes);
 	
 }
 
@@ -398,6 +419,30 @@ void class_membrane_ibm3D::change_cell_volume(float change, int nBlocks, int nTh
 }
 
 
+
+// --------------------------------------------------------
+// Unwrap node coordinates based on difference between node
+// position and the cell's reference node position:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::unwrap_node_coordinates()
+{
+	for (int i=0; i<nNodes; i++) {
+		int c = cellIDsH[i];
+		int j = cellsH[c].refNode;
+		float3 rij = rH[j] - rH[i];
+		// assume lattice spacing is 1
+		float Lx = float(Nx);
+		float Ly = float(Ny);
+		float Lz = float(Nz);
+		if (rij.x > 0.5*Lx) rH[i].x += Lx;
+		if (rij.y > 0.5*Ly) rH[i].y += Ly;
+		if (rij.z > 0.5*Lz) rH[i].z += Lz;		
+		if (rij.x <= -0.5*Lx) rH[i].x -= Lx;
+		if (rij.y <= -0.5*Ly) rH[i].y -= Ly;
+		if (rij.z <= -0.5*Lz) rH[i].z -= Lz;		
+	}	
+}
 
 
 

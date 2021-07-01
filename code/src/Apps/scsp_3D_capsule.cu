@@ -137,8 +137,10 @@ void scsp_3D_capsule::initSystem()
 	// ----------------------------------------------
 	
 	ibm.read_ibm_information("sphere.dat");
-	ibm.shift_node_positions(0,20.0,19.5,20.0);
-	
+	ibm.assign_refNode_to_cells();
+	ibm.assign_cellIDs_to_nodes();
+	ibm.shift_node_positions(0,35.0,19.5,20.0);
+		
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------

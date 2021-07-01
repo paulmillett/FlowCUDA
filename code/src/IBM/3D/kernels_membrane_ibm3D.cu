@@ -430,6 +430,72 @@ __global__ void zero_cell_volumes_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to unwrap node coordinates.  Here, the
+// nodes of a cell are brought back close to the cell's 
+// refNode.  This is done to avoid complications with
+// PBCs:
+// --------------------------------------------------------
+
+__global__ void unwrap_node_coordinates_IBM3D(
+	float3* r,
+	cell* cells,
+	int* cellIDs,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		int c = cellIDs[i];
+		int j = cells[c].refNode;
+		float3 rij = r[j] - r[i];
+		// assume lattice spacing is 1
+		float Lx = float(Nx);
+		float Ly = float(Ny);
+		float Lz = float(Nz);
+		if (rij.x > 0.5*Lx) r[i].x += Lx;
+		if (rij.y > 0.5*Ly) r[i].y += Ly;
+		if (rij.z > 0.5*Lz) r[i].z += Lz;		
+		if (rij.x <= -0.5*Lx) r[i].x -= Lx;
+		if (rij.y <= -0.5*Ly) r[i].y -= Ly;
+		if (rij.z <= -0.5*Lz) r[i].z -= Lz;		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to wrap node coordinates for PBCs:
+// --------------------------------------------------------
+
+__global__ void wrap_node_coordinates_IBM3D(
+	float3* r,	
+	int Nx,
+	int Ny,
+	int Nz,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		// assume lattice spacing is 1	
+		float Lx = float(Nx);
+		float Ly = float(Ny);
+		float Lz = float(Nz);
+		if (r[i].x > Lx) r[i].x -= Lx;
+		if (r[i].y > Ly) r[i].y -= Ly;
+		if (r[i].z > Lz) r[i].z -= Lz;		
+		if (r[i].x < 0.0) r[i].x += Lx;
+		if (r[i].y < 0.0) r[i].y += Ly;
+		if (r[i].z < 0.0) r[i].z += Lz;		
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to reduce cell volume:
 // --------------------------------------------------------
 

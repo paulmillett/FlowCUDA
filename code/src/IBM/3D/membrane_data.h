@@ -38,7 +38,7 @@ struct cell {
 	float vol0;
 	float area;
 	float area0;
-	float3 com;
+	int refNode;
 };
 
 # endif  // MEMBRANE_DATA_H

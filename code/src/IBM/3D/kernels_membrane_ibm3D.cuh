@@ -104,6 +104,24 @@ __global__ void zero_cell_volumes_IBM3D(
 	int);
 
 
+__global__ void unwrap_node_coordinates_IBM3D(
+	float3*,
+	cell*,
+	int*,
+	int,
+	int,
+	int,
+	int);
+
+
+__global__ void wrap_node_coordinates_IBM3D(
+	float3*,	
+	int,
+	int,
+	int,
+	int);
+
+
 __global__ void change_cell_volumes_IBM3D(
     cell*,
 	float,

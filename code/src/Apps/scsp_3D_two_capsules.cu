@@ -138,6 +138,7 @@ void scsp_3D_two_capsules::initSystem()
 	ibm.read_ibm_information("sphere.dat");
 	ibm.duplicate_cells();
 	ibm.assign_cellIDs_to_nodes();
+	ibm.assign_refNode_to_cells();
 	ibm.shift_node_positions(0,20.0,25.0,20.0);
 	ibm.shift_node_positions(1,60.0,15.0,20.0);
 	

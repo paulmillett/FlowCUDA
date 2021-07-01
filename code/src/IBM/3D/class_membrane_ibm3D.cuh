@@ -28,6 +28,7 @@ class class_membrane_ibm3D {
 	int binMax;
 	int nnbins;
 	int nBins;
+	int Nx,Ny,Nz;
 	int3 numBins;
 	float sizeBins;
 	float ks,kb,ka,kag,kv;
@@ -60,6 +61,7 @@ class class_membrane_ibm3D {
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
 	void read_ibm_information(std::string);
+	void assign_refNode_to_cells();
 	void assign_cellIDs_to_nodes();
 	void duplicate_cells();	
 	void shift_node_positions(int,float,float,float);
@@ -74,6 +76,7 @@ class class_membrane_ibm3D {
 	void nonbonded_node_interactions(int,int);	
 	void compute_node_forces(int,int);
 	void change_cell_volume(float,int,int);
+	void unwrap_node_coordinates();
 
 };
 
