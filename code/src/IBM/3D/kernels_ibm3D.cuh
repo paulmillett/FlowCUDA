@@ -49,6 +49,7 @@ __global__ void interpolate_velocity_IBM3D(
     float*,
 	int,
 	int,
+	int,
     int);
 	
 	
@@ -72,6 +73,7 @@ __global__ void extrapolate_force_IBM3D(
     float*,
 	int,
     int,
+	int,
 	int);
 	
 	
@@ -81,6 +83,15 @@ __global__ void compute_node_force_IBM3D(
     float3*,
 	float,
     int);
+	
+	
+__device__ inline int voxel_ndx(
+	int,
+	int,
+	int,
+	int,
+	int,
+	int);
 		
 		
 # endif  // KERNELS_IBM3D_H

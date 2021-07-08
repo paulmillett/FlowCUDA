@@ -28,10 +28,11 @@ class class_membrane_ibm3D {
 	int binMax;
 	int nnbins;
 	int nBins;
-	int Nx,Ny,Nz;
+	int3 N;
 	int3 numBins;
 	float sizeBins;
 	float ks,kb,ka,kag,kv;
+	float3 Box;
 	bool binsFlag;
 			
 	// host arrays:
@@ -68,8 +69,8 @@ class class_membrane_ibm3D {
 	void rest_geometries(int,int);
 	void write_output(std::string,int);
 	void update_node_positions(int,int);
-	void interpolate_velocity(float*,float*,float*,int,int,int,int);
-	void extrapolate_force(float*,float*,float*,int,int,int,int);	
+	void interpolate_velocity(float*,float*,float*,int,int);
+	void extrapolate_force(float*,float*,float*,int,int);	
 	void build_binMap(int,int);
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);

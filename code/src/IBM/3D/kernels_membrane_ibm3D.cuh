@@ -108,17 +108,13 @@ __global__ void unwrap_node_coordinates_IBM3D(
 	float3*,
 	cell*,
 	int*,
-	int,
-	int,
-	int,
+	float3,
 	int);
 
 
 __global__ void wrap_node_coordinates_IBM3D(
 	float3*,	
-	int,
-	int,
-	int,
+	float3,
 	int);
 
 

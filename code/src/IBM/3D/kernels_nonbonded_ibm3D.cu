@@ -91,7 +91,8 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	float sizeBins,
 	int nNodes,
 	int binMax,
-	int nnbins)
+	int nnbins,
+	float3 Box)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
@@ -115,7 +116,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			int j = binMembers[k];
 			if (i==j) continue;
 			if (cellIDs[i]==cellIDs[j]) continue;
-			node_interaction_forces(i,j,vertR,vertF);			
+			node_interaction_forces(i,j,vertR,vertF,Box);			
 		}
 		
 		// -------------------------------
@@ -131,7 +132,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			for (int k=offst; k<offst+occup; k++) {
 				int j = binMembers[k];
 				if (cellIDs[i]==cellIDs[j]) continue;
-				node_interaction_forces(i,j,vertR,vertF);			
+				node_interaction_forces(i,j,vertR,vertF,Box);			
 			}
 		}
 				
@@ -148,11 +149,13 @@ __device__ inline void node_interaction_forces(
 	const int i, 
 	const int j, 
 	const float3* R,
-	float3* F)
+	float3* F,
+	float3 Box)
 {
 	const float d = 1.5;
 	const float A = 2.0;
-	const float3 rij = R[i] - R[j];
+	float3 rij = R[i] - R[j];
+	rij -= roundf(rij/Box)*Box;  // PBC's	
 	const float r = length(rij);
 	if (r < d) {
 		const float force = A/pow(r,2) - A/pow(d,2);

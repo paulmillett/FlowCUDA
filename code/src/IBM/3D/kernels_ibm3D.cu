@@ -112,6 +112,7 @@ __global__ void interpolate_velocity_IBM3D(
 	float* wLBM,
 	int Nx,
 	int Ny,
+	int Nz,
 	int nNodes)
 {
 	// define node:
@@ -132,15 +133,15 @@ __global__ void interpolate_velocity_IBM3D(
 		int i0 = int(floor(r[i].x));
 		int j0 = int(floor(r[i].y));
 		int k0 = int(floor(r[i].z));
-				
+		
 		// --------------------------------------
 		// loop over footprint
 		// --------------------------------------
 		
-		for (int kk=k0; kk<=k0+1; kk++) {
+		for (int kk=k0; kk<=k0+1; kk++) {			
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {
-					int ndx = kk*Nx*Ny + jj*Nx + ii;
+					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
 					float rx = r[i].x - float(ii);
 					float ry = r[i].y - float(jj);
 					float rz = r[i].z - float(kk);
@@ -220,6 +221,7 @@ __global__ void extrapolate_force_IBM3D(
 	float* fzLBM,
 	int Nx,
 	int Ny,
+	int Nz,
 	int nNodes)
 {
 	// define node:
@@ -242,7 +244,7 @@ __global__ void extrapolate_force_IBM3D(
 		for (int kk=k0; kk<=k0+1; kk++) {
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {				
-					int ndx = kk*Nx*Ny + jj*Nx + ii;
+					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
 					float rx = r[i].x - float(ii);
 					float ry = r[i].y - float(jj);
 					float rz = r[i].z - float(kk);
@@ -272,4 +274,27 @@ __global__ void compute_node_force_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) f[i] = -kstiff*(r[i] - r0[i]);
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to determine 1D index from 3D indices:
+// --------------------------------------------------------
+
+__device__ inline int voxel_ndx(
+	int i,
+	int j,
+	int k,
+	int Nx,
+	int Ny,
+	int Nz)
+{
+    if (i < 0) i += Nx;
+    if (i >= Nx) i -= Nx;
+    if (j < 0) j += Ny;
+    if (j >= Ny) j -= Ny;
+    if (k < 0) k += Nz;
+    if (k >= Nz) k -= Nz;
+    return k*Nx*Ny + j*Nx + i;	
 }

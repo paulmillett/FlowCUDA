@@ -23,22 +23,25 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	ka = inputParams("IBM/ka",0.0);
 	kag = inputParams("IBM/kag",0.0);
 	kv = inputParams("IBM/kv",0.0);
-	Nx = inputParams("Lattice/Nx",1);
-	Ny = inputParams("Lattice/Ny",1);
-	Nz = inputParams("Lattice/Nz",1);	
+	N.x = inputParams("Lattice/Nx",1);
+	N.y = inputParams("Lattice/Ny",1);
+	N.z = inputParams("Lattice/Nz",1);	
 	nNodesPerCell = nNodes/nCells;
 	nFacesPerCell = nFaces/nCells;
 	nEdgesPerCell = nEdges/nCells;
-	binsFlag = false;
-	if (nCells > 1) binsFlag = true;
+	Box.x = float(N.x);   // assume dx=1
+	Box.y = float(N.y);
+	Box.z = float(N.z);
 		
 	// if we need bins, do some calculations:
+	binsFlag = false;
+	if (nCells > 1) binsFlag = true;
 	if (binsFlag) {
 		sizeBins = inputParams("IBM/sizeBins",2.0);
 		binMax = inputParams("IBM/binMax",1);			
-		numBins.x = int(floor(Nx/sizeBins));
-	    numBins.y = int(floor(Ny/sizeBins));
-	    numBins.z = int(floor(Nz/sizeBins));
+		numBins.x = int(floor(N.x/sizeBins));
+	    numBins.y = int(floor(N.y/sizeBins));
+	    numBins.z = int(floor(N.z/sizeBins));
 		nBins = numBins.x*numBins.y*numBins.z;
 	}
 }
@@ -245,7 +248,7 @@ void class_membrane_ibm3D::shift_node_positions(int cellID, float xsh, float ysh
 void class_membrane_ibm3D::write_output(std::string tagname, int tagnum)
 {
 	// first unwrap coordinate positions:
-	unwrap_node_coordinates();
+	unwrap_node_coordinates(); 
 	// write ouput:
 	write_vtk_immersed_boundary_3D(tagname,tagnum,
 	nNodes,nFaces,rH,facesH);
@@ -287,7 +290,7 @@ void class_membrane_ibm3D::update_node_positions(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (r,v,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Nx,Ny,Nz,nNodes);	
+	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
 }
 
 
@@ -297,10 +300,10 @@ void class_membrane_ibm3D::update_node_positions(int nBlocks, int nThreads)
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::interpolate_velocity(float* uLBM, float* vLBM, 
-	float* wLBM, int Nx, int Ny, int nBlocks, int nThreads)
+	float* wLBM, int nBlocks, int nThreads)
 {
 	interpolate_velocity_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,uLBM,vLBM,wLBM,Nx,Ny,nNodes);	
+	<<<nBlocks,nThreads>>> (r,v,uLBM,vLBM,wLBM,N.x,N.y,N.z,nNodes);	
 }
 
 
@@ -310,10 +313,10 @@ void class_membrane_ibm3D::interpolate_velocity(float* uLBM, float* vLBM,
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::extrapolate_force(float* fxLBM, float* fyLBM, 
-	float* fzLBM, int Nx, int Ny, int nBlocks, int nThreads)
+	float* fzLBM, int nBlocks, int nThreads)
 {
 	extrapolate_force_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,fxLBM,fyLBM,fzLBM,Nx,Ny,nNodes);	
+	<<<nBlocks,nThreads>>> (r,v,fxLBM,fyLBM,fzLBM,N.x,N.y,N.z,nNodes);	
 }
 
 
@@ -361,7 +364,8 @@ void class_membrane_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 void class_membrane_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads)
 {
 	nonbonded_node_interactions_IBM3D
-	<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,numBins,sizeBins,nNodes,binMax,nnbins);
+	<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,numBins,sizeBins,
+	                        nNodes,binMax,nnbins,Box);
 }
 
 
@@ -382,8 +386,8 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 	
 	// Second, unwrap node coordinates:
 	unwrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Nx,Ny,Nz,nNodes);	
-			
+	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Box,nNodes);	
+					
 	// Third, compute the area dilation force for each face:
 	compute_node_force_membrane_area_IBM3D
 	<<<nBlocks,nThreads>>> (faces,r,f,cells,ka,nFaces);	
@@ -399,11 +403,11 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 	// Sixth, compute the global area conservation force for each face:
 	compute_node_force_membrane_globalarea_IBM3D
 	<<<nBlocks,nThreads>>> (faces,r,f,cells,kag,nFaces);
-	
+		
 	// Seventh, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Nx,Ny,Nz,nNodes);
-	
+	<<<nBlocks,nThreads>>> (r,Box,nNodes);
+			
 }
 
 
@@ -431,16 +435,7 @@ void class_membrane_ibm3D::unwrap_node_coordinates()
 		int c = cellIDsH[i];
 		int j = cellsH[c].refNode;
 		float3 rij = rH[j] - rH[i];
-		// assume lattice spacing is 1
-		float Lx = float(Nx);
-		float Ly = float(Ny);
-		float Lz = float(Nz);
-		if (rij.x > 0.5*Lx) rH[i].x += Lx;
-		if (rij.y > 0.5*Ly) rH[i].y += Ly;
-		if (rij.z > 0.5*Lz) rH[i].z += Lz;		
-		if (rij.x <= -0.5*Lx) rH[i].x -= Lx;
-		if (rij.y <= -0.5*Ly) rH[i].y -= Ly;
-		if (rij.z <= -0.5*Lz) rH[i].z -= Lz;		
+		rH[i] = rH[i] + roundf(rij/Box)*Box; // PBC's		
 	}	
 }
 

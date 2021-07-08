@@ -547,11 +547,11 @@ void class_scsp_D3Q19::extrapolate_velocity_from_IBM(int nBlocks, int nThreads,
 //       should use nBlocks as if calling an IBM kernel.
 // --------------------------------------------------------
 
-void class_scsp_D3Q19::interpolate_velocity_from_IBM(int nBlocks, int nThreads,
-	                                                 float3* rIB, float3* vIB, int nNodes)
+void class_scsp_D3Q19::interpolate_velocity_to_IBM(int nBlocks, int nThreads,
+	                                               float3* rIB, float3* vIB, int nNodes)
 {
 	interpolate_velocity_IBM3D
-	<<<nBlocks,nThreads>>> (rIB,vIB,u,v,w,Nx,Ny,nNodes);
+	<<<nBlocks,nThreads>>> (rIB,vIB,u,v,w,Nx,Ny,Nz,nNodes);
 }
 
 
@@ -567,7 +567,7 @@ void class_scsp_D3Q19::extrapolate_forces_from_IBM(int nBlocks, int nThreads,
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	extrapolate_force_IBM3D
-	<<<nBlocks,nThreads>>> (rIB,fIB,Fx,Fy,Fz,Nx,Ny,nNodes);	
+	<<<nBlocks,nThreads>>> (rIB,fIB,Fx,Fy,Fz,Nx,Ny,Nz,nNodes);	
 }
 
 

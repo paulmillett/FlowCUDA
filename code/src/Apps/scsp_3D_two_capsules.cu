@@ -140,7 +140,7 @@ void scsp_3D_two_capsules::initSystem()
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();
 	ibm.shift_node_positions(0,20.0,25.0,20.0);
-	ibm.shift_node_positions(1,60.0,15.0,20.0);
+	ibm.shift_node_positions(1,60.0,15.0,35.0);
 	
 	// ----------------------------------------------
 	// write initial output file:
@@ -217,7 +217,7 @@ void scsp_3D_two_capsules::cycleForward(int stepsPerCycle, int currentCycle)
 		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		
 		// update membrane:
-		lbm.interpolate_velocity_from_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
 		ibm.update_node_positions(nBlocks,nThreads);
 				
 		cudaDeviceSynchronize();

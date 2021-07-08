@@ -1364,6 +1364,23 @@ inline __host__ __device__ float4 floorf(float4 v)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// round
+////////////////////////////////////////////////////////////////////////////////
+
+inline __host__ __device__ float2 roundf(float2 v)
+{
+    return make_float2(roundf(v.x), roundf(v.y));
+}
+inline __host__ __device__ float3 roundf(float3 v)
+{
+    return make_float3(roundf(v.x), roundf(v.y), roundf(v.z));
+}
+inline __host__ __device__ float4 roundf(float4 v)
+{
+    return make_float4(roundf(v.x), roundf(v.y), roundf(v.z), roundf(v.w));
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // frac - returns the fractional portion of a scalar or each vector component
 ////////////////////////////////////////////////////////////////////////////////
 

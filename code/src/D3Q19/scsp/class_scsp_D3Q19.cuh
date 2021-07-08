@@ -112,7 +112,7 @@ public:
 	void zero_forces(int,int);
 	void zero_forces_with_IBM(int,int);	
 	void extrapolate_velocity_from_IBM(int,int,float3*,float3*,int);
-	void interpolate_velocity_from_IBM(int,int,float3*,float3*,int);
+	void interpolate_velocity_to_IBM(int,int,float3*,float3*,int);
 	void extrapolate_forces_from_IBM(int,int,float3*,float3*,int);
 	void inside_hemisphere(int,int);
 	void read_lattice_geometry(int);
