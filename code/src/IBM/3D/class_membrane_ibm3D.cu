@@ -14,9 +14,9 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 {
 	// get some parameters:
 	GetPot inputParams("input.dat");	
-	nNodes = inputParams("IBM/nNodes",0);
-	nFaces = inputParams("IBM/nFaces",0);	
-	nEdges = inputParams("IBM/nEdges",0);
+	nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
+	nFacesPerCell = inputParams("IBM/nFacesPerCell",0);	
+	nEdgesPerCell = inputParams("IBM/nEdgesPerCell",0);
 	nCells = inputParams("IBM/nCells",1);
 	ks = inputParams("IBM/ks",0.0);
 	kb = inputParams("IBM/kb",0.0);
@@ -26,9 +26,9 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	N.x = inputParams("Lattice/Nx",1);
 	N.y = inputParams("Lattice/Ny",1);
 	N.z = inputParams("Lattice/Nz",1);	
-	nNodesPerCell = nNodes/nCells;
-	nFacesPerCell = nFaces/nCells;
-	nEdgesPerCell = nEdges/nCells;
+	nNodes = nNodesPerCell*nCells;
+	nFaces = nFacesPerCell*nCells;
+	nEdges = nEdgesPerCell*nCells;
 	Box.x = float(N.x);   // assume dx=1
 	Box.y = float(N.y);
 	Box.z = float(N.z);
@@ -413,7 +413,19 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
-// Calls to kernels that changes the default cell volume:
+// Call to kernel that calculates nonbonded forces:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)
+{
+	wall_forces_ydir_IBM3D
+	<<<nBlocks,nThreads>>> (r,f,Box,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that changes the default cell volume:
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::change_cell_volume(float change, int nBlocks, int nThreads)

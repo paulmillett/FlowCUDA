@@ -37,13 +37,20 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	float3);
 
 
-__device__ inline void node_interaction_forces(
+__device__ inline void pairwise_interaction_forces(
 	const int, 
 	const int, 
 	const float3*,
 	float3*,
 	float3);
-			
+
+
+__global__ void wall_forces_ydir_IBM3D(
+	float3*,
+	float3*,
+	float3,
+	int);
+				
 
 __global__ void build_binMap_IBM3D(
 	int*,

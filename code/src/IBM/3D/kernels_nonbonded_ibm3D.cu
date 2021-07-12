@@ -116,7 +116,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			int j = binMembers[k];
 			if (i==j) continue;
 			if (cellIDs[i]==cellIDs[j]) continue;
-			node_interaction_forces(i,j,vertR,vertF,Box);			
+			pairwise_interaction_forces(i,j,vertR,vertF,Box);			
 		}
 		
 		// -------------------------------
@@ -132,7 +132,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			for (int k=offst; k<offst+occup; k++) {
 				int j = binMembers[k];
 				if (cellIDs[i]==cellIDs[j]) continue;
-				node_interaction_forces(i,j,vertR,vertF,Box);			
+				pairwise_interaction_forces(i,j,vertR,vertF,Box);			
 			}
 		}
 				
@@ -145,7 +145,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 // IBM3D kernel to calculate i-j force:
 // --------------------------------------------------------
 
-__device__ inline void node_interaction_forces(
+__device__ inline void pairwise_interaction_forces(
 	const int i, 
 	const int j, 
 	const float3* R,
@@ -161,6 +161,38 @@ __device__ inline void node_interaction_forces(
 		const float force = A/pow(r,2) - A/pow(d,2);
 		F[i] += force*(rij/r);
 	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void wall_forces_ydir_IBM3D(
+	float3* R,
+	float3* F,
+	float3 Box,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		const float d = 2.0;
+		const float A = 2.0;
+		const float yi = R[i].y;
+		// bottom wall
+		if (yi < d) {
+			const float force = A/pow(yi,2) - A/pow(d,2);
+			F[i].y += force;
+		}
+		// top wall
+		else if (yi > Box.y-d) {
+			const float bmyi = Box.y - yi;
+			const float force = A/pow(bmyi,2) - A/pow(d,2);
+			F[i].y -= force;
+		}
+	}
 }
 
 

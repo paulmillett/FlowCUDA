@@ -1,5 +1,5 @@
 
-# include "scsp_3D_capsule.cuh"
+# include "scsp_3D_capsules_lots.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
+scsp_3D_capsules_lots::scsp_3D_capsules_lots() : lbm(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -54,7 +54,7 @@ scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
 	int nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
 	int nCells = inputParams("IBM/nCells",1);
 	nNodes = nNodesPerCell*nCells;
-	
+		
 	// ----------------------------------------------
 	// iolets parameters:
 	// ----------------------------------------------
@@ -86,7 +86,7 @@ scsp_3D_capsule::scsp_3D_capsule() : lbm(),ibm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_capsule::~scsp_3D_capsule()
+scsp_3D_capsules_lots::~scsp_3D_capsules_lots()
 {
 	lbm.deallocate();
 	ibm.deallocate();	
@@ -98,7 +98,7 @@ scsp_3D_capsule::~scsp_3D_capsule()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_capsule::initSystem()
+void scsp_3D_capsules_lots::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -136,10 +136,19 @@ void scsp_3D_capsule::initSystem()
 	// ----------------------------------------------
 	
 	ibm.read_ibm_information("sphere.dat");
-	ibm.assign_refNode_to_cells();
+	ibm.duplicate_cells();
 	ibm.assign_cellIDs_to_nodes();
-	ibm.shift_node_positions(0,30.0,29.5,30.0);
-		
+	ibm.assign_refNode_to_cells();
+	ibm.shift_node_positions(0,15.0,15.0,15.0);
+	ibm.shift_node_positions(1,45.0,15.0,15.0);
+	ibm.shift_node_positions(2,45.0,45.0,15.0);
+	ibm.shift_node_positions(3,15.0,45.0,15.0);
+	ibm.shift_node_positions(4,30.0,30.0,30.0);
+	ibm.shift_node_positions(5,15.0,15.0,45.0);
+	ibm.shift_node_positions(6,45.0,15.0,45.0);
+	ibm.shift_node_positions(7,45.0,45.0,45.0);
+	ibm.shift_node_positions(8,15.0,45.0,45.0);
+	
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
@@ -165,6 +174,12 @@ void scsp_3D_capsule::initSystem()
 	
 	ibm.rest_geometries(nBlocks,nThreads);
 	
+	// ----------------------------------------------
+	// build the binMap array for neighbor lists: 
+	// ----------------------------------------------
+	
+	ibm.build_binMap(nBlocks,nThreads);
+	
 }
 
 
@@ -175,7 +190,7 @@ void scsp_3D_capsule::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_capsules_lots::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -195,8 +210,13 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 		// zero fluid forces:
 		lbm.zero_forces(nBlocks,nThreads);
 		
+		// re-build bin lists for IBM nodes:
+		ibm.reset_bin_lists(nBlocks,nThreads);
+		ibm.build_bin_lists(nBlocks,nThreads);
+		
 		// compute IBM node forces:
 		ibm.compute_node_forces(nBlocks,nThreads);
+		ibm.nonbonded_node_interactions(nBlocks,nThreads);
 		
 		// update fluid:
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
@@ -205,7 +225,7 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 		
 		// update membrane:
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
-		ibm.update_node_positions(nBlocks,nThreads); 
+		ibm.update_node_positions(nBlocks,nThreads);
 				
 		cudaDeviceSynchronize();
 	}
@@ -233,7 +253,7 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_capsule::writeOutput(std::string tagname, int step)
+void scsp_3D_capsules_lots::writeOutput(std::string tagname, int step)
 {	
 	// ----------------------------------------------
 	// decide which VTK file format to use for output

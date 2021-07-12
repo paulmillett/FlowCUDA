@@ -51,9 +51,9 @@ scsp_3D_two_capsules::scsp_3D_two_capsules() : lbm(),ibm()
 	// Immersed-Boundary parameters:
 	// ----------------------------------------------
 	
-	nNodes = inputParams("IBM/nNodes",0);
-	nFaces = inputParams("IBM/nFaces",0);
-	nEdges = inputParams("IBM/nEdges",0);
+	int nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
+	int nCells = inputParams("IBM/nCells",1);
+	nNodes = nNodesPerCell*nCells;
 	
 	// ----------------------------------------------
 	// iolets parameters:
@@ -140,7 +140,7 @@ void scsp_3D_two_capsules::initSystem()
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();
 	ibm.shift_node_positions(0,20.0,25.0,20.0);
-	ibm.shift_node_positions(1,60.0,15.0,35.0);
+	ibm.shift_node_positions(1,60.0,15.0,20.0);
 	
 	// ----------------------------------------------
 	// write initial output file:

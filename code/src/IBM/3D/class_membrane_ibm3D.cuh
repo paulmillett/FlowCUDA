@@ -76,6 +76,7 @@ class class_membrane_ibm3D {
 	void build_bin_lists(int,int);
 	void nonbonded_node_interactions(int,int);	
 	void compute_node_forces(int,int);
+	void wall_forces_ydir(int,int);
 	void change_cell_volume(float,int,int);
 	void unwrap_node_coordinates();
 
