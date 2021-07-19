@@ -67,8 +67,13 @@ class class_membrane_ibm3D {
 	void duplicate_cells();	
 	void shift_node_positions(int,float,float,float);
 	void rest_geometries(int,int);
+	void shrink_and_randomize_cells(float,float);
+	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);
+	void write_output_long(std::string,int);
 	void update_node_positions(int,int);
+	void relax_node_positions(int,float,int,int);
+	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
 	void extrapolate_force(float*,float*,float*,int,int);	
 	void build_binMap(int,int);

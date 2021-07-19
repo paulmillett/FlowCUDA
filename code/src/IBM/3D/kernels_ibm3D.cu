@@ -21,6 +21,24 @@ __global__ void update_node_position_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D node update kernel (this uses force and a mobility
+// constant, instead of velocity):
+// --------------------------------------------------------
+
+__global__ void update_node_position_vacuum_IBM3D(
+	float3* r,
+	float3* f,
+	float M,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) r[i] += M*f[i];
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D node update kernel:
 // --------------------------------------------------------
 

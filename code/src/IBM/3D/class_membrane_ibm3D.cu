@@ -226,6 +226,68 @@ void class_membrane_ibm3D::duplicate_cells()
 
 
 // --------------------------------------------------------
+// With the Host, shrink cells and randomly shift them with
+// the box:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float sepMin)
+{
+	// copy node positions from device to host:
+	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	// shrink cells by specified amount:
+	for (int c=0; c<nCells; c++) {
+		for (int i=0; i<nNodesPerCell; i++) {
+			int indx = i + c*nNodesPerCell;
+			rH[indx] *= shrinkFactor;
+		}
+	}
+	// randomly shift cells, without overlapping previous cells:
+	float3* cellCOM = (float3*)malloc(nCells*sizeof(float3));
+	for (int c=0; c<nCells; c++) {
+		cellCOM[c] = make_float3(0.0);
+		float3 shift = make_float3(0.0);		
+		bool tooClose = true;
+		while (tooClose) {
+			// reset tooClose to false
+			tooClose = false;
+			// get random position
+			shift.x = (float)rand()/RAND_MAX*Box.x;
+			shift.y = 0.5*sepMin + (float)rand()/RAND_MAX*(Box.y-sepMin);
+			shift.z = (float)rand()/RAND_MAX*Box.z;
+			// check with other cells
+			for (int d=0; d<c; d++) {
+				float sep = calc_separation_pbc(shift,cellCOM[d]);
+                if (sep < sepMin) 
+                {
+                    tooClose = true;
+                    break;
+                }
+			}
+			
+		}
+		cellCOM[c] = shift;		
+		shift_node_positions(c,shift.x,shift.y,shift.z);
+	}
+	// last, copy node positions from host to device:
+	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+}
+
+
+
+// --------------------------------------------------------
+// calculate separation distance using PBCs:
+// --------------------------------------------------------
+
+float class_membrane_ibm3D::calc_separation_pbc(float3 r1, float3 r2)
+{
+	float3 dr = r1 - r2;
+	dr -= roundf(dr/Box)*Box;
+	return length(dr);
+}
+
+
+
+// --------------------------------------------------------
 // Shift IBM start positions by specified amount:
 // --------------------------------------------------------
 
@@ -252,9 +314,22 @@ void class_membrane_ibm3D::write_output(std::string tagname, int tagnum)
 	// write ouput:
 	write_vtk_immersed_boundary_3D(tagname,tagnum,
 	nNodes,nFaces,rH,facesH);
-	// below writes out more information (edge angles)
-	//write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
-	//nNodes,nFaces,nEdges,rH,facesH,edgesH);
+}
+
+
+
+// --------------------------------------------------------
+// Write IBM output to file, including more information
+// (edge angles):
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::write_output_long(std::string tagname, int tagnum)
+{
+	// first unwrap coordinate positions:
+	unwrap_node_coordinates(); 
+	// write ouput:
+	write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
+	nNodes,nFaces,nEdges,rH,facesH,edgesH);
 }
 
 
@@ -276,6 +351,40 @@ void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 	// rest triangle area:
 	rest_triangle_areas_IBM3D
 	<<<nBlocks,nThreads>>> (r,faces,cells,nFaces);
+}
+
+
+
+// --------------------------------------------------------
+// For a certain number of iterations, relax the 
+// the node positions (for example, after cells are shrunk 
+// to allow them to readjust to their regular volume):
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::relax_node_positions(int nIts, float M, int nBlocks, int nThreads)
+{
+	for (int i=0; i<nIts; i++) {
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+		compute_node_forces(nBlocks,nThreads);
+		nonbonded_node_interactions(nBlocks,nThreads);
+		update_node_positions_vacuum(M,nBlocks,nThreads);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_node_position_vacuum_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::update_node_positions_vacuum(float M, int nBlocks, int nThreads)
+{
+	update_node_position_vacuum_IBM3D
+	<<<nBlocks,nThreads>>> (r,f,M,nNodes);
+	
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
 }
 
 

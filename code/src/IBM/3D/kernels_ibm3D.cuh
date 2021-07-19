@@ -8,6 +8,13 @@ __global__ void update_node_position_IBM3D(
 	float3*,
     float3*,
 	int);
+
+
+__global__ void update_node_position_vacuum_IBM3D(
+	float3*,
+	float3*,
+	float,	
+	int);
 	
 
 __global__ void update_node_position_IBM3D(

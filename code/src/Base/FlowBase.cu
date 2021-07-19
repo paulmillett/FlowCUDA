@@ -29,6 +29,7 @@
 # include "../Apps/scsp_3D_capsule.cuh"
 # include "../Apps/scsp_3D_two_capsules.cuh"
 # include "../Apps/scsp_3D_capsules_lots.cuh"
+# include "../Apps/scsp_3D_capsules_susp_shear.cuh"
 # include "../Apps/scsp_3D_swell_ibm.cuh"
 # include "../Apps/scsp_3D_leftvent_ibm.cuh"
 # include "../Apps/mcmp_3D_capbridge_dip.cuh"
@@ -74,6 +75,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_capsule") return new scsp_3D_capsule();
 	if (specifier == "scsp_3D_two_capsules") return new scsp_3D_two_capsules();
 	if (specifier == "scsp_3D_capsules_lots") return new scsp_3D_capsules_lots();
+	if (specifier == "scsp_3D_capsules_susp_shear") return new scsp_3D_capsules_susp_shear();
 	if (specifier == "scsp_3D_swell_ibm") return new scsp_3D_swell_ibm();
 	if (specifier == "scsp_3D_leftvent_ibm") return new scsp_3D_leftvent_ibm();
 	if (specifier == "mcmp_3D_capbridge_dip") return new mcmp_3D_capbridge_dip();
