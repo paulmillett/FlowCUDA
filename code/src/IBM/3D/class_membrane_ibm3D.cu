@@ -361,13 +361,16 @@ void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 // to allow them to readjust to their regular volume):
 // --------------------------------------------------------
 
-void class_membrane_ibm3D::relax_node_positions(int nIts, float M, int nBlocks, int nThreads)
+void class_membrane_ibm3D::relax_node_positions(int nIts, float dvol, float M, int nBlocks, int nThreads)
 {
+	dvol /= float(nIts);	
 	for (int i=0; i<nIts; i++) {
+		change_cell_volume(dvol,nBlocks,nThreads);
 		reset_bin_lists(nBlocks,nThreads);
 		build_bin_lists(nBlocks,nThreads);
 		compute_node_forces(nBlocks,nThreads);
 		nonbonded_node_interactions(nBlocks,nThreads);
+		wall_forces_ydir(nBlocks,nThreads);
 		update_node_positions_vacuum(M,nBlocks,nThreads);
 	}
 }
@@ -541,6 +544,18 @@ void class_membrane_ibm3D::change_cell_volume(float change, int nBlocks, int nTh
 {
 	change_cell_volumes_IBM3D
 	<<<nBlocks,nThreads>>> (cells,change,nCells);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that scales the default edge lengths:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::scale_edge_lengths(float scale, int nBlocks, int nThreads)
+{
+	scale_edge_lengths_IBM3D
+	<<<nBlocks,nThreads>>> (edges,scale,nEdges);
 }
 
 

@@ -183,7 +183,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		
 		// calculate edge elongation force:
 		float lengthRatio = (edgeL-length0)/length0;
-		float lengthForceMag = ks*(lengthRatio + lengthRatio/abs(9.0-lengthRatio*lengthRatio));
+		float lengthForceMag = ks*(edgeL-length0); //ks*(lengthRatio + lengthRatio/abs(9.0-lengthRatio*lengthRatio));
 		r01 /= edgeL;  // normalize vector
 		add_force_to_vertex(V0,vertF, lengthForceMag*r01);
 		add_force_to_vertex(V1,vertF,-lengthForceMag*r01);
@@ -487,6 +487,24 @@ __global__ void change_cell_volumes_IBM3D(
 	if (i < nCells) {
 		cells[i].vol0 += dV;
 		cells[i].area0 = pow(M_PI,1./3.)*pow(6*cells[i].vol0,2./3.);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to reduce cell volume:
+// --------------------------------------------------------
+
+__global__ void scale_edge_lengths_IBM3D(
+	edge* edges,
+	float scale,
+	int nEdges)
+{
+	// define edge:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
+	if (i < nEdges) {
+		edges[i].length0 *= scale;
 	}
 }
 

@@ -122,6 +122,12 @@ __global__ void change_cell_volumes_IBM3D(
     cell*,
 	float,
 	int);
+	
+	
+__global__ void scale_edge_lengths_IBM3D(
+	edge*,
+	float,
+	int);
 		
 
 # endif  // KERNELS_MEMBRANE_IBM3D_H

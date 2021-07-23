@@ -72,7 +72,7 @@ class class_membrane_ibm3D {
 	void write_output(std::string,int);
 	void write_output_long(std::string,int);
 	void update_node_positions(int,int);
-	void relax_node_positions(int,float,int,int);
+	void relax_node_positions(int,float,float,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
 	void extrapolate_force(float*,float*,float*,int,int);	
@@ -83,6 +83,7 @@ class class_membrane_ibm3D {
 	void compute_node_forces(int,int);
 	void wall_forces_ydir(int,int);
 	void change_cell_volume(float,int,int);
+	void scale_edge_lengths(float,int,int);
 	void unwrap_node_coordinates();
 
 };
