@@ -178,8 +178,7 @@ void scsp_3D_capsules_susp_shear::initSystem()
 	// relax node positions: 
 	// ----------------------------------------------
 	
-	ibm.relax_node_positions(90000,-dvol,0.02,nBlocks,nThreads);
-	
+	ibm.relax_node_positions(90000,-dvol,0.02,nBlocks,nThreads);	
 	ibm.relax_node_positions(90000,0.0,0.02,nBlocks,nThreads);
 		
 	// ----------------------------------------------
@@ -226,6 +225,7 @@ void scsp_3D_capsules_susp_shear::cycleForward(int stepsPerCycle, int currentCyc
 		// compute IBM node forces:
 		ibm.compute_node_forces(nBlocks,nThreads);
 		ibm.nonbonded_node_interactions(nBlocks,nThreads);
+		ibm.wall_forces_ydir(nBlocks,nThreads);
 		
 		// update fluid:
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);

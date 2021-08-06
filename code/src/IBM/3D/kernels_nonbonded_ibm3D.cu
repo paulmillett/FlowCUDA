@@ -112,6 +112,11 @@ __global__ void nonbonded_node_interactions_IBM3D(
 		
 		int offst = binID*binMax;
 		int occup = binOccupancy[binID];
+		
+		if (occup > binMax) {
+			printf("Warning: linked-list bin has exceeded max capacity.  Occup. # = %i \n",occup);
+		}
+		
 		for (int k=offst; k<offst+occup; k++) {
 			int j = binMembers[k];
 			if (i==j) continue;
@@ -152,13 +157,14 @@ __device__ inline void pairwise_interaction_forces(
 	float3* F,
 	float3 Box)
 {
-	const float d = 1.5;
+	const float d = 2.0;
 	const float A = 2.0;
 	float3 rij = R[i] - R[j];
 	rij -= roundf(rij/Box)*Box;  // PBC's	
 	const float r = length(rij);
 	if (r < d) {
-		const float force = A/pow(r,2) - A/pow(d,2);
+		float force = A/pow(r,2) - A/pow(d,2);
+		if (force > 0.2) force = 0.2;
 		F[i] += force*(rij/r);
 	} 	
 }
