@@ -493,7 +493,7 @@ __global__ void change_cell_volumes_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to reduce cell volume:
+// IBM3D kernel to scale edge length:
 // --------------------------------------------------------
 
 __global__ void scale_edge_lengths_IBM3D(
@@ -501,10 +501,40 @@ __global__ void scale_edge_lengths_IBM3D(
 	float scale,
 	int nEdges)
 {
-	// define edge:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;	
-	if (i < nEdges) {
-		edges[i].length0 *= scale;
+	if (i < nEdges) edges[i].length0 *= scale;
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to scale face area:
+// --------------------------------------------------------
+
+__global__ void scale_face_areas_IBM3D(
+	triangle* faces,
+	float scale,
+	int nFaces)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
+	if (i < nFaces) faces[i].area0 *= scale*scale;
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to scale cell global area & volume:
+// --------------------------------------------------------
+
+__global__ void scale_cell_areas_volumes_IBM3D(
+	cell* cells,
+	float scale,
+	int nCells)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nCells) {
+		cells[i].area0 *= scale*scale;
+		cells[i].vol0 *= scale*scale*scale;		
 	}
 }
 

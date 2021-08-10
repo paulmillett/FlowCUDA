@@ -169,17 +169,17 @@ void scsp_3D_capsules_susp_shear::initSystem()
 	// shrink and randomly disperse cells: 
 	// ----------------------------------------------
 	
-	float dr = 0.7;
-	float dvol = 4.0/3.0*M_PI*dr*dr*dr*10.0*10.0*10.0 - 4.0/3.0*M_PI*10.0*10.0*10.0;
-	ibm.shrink_and_randomize_cells(dr,16.0);
-	ibm.change_cell_volume(dvol,nBlocks,nThreads);
+	float scale = 0.7;
+	ibm.shrink_and_randomize_cells(scale,16.0);
+	ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// relax node positions: 
 	// ----------------------------------------------
 	
-	ibm.relax_node_positions(90000,-dvol,0.02,nBlocks,nThreads);	
-	ibm.relax_node_positions(90000,0.0,0.02,nBlocks,nThreads);
+	scale = 1.0/0.7;
+	ibm.relax_node_positions(90000,scale,0.02,nBlocks,nThreads);	
+	ibm.relax_node_positions(90000,1.0,0.02,nBlocks,nThreads);
 		
 	// ----------------------------------------------
 	// write initial output file:

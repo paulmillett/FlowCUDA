@@ -361,11 +361,12 @@ void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 // to allow them to readjust to their regular volume):
 // --------------------------------------------------------
 
-void class_membrane_ibm3D::relax_node_positions(int nIts, float dvol, float M, int nBlocks, int nThreads)
+void class_membrane_ibm3D::relax_node_positions(int nIts, float scale, float M, int nBlocks, int nThreads) 
 {
-	dvol /= float(nIts);	
+	float power = 1.0/float(nIts);
+	float scalePerIter = powf(scale,power);  // per iteraction scale factor	
 	for (int i=0; i<nIts; i++) {
-		change_cell_volume(dvol,nBlocks,nThreads);
+		scale_equilibrium_cell_size(scalePerIter,nBlocks,nThreads);
 		reset_bin_lists(nBlocks,nThreads);
 		build_bin_lists(nBlocks,nThreads);
 		compute_node_forces(nBlocks,nThreads);
@@ -373,6 +374,7 @@ void class_membrane_ibm3D::relax_node_positions(int nIts, float dvol, float M, i
 		wall_forces_ydir(nBlocks,nThreads);
 		update_node_positions_vacuum(M,nBlocks,nThreads);
 	}
+	
 }
 
 
@@ -544,6 +546,25 @@ void class_membrane_ibm3D::change_cell_volume(float change, int nBlocks, int nTh
 {
 	change_cell_volumes_IBM3D
 	<<<nBlocks,nThreads>>> (cells,change,nCells);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that scales the default cell geometry:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::scale_equilibrium_cell_size(float scale, int nBlocks, int nThreads)
+{
+	// scale the equilibrium edge length:
+	scale_edge_lengths_IBM3D
+	<<<nBlocks,nThreads>>> (edges,scale,nEdges);
+	// scale the equilibrium local area:
+	scale_face_areas_IBM3D
+	<<<nBlocks,nThreads>>> (faces,scale,nFaces);
+	// scale the equilibrium global area and volume:
+	scale_cell_areas_volumes_IBM3D
+	<<<nBlocks,nThreads>>> (cells,scale,nCells);
 }
 
 
