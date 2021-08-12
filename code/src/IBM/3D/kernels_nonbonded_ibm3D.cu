@@ -58,16 +58,18 @@ __global__ void build_bin_lists_IBM3D(
 		int binID = int(floor(vertR[i].x/sizeBins))*numBins.z*numBins.y +  
 			        int(floor(vertR[i].y/sizeBins))*numBins.z +
 		            int(floor(vertR[i].z/sizeBins));		
-		
+						
 		// -------------------------------
 		// update the lists:
 		// -------------------------------
 		
-		atomicAdd(&binOccupancy[binID],1);
-		int offst = binID*binMax;
-		for (int k=offst; k<offst+binMax; k++) {
-			int flag = atomicCAS(&binMembers[k],-1,i);
-			if (flag == -1) break;  
+		if (binID >= 0 && binID < numBins.x*numBins.y*numBins.z) {
+			atomicAdd(&binOccupancy[binID],1);
+			int offst = binID*binMax;
+			for (int k=offst; k<offst+binMax; k++) {
+				int flag = atomicCAS(&binMembers[k],-1,i); 
+				if (flag == -1) break;  
+			}
 		}
 		
 	}
@@ -113,10 +115,12 @@ __global__ void nonbonded_node_interactions_IBM3D(
 		int offst = binID*binMax;
 		int occup = binOccupancy[binID];
 		
+		/*
 		if (occup > binMax) {
 			printf("Warning: linked-list bin has exceeded max capacity.  Occup. # = %i \n",occup);
 		}
-		
+		*/
+				
 		for (int k=offst; k<offst+occup; k++) {
 			int j = binMembers[k];
 			if (i==j) continue;
@@ -136,7 +140,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			// loop over nodes in this bin:
 			for (int k=offst; k<offst+occup; k++) {
 				int j = binMembers[k];
-				if (cellIDs[i]==cellIDs[j]) continue;
+				if (cellIDs[i]==cellIDs[j]) continue;				
 				pairwise_interaction_forces(i,j,vertR,vertF,Box);			
 			}
 		}

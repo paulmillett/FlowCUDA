@@ -152,7 +152,7 @@ void scsp_3D_capsules_susp_shear::initSystem()
 	
 	lbm.memcopy_host_to_device();
 	ibm.memcopy_host_to_device();
-	
+		
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
@@ -176,18 +176,18 @@ void scsp_3D_capsules_susp_shear::initSystem()
 	// ----------------------------------------------
 	// relax node positions: 
 	// ----------------------------------------------
-	
+		
 	scale = 1.0/0.7;
 	ibm.relax_node_positions(90000,scale,0.02,nBlocks,nThreads);	
 	ibm.relax_node_positions(90000,1.0,0.02,nBlocks,nThreads);
-		
+				
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
 	
 	ibm.memcopy_device_to_host();
 	writeOutput("macros",0);
-	
+		
 }
 
 
@@ -214,7 +214,7 @@ void scsp_3D_capsules_susp_shear::cycleForward(int stepsPerCycle, int currentCyc
 	
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
-		
+				
 		// zero fluid forces:
 		lbm.zero_forces(nBlocks,nThreads);
 		
@@ -237,6 +237,7 @@ void scsp_3D_capsules_susp_shear::cycleForward(int stepsPerCycle, int currentCyc
 		ibm.update_node_positions(nBlocks,nThreads);
 				
 		cudaDeviceSynchronize();
+
 	}
 	
 	cout << cummulativeSteps << endl;	

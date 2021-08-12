@@ -86,7 +86,7 @@ class class_membrane_ibm3D {
 	void scale_equilibrium_cell_size(float,int,int); 
 	void scale_edge_lengths(float,int,int);
 	void unwrap_node_coordinates();
-
+	
 };
 
 # endif  // CLASS_MEMBRANE_IBM3D_H

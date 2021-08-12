@@ -215,7 +215,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		float3 FA = bendForceMag*(nC*dot(A-B,C-B)/BmA + nD*dot(A-B,D-B)/BmA);
 		float3 FB = bendForceMag*(nC*dot(A-B,A-C)/BmA + nD*dot(A-B,A-D)/BmA);
 		float3 FC = -bendForceMag*BmA*nC;
-		float3 FD = -bendForceMag*BmA*nD;		
+		float3 FD = -bendForceMag*BmA*nD;
 		add_force_to_vertex(pA,vertF,FA);
 		add_force_to_vertex(pB,vertF,FB);
 		add_force_to_vertex(pC,vertF,FC);
@@ -391,7 +391,7 @@ __device__ inline void add_force_to_vertex(
 {
 	atomicAdd(&f[i].x,g.x);
 	atomicAdd(&f[i].y,g.y);
-	atomicAdd(&f[i].z,g.z);
+	atomicAdd(&f[i].z,g.z);	
 }
 
 
@@ -448,8 +448,8 @@ __global__ void unwrap_node_coordinates_IBM3D(
 	if (i < nNodes) {
 		int c = cellIDs[i];
 		int j = cells[c].refNode;
-		float3 rij = r[j] - r[i];
-		r[i] = r[i] + roundf(rij/Box)*Box; // PBC's		
+		float3 rij = r[j] - r[i];		
+		r[i] = r[i] + roundf(rij/Box)*Box; // PBC's
 	}
 }
 

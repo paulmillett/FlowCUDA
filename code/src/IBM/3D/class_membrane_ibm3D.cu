@@ -129,7 +129,7 @@ void class_membrane_ibm3D::memcopy_host_to_device()
 	cudaMemcpy(faces, facesH, sizeof(triangle)*nFaces, cudaMemcpyHostToDevice);	
 	cudaMemcpy(edges, edgesH, sizeof(edge)*nEdges, cudaMemcpyHostToDevice);
 	cudaMemcpy(cells, cellsH, sizeof(cell)*nCells, cudaMemcpyHostToDevice);
-	cudaMemcpy(cellIDs, cellIDsH, sizeof(int)*nNodes, cudaMemcpyHostToDevice);	
+	cudaMemcpy(cellIDs, cellIDsH, sizeof(int)*nNodes, cudaMemcpyHostToDevice);
 }
 	
 
@@ -234,6 +234,7 @@ void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 {
 	// copy node positions from device to host:
 	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	
 	// shrink cells by specified amount:
 	for (int c=0; c<nCells; c++) {
 		for (int i=0; i<nNodesPerCell; i++) {
@@ -241,6 +242,7 @@ void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 			rH[indx] *= shrinkFactor;
 		}
 	}
+	
 	// randomly shift cells, without overlapping previous cells:
 	float3* cellCOM = (float3*)malloc(nCells*sizeof(float3));
 	for (int c=0; c<nCells; c++) {
@@ -268,6 +270,7 @@ void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 		cellCOM[c] = shift;		
 		shift_node_positions(c,shift.x,shift.y,shift.z);
 	}
+	
 	// last, copy node positions from host to device:
 	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
 }
@@ -294,10 +297,10 @@ float class_membrane_ibm3D::calc_separation_pbc(float3 r1, float3 r2)
 void class_membrane_ibm3D::shift_node_positions(int cellID, float xsh, float ysh, float zsh)
 {
 	for (int i=0; i<nNodesPerCell; i++) {
-		int indx = i + cellID*nNodesPerCell;
+		int indx = i + cellID*nNodesPerCell;		 
 		rH[indx].x += xsh;
 		rH[indx].y += ysh;
-		rH[indx].z += zsh;
+		rH[indx].z += zsh;		
 	}
 }
 
@@ -363,18 +366,28 @@ void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 
 void class_membrane_ibm3D::relax_node_positions(int nIts, float scale, float M, int nBlocks, int nThreads) 
 {
+	// per iteraction scale factor:
 	float power = 1.0/float(nIts);
-	float scalePerIter = powf(scale,power);  // per iteraction scale factor	
-	for (int i=0; i<nIts; i++) {
-		scale_equilibrium_cell_size(scalePerIter,nBlocks,nThreads);
-		reset_bin_lists(nBlocks,nThreads);
-		build_bin_lists(nBlocks,nThreads);
-		compute_node_forces(nBlocks,nThreads);
-		nonbonded_node_interactions(nBlocks,nThreads);
-		wall_forces_ydir(nBlocks,nThreads);
-		update_node_positions_vacuum(M,nBlocks,nThreads);
-	}
+	float scalePerIter = powf(scale,power);
 	
+	// make sure node coordinates are wrapped for 
+	// PBC's prior to building bin-lists the first time:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
+	
+	// iterate to relax node positions while scaling equilibirum
+	// cell size:
+	for (int i=0; i<nIts; i++) {
+		if (i%10000 == 0) cout << "relax step " << i << endl;		
+		scale_equilibrium_cell_size(scalePerIter,nBlocks,nThreads);		
+		reset_bin_lists(nBlocks,nThreads);		
+		build_bin_lists(nBlocks,nThreads);		
+		compute_node_forces(nBlocks,nThreads);		
+		nonbonded_node_interactions(nBlocks,nThreads);		
+		wall_forces_ydir(nBlocks,nThreads);		
+		update_node_positions_vacuum(M,nBlocks,nThreads);		
+		cudaDeviceSynchronize();
+	}	
 }
 
 

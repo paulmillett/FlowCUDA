@@ -33,7 +33,9 @@ __global__ void update_node_position_vacuum_IBM3D(
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) r[i] += M*f[i];
+	if (i < nNodes) {
+		r[i] += M*f[i];
+	}
 }
 
 
