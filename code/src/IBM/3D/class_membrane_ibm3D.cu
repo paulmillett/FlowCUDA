@@ -230,7 +230,7 @@ void class_membrane_ibm3D::duplicate_cells()
 // the box:
 // --------------------------------------------------------
 
-void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float sepMin)
+void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float sepMin, float sepWall)
 {
 	// copy node positions from device to host:
 	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
@@ -254,7 +254,7 @@ void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 			tooClose = false;
 			// get random position
 			shift.x = (float)rand()/RAND_MAX*Box.x;
-			shift.y = 0.5*sepMin + (float)rand()/RAND_MAX*(Box.y-sepMin);
+			shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
 			shift.z = (float)rand()/RAND_MAX*Box.z;
 			// check with other cells
 			for (int d=0; d<c; d++) {
