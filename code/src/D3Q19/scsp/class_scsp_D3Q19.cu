@@ -20,6 +20,7 @@ class_scsp_D3Q19::class_scsp_D3Q19()
 	nVoxels = inputParams("Lattice/nVoxels",0);
 	numIolets = inputParams("Lattice/numIolets",0);
 	nu = inputParams("LBM/nu",0.1666666);
+	dt = inputParams("Time/dt",1.0);
 	forceFlag = false;
 	velIBFlag = false;
 	inoutFlag = false;
@@ -487,6 +488,22 @@ void class_scsp_D3Q19::stream_collide_save_forcing(int nBlocks, int nThreads)
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	scsp_stream_collide_save_forcing_D3Q19 
 	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,Fx,Fy,Fz,streamIndex,voxelType,iolets,nu,nVoxels);
+	float* temp = f1;
+	f1 = f2;
+	f2 = temp;
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_stream_collide_save_forcing_dt_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::stream_collide_save_forcing_dt(int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	scsp_stream_collide_save_forcing_dt_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,Fx,Fy,Fz,streamIndex,voxelType,iolets,nu,dt,nVoxels);
 	float* temp = f1;
 	f1 = f2;
 	f2 = temp;

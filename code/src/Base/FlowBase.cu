@@ -27,6 +27,7 @@
 # include "../Apps/scsp_3D_hemisphere_3.cuh"
 # include "../Apps/scsp_3D_bulge.cuh"
 # include "../Apps/scsp_3D_capsule.cuh"
+# include "../Apps/scsp_3D_capsule_skalak.cuh"
 # include "../Apps/scsp_3D_two_capsules.cuh"
 # include "../Apps/scsp_3D_capsules_lots.cuh"
 # include "../Apps/scsp_3D_capsules_susp_shear.cuh"
@@ -73,6 +74,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_hemisphere_3") return new scsp_3D_hemisphere_3();
 	if (specifier == "scsp_3D_bulge") return new scsp_3D_bulge();
 	if (specifier == "scsp_3D_capsule") return new scsp_3D_capsule();
+	if (specifier == "scsp_3D_capsule_skalak") return new scsp_3D_capsule_skalak();
 	if (specifier == "scsp_3D_two_capsules") return new scsp_3D_two_capsules();
 	if (specifier == "scsp_3D_capsules_lots") return new scsp_3D_capsules_lots();
 	if (specifier == "scsp_3D_capsules_susp_shear") return new scsp_3D_capsules_susp_shear();

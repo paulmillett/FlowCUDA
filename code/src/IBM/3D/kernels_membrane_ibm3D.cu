@@ -1,11 +1,55 @@
 
+
 # include "kernels_membrane_ibm3D.cuh"
 # include <stdio.h>
 
 
 
+// **********************************************************************************************
+// Kernels to compute membrane rest geometries
+// **********************************************************************************************
+
+
+
 // --------------------------------------------------------
-// IBM3D kernel to compute rest edge lengths:
+// IBM3D kernel to compute rest triangle properties (Skalak):
+// --------------------------------------------------------
+
+__global__ void rest_triangle_skalak_IBM3D(
+	float3* vertR,
+	triangle* faces,
+	cell* cells, 
+	int nFaces)
+{
+	// define face:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nFaces) {
+		int V0 = faces[i].v0;
+		int V1 = faces[i].v1;
+		int V2 = faces[i].v2;
+		float3 r0 = vertR[V0]; 
+		float3 r1 = vertR[V1];
+		float3 r2 = vertR[V2];
+		float3 vec1 = r1 - r0;
+		float3 vec2 = r2 - r0;
+		float3 norm = cross(vec1,vec2);
+		faces[i].area0 = 0.5*length(norm);
+		faces[i].l0 = length(vec2);
+		faces[i].lp0 = length(vec1);
+		faces[i].cosphi0 = dot(vec1,vec2)/(faces[i].lp0*faces[i].l0);
+		faces[i].sinphi0 = length(cross(vec1,vec2))/(faces[i].lp0*faces[i].l0);			
+		// calculate global cell geometries:
+		int cID = faces[i].cellID;
+		float volFace = triangle_signed_volume(r0,r1,r2);
+		atomicAdd(&cells[cID].vol0,volFace); 
+		atomicAdd(&cells[cID].area0,faces[i].area0);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute rest edge lengths (Spring):
 // --------------------------------------------------------
 
 __global__ void rest_edge_lengths_IBM3D(
@@ -27,7 +71,7 @@ __global__ void rest_edge_lengths_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to compute rest edge angles:
+// IBM3D kernel to compute rest edge angles (Spring):
 // --------------------------------------------------------
 
 __global__ void rest_edge_angles_IBM3D(
@@ -62,7 +106,8 @@ __global__ void rest_edge_angles_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to compute rest triangle areas:
+// IBM3D kernel to compute rest triangle areas &
+// cell volumes (Spring):
 // --------------------------------------------------------
 
 __global__ void rest_triangle_areas_IBM3D(
@@ -89,6 +134,214 @@ __global__ void rest_triangle_areas_IBM3D(
 		atomicAdd(&cells[cID].area0,faces[i].area0);		
 	}
 }
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute rest cell volumes only:
+// (note: this can be done when using Skalak model)
+// --------------------------------------------------------
+
+__global__ void rest_cell_volumes_IBM3D(
+	float3* vertR,
+	triangle* faces,
+	cell* cells, 
+	int nFaces)
+{
+	// define face:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nFaces) {
+		int V0 = faces[i].v0;
+		int V1 = faces[i].v1;
+		int V2 = faces[i].v2;
+		float3 r0 = vertR[V0]; 
+		float3 r1 = vertR[V1];
+		float3 r2 = vertR[V2];
+		int cID = faces[i].cellID;
+		float volFace = triangle_signed_volume(r0,r1,r2);
+		atomicAdd(&cells[cID].vol0,volFace); 
+	}
+}
+
+
+
+
+
+
+// **********************************************************************************************
+// Skalak force kernel
+// **********************************************************************************************
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute force on nodes based on the 
+// Skalak elastic membrane model.  Here, we follow the details of 
+// Timm Kruger's Thesis (Appendix C), or see Kruger et al. 
+// Computers & Mathem. Appl. 61 (2011) 3485. 
+// --------------------------------------------------------
+
+__global__ void compute_node_force_membrane_skalak_IBM3D(
+	triangle* faces,
+	float3* vertR,
+	float3* vertF,
+	cell* cells,	
+	float gs,
+	float ga,
+	int nFaces)
+{
+	// define face:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nFaces) {
+				
+		// calculate current shape of triangle:
+		int V0 = faces[i].v0;
+		int V1 = faces[i].v1;
+		int V2 = faces[i].v2;
+		float3 r0 = vertR[V0]; 
+		float3 r1 = vertR[V1];
+		float3 r2 = vertR[V2];
+		float3 vec1 = r1 - r0;
+		float3 vec2 = r2 - r0;
+		const float l = length(vec2);
+		const float lp = length(vec1);
+		const float cosphi = dot(vec1,vec2)/(lp*l);
+		const float sinphi = length(cross(vec1,vec2))/(lp*l);
+		float3 norm = cross(vec1,vec2);
+		const float  area = 0.5*length(norm);
+		faces[i].area = area;
+		faces[i].norm = norm;	
+		
+		// Variables in the reference state
+	    const float l0 = faces[i].l0;
+	    const float lp0 = faces[i].lp0;
+	    const float cosphi0 = faces[i].cosphi0;
+	    const float sinphi0 = faces[i].sinphi0;
+	    const float area0 = faces[i].area0;			
+		const float a1 = -l0*sinphi0/(2*area0);
+	    const float a2 = -a1;
+	    const float b1 = (l0*cosphi0 - lp0)/(2*area0);
+	    const float b2 = -l0*cosphi0/(2*area0);
+		
+		// Displacement gradient tensor D: eq. (C.9) in Kruger
+	    const float Dxx = lp/lp0;
+	    const float Dxy = ((l/l0*cosphi) - (lp/lp0*cosphi0))/sinphi0;
+	    const float Dyx = 0.0;
+	    const float Dyy = l/l0*sinphi/sinphi0;
+
+	    // Tensor G: (C.12)
+	    const float Gxx = Dxx*Dxx + Dyx*Dyx;
+	    const float Gxy = Dxx*Dxy + Dyx*Dyy;
+	    const float Gyx = Gxy;  // symmetry
+	    const float Gyy = Dxy*Dxy + Dyy*Dyy;
+
+	    // Strain invariants, C.11 and C.12
+	    const float i1 = (Gxx + Gyy) - 2.0;
+	    const float i2 = (Gxx*Gyy - Gxy*Gyx) - 1.0;
+
+	    // Derivatives of Skalak energy density E used in chain rule below: eq. (C.14)
+	    const float dEdI1 = gs*(i1 + 1.0)/6.0;
+	    const float dEdI2 = (ga*i2 - gs)/6.0;
+		// Derivatives of Neo-Hookean energy density E used in chain rule below: eq. (C.14)
+	    //const float dEdI1 = gs/6.0;
+	    //const float dEdI2 = -gs/(6.0*(i2+1.0)*(i2+1.0));
+		
+	  // Derivatives of Is (C.15)
+	    const float dI1dGxx = 1;
+	    const float dI1dGxy = 0;
+	    const float dI1dGyx = 0;
+	    const float dI1dGyy = 1;
+	    const float dI2dGxx = Gyy;
+	    const float dI2dGxy = -Gyx;  // Note: Krueger has a factor 2 here, because he
+	                                 // uses the symmetry of the G-matrix.
+	    const float dI2dGyx = -Gxy;  // But we don't use it. So, Krueger is missing
+	                                 // the yx term, whereas we have it.
+	    const float dI2dGyy = Gxx;
+
+	    // Derivatives of G (C.16)
+	    const float dGxxdV1x = 2.0*a1*Dxx;
+	    const float dGxxdV1y = 0.0;
+	    const float dGxxdV2x = 2.0*a2*Dxx;
+	    const float dGxxdV2y = 0.0;
+
+	    const float dGxydV1x = a1*Dxy + b1*Dxx;
+	    const float dGxydV1y = a1*Dyy;
+	    const float dGxydV2x = a2*Dxy + b2*Dxx;
+	    const float dGxydV2y = a2*Dyy;
+
+	    const float dGyxdV1x = a1*Dxy + b1*Dxx;
+	    const float dGyxdV1y = a1*Dyy;
+	    const float dGyxdV2x = a2*Dxy + b2*Dxx;
+	    const float dGyxdV2y = a2*Dyy;
+
+	    const float dGyydV1x = 2.0*b1*Dxy;
+	    const float dGyydV1y = 2.0*b1*Dyy;
+	    const float dGyydV2x = 2.0*b2*Dxy;
+	    const float dGyydV2y = 2.0*b2*Dyy;
+
+	    // Calculate forces per area in rotated system: chain rule as in appendix C of
+	    // Krüger (chain rule applied in eq. (C.13), but for the energy density). Only
+	    // two nodes are needed, third one is calculated from momentum conservation
+	    // Note: If you calculate the derivatives in a straightforward manner, you get
+	    // 8 terms (done here). Krueger exploits the symmetry of the G-matrix, which
+	    // results in 6 elements, but with an additional factor 2 for the xy-elements
+	    // (see also above at the definition of dI2dGxy).
+	    float2 f1_rot;
+	    float2 f2_rot;
+	    f1_rot.x = -(dEdI1 * dI1dGxx * dGxxdV1x) - (dEdI1 * dI1dGxy * dGxydV1x) -
+	                (dEdI1 * dI1dGyx * dGyxdV1x) - (dEdI1 * dI1dGyy * dGyydV1x) -
+	                (dEdI2 * dI2dGxx * dGxxdV1x) - (dEdI2 * dI2dGxy * dGxydV1x) -
+	                (dEdI2 * dI2dGyx * dGyxdV1x) - (dEdI2 * dI2dGyy * dGyydV1x);
+	    f1_rot.y = -(dEdI1 * dI1dGxx * dGxxdV1y) - (dEdI1 * dI1dGxy * dGxydV1y) -
+	                (dEdI1 * dI1dGyx * dGyxdV1y) - (dEdI1 * dI1dGyy * dGyydV1y) -
+	                (dEdI2 * dI2dGxx * dGxxdV1y) - (dEdI2 * dI2dGxy * dGxydV1y) -
+	                (dEdI2 * dI2dGyx * dGyxdV1y) - (dEdI2 * dI2dGyy * dGyydV1y);
+	    f2_rot.x = -(dEdI1 * dI1dGxx * dGxxdV2x) - (dEdI1 * dI1dGxy * dGxydV2x) -
+	                (dEdI1 * dI1dGyx * dGyxdV2x) - (dEdI1 * dI1dGyy * dGyydV2x) -
+	                (dEdI2 * dI2dGxx * dGxxdV2x) - (dEdI2 * dI2dGxy * dGxydV2x) -
+	                (dEdI2 * dI2dGyx * dGyxdV2x) - (dEdI2 * dI2dGyy * dGyydV2x);
+	    f2_rot.y = -(dEdI1 * dI1dGxx * dGxxdV2y) - (dEdI1 * dI1dGxy * dGxydV2y) -
+	                (dEdI1 * dI1dGyx * dGyxdV2y) - (dEdI1 * dI1dGyy * dGyydV2y) -
+	                (dEdI2 * dI2dGxx * dGxxdV2y) - (dEdI2 * dI2dGxy * dGxydV2y) -
+	                (dEdI2 * dI2dGyx * dGyxdV2y) - (dEdI2 * dI2dGyy * dGyydV2y);
+
+	    // Multiply by undeformed area
+	    f1_rot *= area0;
+	    f2_rot *= area0;	    
+		
+		// Rotate forces back into original position of triangle.  This is done
+		// by finding the xu and yu directions in 3D space. See Kruger Fig. 7.1B. 
+		// xu = normalized direction from node 0 to node 1 (vec1)
+		// yu = normalized vector rejection of vec1 and vec2.  yu is orthogonal to xu.		
+		float3 xu = normalize(vec1);
+		float3 yu = normalize(vec2 - dot(vec2,xu)*xu);
+	    float3 force0 = f1_rot.x*xu + f1_rot.y*yu;
+	    float3 force1 = f2_rot.x*xu + f2_rot.y*yu;
+	    float3 force2 = -force0-force1;
+		
+		// add forces to nodes
+		add_force_to_vertex(V0,vertF,force0);
+		add_force_to_vertex(V1,vertF,force1);
+		add_force_to_vertex(V2,vertF,force2);	
+				
+		// add to global cell geometries:
+		int cID = faces[i].cellID;
+		float volFace = triangle_signed_volume(r0,r1,r2);
+		atomicAdd(&cells[cID].vol,volFace); 
+		atomicAdd(&cells[cID].area,area);
+					
+	}	
+}
+
+
+
+
+
+
+// **********************************************************************************************
+// Spring force kernels
+// **********************************************************************************************
 
 
 
@@ -160,18 +413,12 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 	float3* vertF,
 	edge* edges,
 	float ks,
-	float kb,
 	int nEdges)
 {
 	// define edge:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nEdges) {
-		
-		// --------------------------------
-		// Edge stretching force:
-		// --------------------------------
-				
 		// calculate edge length:
 		int V0 = edges[i].v0;
 		int V1 = edges[i].v1;
@@ -180,26 +427,46 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		float3 r01 = r1 - r0;
 		float edgeL = length(r01);
 		float length0 = edges[i].length0;
-		
-		// calculate edge elongation force:
+		// calculate edge stretching force:
 		float lengthRatio = (edgeL-length0)/length0;
 		float lengthForceMag = ks*(edgeL-length0); //ks*(lengthRatio + lengthRatio/abs(9.0-lengthRatio*lengthRatio));
 		r01 /= edgeL;  // normalize vector
 		add_force_to_vertex(V0,vertF, lengthForceMag*r01);
-		add_force_to_vertex(V1,vertF,-lengthForceMag*r01);
-						
-		// --------------------------------
-		// Edge bending force:
-		// --------------------------------
+		add_force_to_vertex(V1,vertF,-lengthForceMag*r01);		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute force on node based on the 
+// membrane model of Jancigova et al (Int. J. Numer. Meth.
+// Fluids, 92:1368 (2020)):
+// --------------------------------------------------------
+
+__global__ void compute_node_force_membrane_bending_IBM3D(
+	triangle* faces,
+	float3* vertR,
+	float3* vertF,
+	edge* edges,	
+	float kb,
+	int nEdges)
+{		
+	// define edge:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
-		// bend force magnitude between faces:		
+	if (i < nEdges) {
+		// get basic data about edge:
+		int V0 = edges[i].v0;
+		int V1 = edges[i].v1;
+		float3 n01 = normalize(vertR[V1] - vertR[V0]);	
+		// calculate bending force magnitude:
 		int F0 = edges[i].f0;
 		int F1 = edges[i].f1;
 		float3 n0 = faces[F0].norm;  // normals were calculated above in
 		float3 n1 = faces[F1].norm;  // "compute_node_force_membrane_area_IBM3D()"
-		float dtheta = angle_between_faces(n0,n1,r01/edgeL) - edges[i].theta0;
-		float bendForceMag = kb*dtheta;  // = kb*(dtheta + dtheta/abs(2.467 - dtheta*dtheta));
-				
+		float dtheta = angle_between_faces(n0,n1,n01) - edges[i].theta0;
+		float bendForceMag = kb*dtheta;  // = kb*(dtheta + dtheta/abs(2.467 - dtheta*dtheta));				
 		// apply to the four points:
 		int pA = V0;
 		int pB = V1;
@@ -219,8 +486,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		add_force_to_vertex(pA,vertF,FA);
 		add_force_to_vertex(pB,vertF,FB);
 		add_force_to_vertex(pC,vertF,FC);
-		add_force_to_vertex(pD,vertF,FD);		
-										
+		add_force_to_vertex(pD,vertF,FD);											
 	}	
 }
 
@@ -249,7 +515,7 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
 		float area = faces[i].area;
-		float3 unitnorm = faces[i].norm/length(faces[i].norm);
+		float3 unitnorm = normalize(faces[i].norm);
 		float volRatio = (cells[cID].vol - cells[cID].vol0)/cells[cID].vol0;
 		float volForceMag = -kv*volRatio;
 		volForceMag *= area;	
@@ -302,6 +568,14 @@ __global__ void compute_node_force_membrane_globalarea_IBM3D(
 		add_force_to_vertex(V2,vertF,areaForceMag*ar2);			
 	}	
 }
+
+
+
+
+
+// **********************************************************************************************
+// Miscellaneous kernels and functions
+// **********************************************************************************************
 
 
 
@@ -537,5 +811,7 @@ __global__ void scale_cell_areas_volumes_IBM3D(
 		cells[i].vol0 *= scale*scale*scale;		
 	}
 }
+
+
 
 

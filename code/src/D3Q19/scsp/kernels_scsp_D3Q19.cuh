@@ -86,7 +86,25 @@ __global__ void scsp_stream_collide_save_forcing_D3Q19(
 	iolet*,
 	float,
 	int);
-		
+	
+	
+__global__ void scsp_stream_collide_save_forcing_dt_D3Q19(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	int*,
+	int*,
+	iolet*,
+	float,
+	float,
+	int);
+				
 
 __global__ void scsp_stream_collide_save_IBforcing_D3Q19(
 	float*,

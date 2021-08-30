@@ -636,6 +636,297 @@ __global__ void scsp_stream_collide_save_forcing_D3Q19(float* f1,
 // save" algorithm recommended by T. Kruger in the 
 // textbook: "The Lattice Boltzmann Method: Principles
 // and Practice".
+//
+// Here, the timestep can be varied.
+// --------------------------------------------------------
+
+__global__ void scsp_stream_collide_save_forcing_dt_D3Q19(float* f1,
+                                                          float* f2,
+										                  float* r,
+										                  float* u,
+										                  float* v,
+										                  float* w,
+													      float* Fx,
+													      float* Fy,
+													      float* Fz,
+										                  int* streamIndex,
+										                  int* voxelType, 
+										                  iolet* iolets,
+										                  float nu,
+														  float dt,
+										                  int nVoxels)
+{
+
+	// -----------------------------------------------
+	// define voxel:
+	// -----------------------------------------------
+	
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+		
+	if (i < nVoxels) {
+		
+		// --------------------------------------------------		
+		// voxel-specific parameters:
+		// --------------------------------------------------
+		
+		int vtype = voxelType[i];
+		int offst = 19*i;	
+		float ft[19];
+		
+		// --------------------------------------------------		
+		// STREAMING - load populations from adjacent voxels,
+		//             note	that streamIndex[] accounts for
+		//             halfway bounceback conditions.
+		// --------------------------------------------------
+				
+		ft[0]  = f1[streamIndex[offst+0]];                   
+		ft[1]  = f1[streamIndex[offst+1]]; 
+		ft[2]  = f1[streamIndex[offst+2]];  
+		ft[3]  = f1[streamIndex[offst+3]];  
+		ft[4]  = f1[streamIndex[offst+4]];  
+		ft[5]  = f1[streamIndex[offst+5]]; 
+		ft[6]  = f1[streamIndex[offst+6]];  
+		ft[7]  = f1[streamIndex[offst+7]];  
+		ft[8]  = f1[streamIndex[offst+8]]; 
+		ft[9]  = f1[streamIndex[offst+9]]; 
+		ft[10] = f1[streamIndex[offst+10]]; 	
+		ft[11] = f1[streamIndex[offst+11]]; 	
+		ft[12] = f1[streamIndex[offst+12]]; 	
+		ft[13] = f1[streamIndex[offst+13]]; 	
+		ft[14] = f1[streamIndex[offst+14]]; 	
+		ft[15] = f1[streamIndex[offst+15]]; 	
+		ft[16] = f1[streamIndex[offst+16]]; 	
+		ft[17] = f1[streamIndex[offst+17]]; 	
+		ft[18] = f1[streamIndex[offst+18]]; 	
+		
+		// --------------------------------------------------		
+		// INLETS/OUTLETS - correct the ft[] values at inlets
+		//                  and outlets using Zou-He BC's.
+		// --------------------------------------------------
+		
+		if (vtype > 0) {
+			zou_he_BC_D3Q19(vtype,ft,iolets);
+		}
+		
+		// --------------------------------------------------
+		// MACROS - calculate the velocity and density (force
+		//          corrected).
+		// --------------------------------------------------	
+		
+		float rho = ft[0]+ft[1]+ft[2]+ft[3]+ft[4]+ft[5]+ft[6]+ft[7]+ft[8]+ft[9]+ft[10]+ft[11]+
+			        ft[12]+ft[13]+ft[14]+ft[15]+ft[16]+ft[17]+ft[18];
+		float rhoinv = 1.0/rho;
+		float ux = rhoinv*(ft[1] + ft[7] + ft[9]  + ft[13] + ft[15] - (ft[2] + ft[8]  + ft[10] + ft[14] + ft[16]) + 0.5*Fx[i]*dt);
+		float vy = rhoinv*(ft[3] + ft[7] + ft[11] + ft[14] + ft[17] - (ft[4] + ft[8]  + ft[12] + ft[13] + ft[18]) + 0.5*Fy[i]*dt);
+		float wz = rhoinv*(ft[5] + ft[9] + ft[11] + ft[16] + ft[18] - (ft[6] + ft[10] + ft[12] + ft[15] + ft[17]) + 0.5*Fz[i]*dt);
+		
+		// --------------------------------------------------
+		// COLLISION - perform the BGK collision operator
+		//             with Guo forcing.
+		// --------------------------------------------------	
+		
+		// useful constants:
+		const float w0 = 1.0/3.0;
+		const float ws = 1.0/18.0;
+		const float wd = 1.0/36.0;	
+		const float invcs2 = 3.0*dt*dt;              // 1/cs^2
+		const float invcs4 = invcs2*invcs2;          // 1/cs^4		
+		const float omega = 2.0/(6.0*nu*dt + 1.0);   // dt/tau
+		const float omomega = 1.0 - omega;           // 1 - dt/tau
+		const float omomega2 = 1.0 - 0.5*omega;      // 1 - dt/(2tau)
+		const float omusq = 1.0 - 0.5*invcs2*(ux*ux + vy*vy + wz*wz);
+			
+		// direction 0
+		float evel = 0.0;       // e dot velocity
+		float emiu = 0.0-ux;    // e minus u
+		float emiv = 0.0-vy;    // e minus v
+		float emiw = 0.0-wz;    // e minus w
+		float feq = w0*rho*omusq;
+		float frc = w0*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw));
+		f2[offst+0] = omomega*ft[0] + omega*feq + omomega2*frc*dt;
+			
+		// direction 1
+		evel = ux;
+		emiu = 1.0-ux;
+		emiv = 0.0-vy;
+		emiw = 0.0-wz;
+		feq = ws*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = ws*(Fx[i]*(invcs2*emiu + invcs4*evel) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw));
+		f2[offst+1] = omomega*ft[1] + omega*feq + omomega2*frc*dt;
+		
+		// direction 2
+		evel = -ux;
+		emiu = -1.0-ux;
+		emiv = 0.0-vy;
+		emiw = 0.0-wz;
+		feq = ws*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = ws*(Fx[i]*(invcs2*emiu - invcs4*evel) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw));
+		f2[offst+2] = omomega*ft[2] + omega*feq + omomega2*frc*dt;
+		
+		// direction 3
+		evel = vy;
+		emiu = 0.0-ux;
+		emiv = 1.0-vy;
+		emiw = 0.0-wz;
+		feq = ws*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = ws*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv + invcs4*evel) + Fz[i]*(invcs2*emiw));
+		f2[offst+3] = omomega*ft[3] + omega*feq + omomega2*frc*dt;
+		
+		// direction 4
+		evel = -vy;
+		emiu = 0.0-ux;
+		emiv = -1.0-vy;
+		emiw = 0.0-wz;
+		feq = ws*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = ws*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv - invcs4*evel) + Fz[i]*(invcs2*emiw));
+		f2[offst+4] = omomega*ft[4] + omega*feq + omomega2*frc*dt;
+		
+		// direction 5
+		evel = wz;
+		emiu = 0.0-ux;
+		emiv = 0.0-vy;
+		emiw = 1.0-wz;
+		feq = ws*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = ws*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw + invcs4*evel));
+		f2[offst+5] = omomega*ft[5] + omega*feq + omomega2*frc*dt;
+		
+		// direction 6
+		evel = -wz;
+		emiu = 0.0-ux;
+		emiv = 0.0-vy;
+		emiw = -1.0-wz;
+		feq = ws*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = ws*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw - invcs4*evel));
+		f2[offst+6] = omomega*ft[6] + omega*feq + omomega2*frc*dt;
+		
+		// direction 7
+		evel = ux+vy;
+		emiu = 1.0-ux;
+		emiv = 1.0-vy;
+		emiw = 0.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu + invcs4*evel) + Fy[i]*(invcs2*emiv + invcs4*evel) + Fz[i]*(invcs2*emiw));
+		f2[offst+7] = omomega*ft[7] + omega*feq + omomega2*frc*dt;
+		
+		// direction 8
+		evel = -ux-vy;
+		emiu = -1.0-ux;
+		emiv = -1.0-vy;
+		emiw = 0.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu - invcs4*evel) + Fy[i]*(invcs2*emiv - invcs4*evel) + Fz[i]*(invcs2*emiw));
+		f2[offst+8] = omomega*ft[8] + omega*feq + omomega2*frc*dt;
+		
+		// direction 9
+		evel = ux+wz;
+		emiu = 1.0-ux;
+		emiv = 0.0-vy;
+		emiw = 1.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu + invcs4*evel) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw + invcs4*evel));
+		f2[offst+9] = omomega*ft[9] + omega*feq + omomega2*frc*dt;
+		
+		// direction 10
+		evel = -ux-wz;
+		emiu = -1.0-ux;
+		emiv = 0.0-vy;
+		emiw = -1.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu - invcs4*evel) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw - invcs4*evel));
+		f2[offst+10] = omomega*ft[10] + omega*feq + omomega2*frc*dt;
+		
+		// direction 11
+		evel = vy+wz;
+		emiu = 0.0-ux;
+		emiv = 1.0-vy;
+		emiw = 1.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv + invcs4*evel) + Fz[i]*(invcs2*emiw + invcs4*evel));
+		f2[offst+11] = omomega*ft[11] + omega*feq + omomega2*frc*dt;
+		
+		// direction 12
+		evel = -vy-wz;
+		emiu = 0.0-ux;
+		emiv = -1.0-vy;
+		emiw = -1.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv - invcs4*evel) + Fz[i]*(invcs2*emiw - invcs4*evel));
+		f2[offst+12] = omomega*ft[12] + omega*feq + omomega2*frc*dt;
+		
+		// direction 13
+		evel = ux-vy;
+		emiu = 1.0-ux;
+		emiv = -1.0-vy;
+		emiw = 0.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu + invcs4*evel) + Fy[i]*(invcs2*emiv - invcs4*evel) + Fz[i]*(invcs2*emiw));
+		f2[offst+13] = omomega*ft[13] + omega*feq + omomega2*frc*dt;
+		
+		// direction 14
+		evel = -ux+vy;
+		emiu = -1.0-ux;
+		emiv = 1.0-vy;
+		emiw = 0.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu - invcs4*evel) + Fy[i]*(invcs2*emiv + invcs4*evel) + Fz[i]*(invcs2*emiw));
+		f2[offst+14] = omomega*ft[14] + omega*feq + omomega2*frc*dt;
+		
+		// direction 15
+		evel = ux-wz;
+		emiu = 1.0-ux;
+		emiv = 0.0-vy;
+		emiw = -1.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu + invcs4*evel) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw - invcs4*evel));
+		f2[offst+15] = omomega*ft[15] + omega*feq + omomega2*frc*dt;
+		
+		// direction 16
+		evel = -ux+wz;
+		emiu = -1.0-ux;
+		emiv = 0.0-vy;
+		emiw = 1.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu - invcs4*evel) + Fy[i]*(invcs2*emiv) + Fz[i]*(invcs2*emiw + invcs4*evel));
+		f2[offst+16] = omomega*ft[16] + omega*feq + omomega2*frc*dt;
+		
+		// direction 17
+		evel = vy-wz;
+		emiu = 0.0-ux;
+		emiv = 1.0-vy;
+		emiw = -1.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv + invcs4*evel) + Fz[i]*(invcs2*emiw - invcs4*evel));
+		f2[offst+17] = omomega*ft[17] + omega*feq + omomega2*frc*dt;
+		
+		// direction 18
+		evel = -vy+wz;
+		emiu = 0.0-ux;
+		emiv = -1.0-vy;
+		emiw = 1.0-wz;
+		feq = wd*rho*(omusq + invcs2*evel + 0.5*invcs4*evel*evel);
+		frc = wd*(Fx[i]*(invcs2*emiu) + Fy[i]*(invcs2*emiv - invcs4*evel) + Fz[i]*(invcs2*emiw + invcs4*evel));
+		f2[offst+18] = omomega*ft[18] + omega*feq + omomega2*frc*dt;
+			
+		// --------------------------------------------------		
+		// SAVE - write macros to arrays 
+		// --------------------------------------------------
+		
+		r[i] = rho;
+		u[i] = ux;
+		v[i] = vy;
+		w[i] = wz;
+					
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 update kernel.
+// This algorithm is based on the optimized "stream-collide-
+// save" algorithm recommended by T. Kruger in the 
+// textbook: "The Lattice Boltzmann Method: Principles
+// and Practice".
 // --------------------------------------------------------
 
 __global__ void scsp_stream_collide_save_IBforcing_D3Q19(float* f1,

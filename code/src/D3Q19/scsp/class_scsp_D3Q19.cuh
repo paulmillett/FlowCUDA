@@ -24,6 +24,7 @@ private:
 	int Nx,Ny,Nz;
 	int numIolets;
 	float nu;
+	float dt;
 	bool forceFlag;
 	bool velIBFlag;
 	bool inoutFlag;
@@ -107,6 +108,7 @@ public:
 	void initial_equilibrium(int,int);
 	void stream_collide_save(int,int,bool);	
 	void stream_collide_save_forcing(int,int);
+	void stream_collide_save_forcing_dt(int,int);
 	void stream_collide_save_IBforcing(int,int);
 	void set_boundary_shear_velocity(float,float,int,int);
 	void zero_forces(int,int);

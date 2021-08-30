@@ -32,6 +32,7 @@ class class_membrane_ibm3D {
 	int3 numBins;
 	float sizeBins;
 	float ks,kb,ka,kag,kv;
+	float dt;
 	float3 Box;
 	bool binsFlag;
 			
@@ -67,11 +68,13 @@ class class_membrane_ibm3D {
 	void duplicate_cells();	
 	void shift_node_positions(int,float,float,float);
 	void rest_geometries(int,int);
+	void rest_geometries_skalak(int,int);
 	void shrink_and_randomize_cells(float,float,float);
 	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);
 	void write_output_long(std::string,int);
 	void update_node_positions(int,int);
+	void update_node_positions_dt(int,int);
 	void relax_node_positions(int,float,float,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
@@ -81,6 +84,7 @@ class class_membrane_ibm3D {
 	void build_bin_lists(int,int);
 	void nonbonded_node_interactions(int,int);	
 	void compute_node_forces(int,int);
+	void compute_node_forces_skalak(int,int);
 	void wall_forces_ydir(int,int);
 	void change_cell_volume(float,int,int);
 	void scale_equilibrium_cell_size(float,int,int); 

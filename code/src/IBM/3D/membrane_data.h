@@ -11,6 +11,9 @@ struct triangle {
 	int v0,v1,v2;
 	float area;
 	float area0;
+	float l0,lp0;
+	float cosphi0;
+	float sinphi0;
 	float3 norm;
 };
 

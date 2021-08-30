@@ -18,6 +18,7 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	nFacesPerCell = inputParams("IBM/nFacesPerCell",0);	
 	nEdgesPerCell = inputParams("IBM/nEdgesPerCell",0);
 	nCells = inputParams("IBM/nCells",1);
+	dt = inputParams("Time/dt",1.0);
 	ks = inputParams("IBM/ks",0.0);
 	kb = inputParams("IBM/kb",0.0);
 	ka = inputParams("IBM/ka",0.0);
@@ -338,7 +339,7 @@ void class_membrane_ibm3D::write_output_long(std::string tagname, int tagnum)
 
 
 // --------------------------------------------------------
-// Calculate rest geometries:
+// Calculate rest geometries (Spring model):
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
@@ -354,6 +355,23 @@ void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 	// rest triangle area:
 	rest_triangle_areas_IBM3D
 	<<<nBlocks,nThreads>>> (r,faces,cells,nFaces);
+}
+
+
+
+// --------------------------------------------------------
+// Calculate rest geometries (Skalak model):
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::rest_geometries_skalak(int nBlocks, int nThreads)
+{
+	// rest triangle properties:
+	rest_triangle_skalak_IBM3D
+	<<<nBlocks,nThreads>>> (r,faces,cells,nFaces);
+		
+	// rest edge angles for bending:
+	rest_edge_angles_IBM3D
+	<<<nBlocks,nThreads>>> (r,edges,faces,nEdges);
 }
 
 
@@ -415,6 +433,21 @@ void class_membrane_ibm3D::update_node_positions(int nBlocks, int nThreads)
 {
 	update_node_position_IBM3D
 	<<<nBlocks,nThreads>>> (r,v,nNodes);
+	
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_node_position_dt_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::update_node_positions_dt(int nBlocks, int nThreads)
+{
+	update_node_position_dt_IBM3D
+	<<<nBlocks,nThreads>>> (r,v,dt,nNodes);
 	
 	wrap_node_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
@@ -499,7 +532,7 @@ void class_membrane_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads
 
 // --------------------------------------------------------
 // Calls to kernels that compute forces on nodes based 
-// on the membrane mechanics model:
+// on the membrane mechanics model (Spring model):
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
@@ -521,7 +554,10 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 		
 	// Forth, compute the edge extension and bending force for each edge:
 	compute_node_force_membrane_edge_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,edges,ks,kb,nEdges);
+	<<<nBlocks,nThreads>>> (faces,r,f,edges,ks,nEdges);
+	
+	compute_node_force_membrane_bending_IBM3D
+	<<<nBlocks,nThreads>>> (faces,r,f,edges,kb,nEdges);
 		
 	// Fifth, compute the volume conservation force for each face:
 	compute_node_force_membrane_volume_IBM3D
@@ -532,6 +568,44 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (faces,r,f,cells,kag,nFaces);
 		
 	// Seventh, re-wrap node coordinates:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Box,nNodes);
+			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on nodes based 
+// on the membrane mechanics model (Skalak model):
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
+{
+	// First, zero the node forces and the cell volumes:
+	zero_node_forces_IBM3D
+	<<<nBlocks,nThreads>>> (f,nNodes);
+			
+	zero_cell_volumes_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
+	// Second, unwrap node coordinates:
+	unwrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Box,nNodes);	
+					
+	// Third, compute the Skalak forces for each face:
+	compute_node_force_membrane_skalak_IBM3D
+	<<<nBlocks,nThreads>>> (faces,r,f,cells,ks,ka,nFaces);
+	
+	// Fourth, compute the bending force for each edge:		
+	compute_node_force_membrane_bending_IBM3D
+	<<<nBlocks,nThreads>>> (faces,r,f,edges,kb,nEdges);
+		
+	// Fifth, compute the volume conservation force for each face:
+	compute_node_force_membrane_volume_IBM3D
+	<<<nBlocks,nThreads>>> (faces,f,cells,kv,nFaces);
+			
+	// Sixth, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (r,Box,nNodes);
 			
@@ -571,13 +645,13 @@ void class_membrane_ibm3D::scale_equilibrium_cell_size(float scale, int nBlocks,
 {
 	// scale the equilibrium edge length:
 	scale_edge_lengths_IBM3D
-	<<<nBlocks,nThreads>>> (edges,scale,nEdges);
+	<<<nBlocks,nThreads>>> (edges,scale,nEdges);		
 	// scale the equilibrium local area:
 	scale_face_areas_IBM3D
 	<<<nBlocks,nThreads>>> (faces,scale,nFaces);
 	// scale the equilibrium global area and volume:
 	scale_cell_areas_volumes_IBM3D
-	<<<nBlocks,nThreads>>> (cells,scale,nCells);
+	<<<nBlocks,nThreads>>> (cells,scale,nCells);		
 }
 
 
