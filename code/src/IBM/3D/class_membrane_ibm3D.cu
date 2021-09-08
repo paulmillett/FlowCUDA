@@ -24,6 +24,7 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	ka = inputParams("IBM/ka",0.0);
 	kag = inputParams("IBM/kag",0.0);
 	kv = inputParams("IBM/kv",0.0);
+	C  = inputParams("IBM/C",0.0);
 	N.x = inputParams("Lattice/Nx",1);
 	N.y = inputParams("Lattice/Ny",1);
 	N.z = inputParams("Lattice/Nz",1);	
@@ -595,7 +596,7 @@ void class_membrane_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 					
 	// Third, compute the Skalak forces for each face:
 	compute_node_force_membrane_skalak_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,cells,ks,ka,nFaces);
+	<<<nBlocks,nThreads>>> (faces,r,f,cells,ks,C,nFaces);
 	
 	// Fourth, compute the bending force for each edge:		
 	compute_node_force_membrane_bending_IBM3D

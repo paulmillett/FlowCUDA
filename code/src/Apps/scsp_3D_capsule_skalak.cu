@@ -138,7 +138,7 @@ void scsp_3D_capsule_skalak::initSystem()
 	ibm.read_ibm_information("sphere.dat");
 	ibm.assign_refNode_to_cells();
 	ibm.assign_cellIDs_to_nodes();
-	ibm.shift_node_positions(0,30.0,29.5,30.0);
+	ibm.shift_node_positions(0,30.0,59.5,30.0);
 		
 	// ----------------------------------------------
 	// write initial output file:

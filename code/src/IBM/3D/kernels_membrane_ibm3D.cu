@@ -187,7 +187,7 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	float3* vertF,
 	cell* cells,	
 	float gs,
-	float ga,
+	float C,
 	int nFaces)
 {
 	// define face:
@@ -241,8 +241,10 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	    const float i2 = (Gxx*Gyy - Gxy*Gyx) - 1.0;
 
 	    // Derivatives of Skalak energy density E used in chain rule below: eq. (C.14)
-	    const float dEdI1 = gs*(i1 + 1.0)/6.0;
-	    const float dEdI2 = (ga*i2 - gs)/6.0;
+	    float dEdI1 = gs*(i1 + 1.0)/2.0;     //gs*(i1 + 1.0)/6.0;
+	    float dEdI2 = gs*(C*i2 - 1.0)/2.0;   //(ga*i2 - gs)/6.0;
+		dEdI1 *= 2.0;          // for some reason, this correction is necessary.  Need to investigate!
+		dEdI2 *= 2.0;          // "                                            "
 		// Derivatives of Neo-Hookean energy density E used in chain rule below: eq. (C.14)
 	    //const float dEdI1 = gs/6.0;
 	    //const float dEdI2 = -gs/(6.0*(i2+1.0)*(i2+1.0));
@@ -323,8 +325,8 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 		// add forces to nodes
 		add_force_to_vertex(V0,vertF,force0);
 		add_force_to_vertex(V1,vertF,force1);
-		add_force_to_vertex(V2,vertF,force2);	
-				
+		add_force_to_vertex(V2,vertF,force2);
+						
 		// add to global cell geometries:
 		int cID = faces[i].cellID;
 		float volFace = triangle_signed_volume(r0,r1,r2);

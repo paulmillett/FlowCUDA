@@ -411,6 +411,26 @@ void class_mcmp_SC_bb_D2Q9::setPmass(int i, float val)
 	ptH[i].mass = val;
 }
 
+void class_mcmp_SC_bb_D2Q9::setPa(int i, float val)
+{
+	ptH[i].a = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::setPb(int i, float val)
+{
+	ptH[i].b = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::setPtheta(int i, float val)
+{
+	ptH[i].theta = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::setPomega(int i, float val)
+{
+	ptH[i].omega = val;
+}
+
 
 
 // --------------------------------------------------------
@@ -472,6 +492,21 @@ float class_mcmp_SC_bb_D2Q9::getPmass(int i)
 	return ptH[i].mass;
 }
 
+float class_mcmp_SC_bb_D2Q9::getPa(int i)
+{
+	return ptH[i].a;
+}
+
+float class_mcmp_SC_bb_D2Q9::getPb(int i)
+{
+	return ptH[i].b;
+}
+
+float class_mcmp_SC_bb_D2Q9::getPtheta(int i)
+{
+	return ptH[i].theta;
+}
+
 
 
 // --------------------------------------------------------
@@ -487,6 +522,12 @@ void class_mcmp_SC_bb_D2Q9::initial_equilibrium_bb(int nBlocks, int nThreads)
 void class_mcmp_SC_bb_D2Q9::map_particles_on_lattice_bb(int nBlocks, int nThreads)
 {
 	mcmp_map_particles_on_lattice_bb_D2Q9 
+	<<<nBlocks,nThreads>>> (pt,x,y,s,sprev,pIDgrid,nVoxels,nParts);	
+}
+
+void class_mcmp_SC_bb_D2Q9::map_particles_on_lattice_ellipse_bb(int nBlocks, int nThreads)
+{
+	mcmp_map_particles_on_lattice_ellipse_bb_D2Q9 
 	<<<nBlocks,nThreads>>> (pt,x,y,s,sprev,pIDgrid,nVoxels,nParts);	
 }
 
@@ -531,13 +572,13 @@ void class_mcmp_SC_bb_D2Q9::compute_SC_forces_bb(int nBlocks, int nThreads)
 void class_mcmp_SC_bb_D2Q9::compute_SC_forces_bb_2(int nBlocks, int nThreads)
 {
 	mcmp_compute_SC_forces_bb_2_D2Q9 
-	<<<nBlocks,nThreads>>> (rA,rB,rAvirt,rBvirt,FxA,FxB,FyA,FyB,pt,pIDgrid,s,nList,gAB,nVoxels);	
+	<<<nBlocks,nThreads>>> (rA,rB,rAvirt,rBvirt,FxA,FxB,FyA,FyB,pt,pIDgrid,s,x,y,nList,gAB,nVoxels);	
 }
 
 void class_mcmp_SC_bb_D2Q9::compute_velocity_bb(int nBlocks, int nThreads)
 {
 	mcmp_compute_velocity_bb_D2Q9 
-	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,FxA,FxB,FyA,FyB,u,v,s,pIDgrid,pt,nVoxels);
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,FxA,FxB,FyA,FyB,u,v,s,x,y,pIDgrid,pt,nVoxels);
 }
 
 void class_mcmp_SC_bb_D2Q9::set_boundary_velocity_bb(float uBC, float vBC, int nBlocks, int nThreads)
@@ -567,7 +608,7 @@ void class_mcmp_SC_bb_D2Q9::bounce_back(int nBlocks, int nThreads)
 void class_mcmp_SC_bb_D2Q9::bounce_back_moving(int nBlocks, int nThreads)
 {
 	mcmp_bounce_back_moving_D2Q9
-	<<<nBlocks,nThreads>>> (f2A,f2B,rA,rB,u,v,pt,pIDgrid,s,nList,streamIndex,nVoxels);
+	<<<nBlocks,nThreads>>> (f2A,f2B,rA,rB,u,v,pt,pIDgrid,s,x,y,nList,streamIndex,nVoxels);
 }
 
 void class_mcmp_SC_bb_D2Q9::move_particles_bb(int nBlocks, int nThreads)

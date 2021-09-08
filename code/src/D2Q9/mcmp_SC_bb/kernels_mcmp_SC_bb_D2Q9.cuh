@@ -12,7 +12,11 @@
 struct particle2D_bb {
 	float2 r,v,f;
 	float rad;
+	float a,b;
 	float mass;
+	float omega;
+	float T;
+	float theta;
 };
 
 
@@ -66,6 +70,17 @@ __device__ void equilibrium_populations_bb_D2Q9(
 
 
 __global__ void mcmp_map_particles_on_lattice_bb_D2Q9(
+	particle2D_bb*,
+	int*,
+	int*,
+	int*,
+	int*,
+	int*,
+	int,
+	int);
+	
+	
+__global__ void mcmp_map_particles_on_lattice_ellipse_bb_D2Q9(
 	particle2D_bb*,
 	int*,
 	int*,
@@ -171,6 +186,8 @@ __global__ void mcmp_compute_velocity_bb_D2Q9(
 	float*,
 	int*,
 	int*,
+	int*,
+	int*,
 	particle2D_bb*,
 	int);
 
@@ -256,6 +273,8 @@ __global__ void mcmp_compute_SC_forces_bb_2_D2Q9(
 	int*,
 	int*,
 	int*,
+	int*,
+	int*,
 	float,
 	int);
 
@@ -297,6 +316,8 @@ __global__ void mcmp_bounce_back_moving_D2Q9(
 	float*,
 	particle2D_bb*,
 	int*,											 
+	int*,
+	int*,
 	int*,
 	int*,
 	int*,

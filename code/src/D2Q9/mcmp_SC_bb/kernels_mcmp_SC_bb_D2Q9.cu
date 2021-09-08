@@ -16,6 +16,7 @@ __global__ void mcmp_zero_particle_forces_bb_D2Q9(particle2D_bb* pt,
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nParts) {		
 		pt[i].f = make_float2(0.0);
+		pt[i].T = 0.0;
 	}
 }
 
@@ -32,9 +33,14 @@ __global__ void mcmp_move_particles_bb_D2Q9(particle2D_bb* pt,
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nParts) {	
 		printf("particle force-x = %f \n",pt[i].f.x); 
+		// linear motion (assume dt = 1):
 		float2 a = pt[i].f/pt[i].mass;
-		pt[i].r += pt[i].v + 0.5*a;  // assume dt = 1
+		pt[i].r += pt[i].v + 0.5*a;
 		pt[i].v += a;
+		// angular motion (assume dt = 1):
+		float angmom = pt[i].T/(0.25*pt[i].mass*(pt[i].a*pt[i].a + pt[i].b*pt[i].b));
+		pt[i].theta += pt[i].omega + 0.5*angmom;
+		pt[i].omega += angmom;
 	}
 }
 
@@ -81,12 +87,26 @@ __global__ void mcmp_particle_particle_forces_bb_D2Q9(particle2D_bb* pt,
 			if (i==j) continue;
 			float2 rij = pt[i].r - pt[j].r;
 			float rr = length(rij);
+			// -----------------------
 			// Hertz contact force:
+			// -----------------------
 			float twoRadii = pt[i].rad + pt[j].rad + halo;
 			if (rr < twoRadii) {
 				float fmag = 2.5*K*pow(twoRadii - rr,1.5);
 				pt[i].f += fmag*(rij/rr);
-			}
+			}			
+			// -----------------------
+			// LJ force:
+			// -----------------------
+			/*
+			float sigma = pt[i].rad + pt[j].rad + halo;
+			float epsilon = 0.5;				
+			float r2Inv = sigma*sigma/(rr*rr);
+			float attract = r2Inv*r2Inv*r2Inv;
+			float repel = attract*attract;
+			float fmag = epsilon*24.0*(2*repel - attract)*r2Inv;
+			pt[i].f += fmag*rij;
+			*/
 		}		
 	}
 }
@@ -206,6 +226,45 @@ __global__ void mcmp_map_particles_on_lattice_bb_D2Q9(particle2D_bb* pt,
 			float dy = float(y[i]) - pt[j].r.y; 
 			float rr = sqrt(dx*dx + dy*dy);
 			if (rr <= pt[j].rad) {
+				s[i] = 1;
+				pIDgrid[i] = j;					
+			}		
+		}							
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Map particles to grid by updating s[] and pIDgrid[]:
+// --------------------------------------------------------
+
+__global__ void mcmp_map_particles_on_lattice_ellipse_bb_D2Q9(particle2D_bb* pt,
+                                                              int* x,
+						    		                          int* y,
+												              int* s,
+													          int* sprev,									   
+									                          int* pIDgrid,													   
+									                          int nVoxels,
+									                          int nParts)
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nVoxels) {
+		// set previous "s" value:
+		sprev[i] = s[i];
+		// default values:		
+		s[i] = 0;
+		pIDgrid[i] = -1;
+		// loop over particles:
+		for (int j=0; j<nParts; j++) {
+			float dx = float(x[i]) - pt[j].r.x;
+			float dy = float(y[i]) - pt[j].r.y; 
+			float sth = sin(pt[j].theta);
+			float cth = cos(pt[j].theta);
+			float dxp = cth*dx + sth*dy;
+			float dyp = sth*dx - cth*dy;
+			if (dxp*dxp/pt[j].a/pt[j].a + dyp*dyp/pt[j].b/pt[j].b <= 1.0) {
 				s[i] = 1;
 				pIDgrid[i] = j;					
 			}		
@@ -636,6 +695,8 @@ __global__ void mcmp_compute_velocity_bb_D2Q9(float* fA,
 										      float* u,
 										      float* v,
 											  int* s,
+											  int* x,
+											  int* y,
 											  int* pIDgrid,
 											  particle2D_bb* pt,
 										      int nVoxels) 
@@ -666,8 +727,8 @@ __global__ void mcmp_compute_velocity_bb_D2Q9(float* fA,
 		
 		else if (s[i] == 1) {
 			int pID = pIDgrid[i];
-			u[i] = pt[pID].v.x;
-			v[i] = pt[pID].v.y;	
+			u[i] = pt[pID].v.x - pt[pID].omega*(float(y[i]) - pt[pID].r.y);
+			v[i] = pt[pID].v.y + pt[pID].omega*(float(x[i]) - pt[pID].r.x);
 		}
 					
 	}
@@ -973,6 +1034,8 @@ __global__ void mcmp_compute_SC_forces_bb_2_D2Q9(float* rA,
 											     particle2D_bb* pt,
 											     int* pIDgrid,
 											     int* s,
+												 int* x,
+												 int* y,
 											     int* nList,
 											     float gAB,											     
 										         int nVoxels)
@@ -1054,10 +1117,15 @@ __global__ void mcmp_compute_SC_forces_bb_2_D2Q9(float* rA,
 			float fxAV = -r0AV*gAB*(sumNbrRhoBx);
 			float fxBV = -r0BV*gAB*(sumNbrRhoAx);
 			float fyAV = -r0AV*gAB*(sumNbrRhoBy);
-			float fyBV = -r0BV*gAB*(sumNbrRhoAy);		
+			float fyBV = -r0BV*gAB*(sumNbrRhoAy);
+			float fxp = fxAV + fxBV;	
+			float fyp = fyAV + fyBV;
 			int pID = pIDgrid[i];
-			atomicAdd(&pt[pID].f.x, fxAV + fxBV);
-			atomicAdd(&pt[pID].f.y, fyAV + fyBV);							
+			atomicAdd(&pt[pID].f.x,fxp);
+			atomicAdd(&pt[pID].f.y,fyp);
+			float xcom = float(x[i]) - pt[pID].r.x;
+			float ycom = float(y[i]) - pt[pID].r.y;
+			atomicAdd(&pt[pID].T,xcom*fyp - ycom*fxp);							
 		}
 		
 	}
@@ -1325,6 +1393,8 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 											 particle2D_bb* pt,
 											 int* pIDgrid,
 									         int* s,
+											 int* x,
+											 int* y,
 									         int* nList,									  
 									         int* streamIndex,
 									         int nVoxels)
@@ -1347,10 +1417,12 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 			int pID = pIDgrid[i];
 			const float ws = 1.0/9.0;
 			const float wd = 1.0/36.0;
+			const float xcom = float(x[i]) - pt[pID].r.x;
+			const float ycom = float(y[i]) - pt[pID].r.y;
 			float meF2S  = 0.0;  // momentum exchange fluid to solid
 			float meF2Sx = 0.0;  // momentum exchange fluid to solid (x)
 			float meF2Sy = 0.0;  // momentum exchange fluid to solid (y)
-						
+									
 			// dir 1 bounce-back to nabor 3 as dir 3:
 			if (s[nList[offst+3]] == 0) {
 				// bounce-back
@@ -1363,7 +1435,8 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 				meF2Sx = meF2S;
 				meF2Sy = 0.0;
 				atomicAdd(&pt[pID].f.x, meF2Sx);
-				atomicAdd(&pt[pID].f.y, meF2Sy);
+				atomicAdd(&pt[pID].f.y, meF2Sy);				
+				atomicAdd(&pt[pID].T, xcom*meF2Sy - ycom*meF2Sx);		
 				// zero populations inside particle				
 				f2A[offst+1] = 0.0;
 				f2B[offst+1] = 0.0;				
@@ -1382,6 +1455,7 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 				meF2Sy = meF2S;
 				atomicAdd(&pt[pID].f.x, meF2Sx);
 				atomicAdd(&pt[pID].f.y, meF2Sy);
+				atomicAdd(&pt[pID].T, xcom*meF2Sy - ycom*meF2Sx);
 				// zero populations inside particle	
 				f2A[offst+2] = 0.0;
 				f2B[offst+2] = 0.0;
@@ -1399,7 +1473,8 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 				meF2Sx = -meF2S;
 				meF2Sy = 0.0;
 				atomicAdd(&pt[pID].f.x, meF2Sx);
-				atomicAdd(&pt[pID].f.y, meF2Sy);	
+				atomicAdd(&pt[pID].f.y, meF2Sy);
+				atomicAdd(&pt[pID].T, xcom*meF2Sy - ycom*meF2Sx);	
 				// zero populations inside particle
 				f2A[offst+3] = 0.0;
 				f2B[offst+3] = 0.0;
@@ -1417,7 +1492,8 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 				meF2Sx = 0.0;  
 				meF2Sy = -meF2S;
 				atomicAdd(&pt[pID].f.x, meF2Sx);
-				atomicAdd(&pt[pID].f.y, meF2Sy);	
+				atomicAdd(&pt[pID].f.y, meF2Sy);
+				atomicAdd(&pt[pID].T, xcom*meF2Sy - ycom*meF2Sx);	
 				// zero populations inside particle
 				f2A[offst+4] = 0.0;
 				f2B[offst+4] = 0.0;
@@ -1435,7 +1511,8 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 				meF2Sx = meF2S;  
 				meF2Sy = meF2S;
 				atomicAdd(&pt[pID].f.x, meF2Sx);
-				atomicAdd(&pt[pID].f.y, meF2Sy);	
+				atomicAdd(&pt[pID].f.y, meF2Sy);
+				atomicAdd(&pt[pID].T, xcom*meF2Sy - ycom*meF2Sx);
 				// zero populations inside particle
 				f2A[offst+5] = 0.0;
 				f2B[offst+5] = 0.0;
@@ -1453,7 +1530,8 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 				meF2Sx = -meF2S;  
 				meF2Sy = meF2S;
 				atomicAdd(&pt[pID].f.x, meF2Sx);
-				atomicAdd(&pt[pID].f.y, meF2Sy);	
+				atomicAdd(&pt[pID].f.y, meF2Sy);
+				atomicAdd(&pt[pID].T, xcom*meF2Sy - ycom*meF2Sx);
 				// zero populations inside particle
 				f2A[offst+6] = 0.0;
 				f2B[offst+6] = 0.0;
@@ -1472,6 +1550,7 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 				meF2Sy = -meF2S;
 				atomicAdd(&pt[pID].f.x, meF2Sx);
 				atomicAdd(&pt[pID].f.y, meF2Sy);
+				atomicAdd(&pt[pID].T, xcom*meF2Sy - ycom*meF2Sx);
 				// zero populations inside particle	
 				f2A[offst+7] = 0.0;
 				f2B[offst+7] = 0.0;
@@ -1490,6 +1569,7 @@ __global__ void mcmp_bounce_back_moving_D2Q9(float* f2A,
 				meF2Sy = -meF2S;
 				atomicAdd(&pt[pID].f.x, meF2Sx);
 				atomicAdd(&pt[pID].f.y, meF2Sy);
+				atomicAdd(&pt[pID].T, xcom*meF2Sy - ycom*meF2Sx);
 				// zero populations inside particle	
 				f2A[offst+8] = 0.0;
 				f2B[offst+8] = 0.0;

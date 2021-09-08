@@ -32,6 +32,7 @@ class class_membrane_ibm3D {
 	int3 numBins;
 	float sizeBins;
 	float ks,kb,ka,kag,kv;
+	float C;
 	float dt;
 	float3 Box;
 	bool binsFlag;

@@ -101,6 +101,10 @@ public:
 	void setPvy(int,float);
 	void setPrad(int,float);
 	void setPmass(int,float);
+	void setPa(int,float);
+	void setPb(int,float);
+	void setPtheta(int,float);
+	void setPomega(int,float);
 	float getU(int);
 	float getV(int);
 	int   getS(int);
@@ -112,6 +116,9 @@ public:
 	float getPfy(int);
 	float getPrad(int);
 	float getPmass(int);
+	float getPa(int);
+	float getPb(int);
+	float getPtheta(int);
 	void calculate_initial_density_sums();
 	void zero_particle_forces_bb(int,int);
 	void move_particles_bb(int,int);
@@ -119,6 +126,7 @@ public:
 	void particle_particle_forces_bb(float,float,int,int);
 	void initial_equilibrium_bb(int,int);
 	void map_particles_on_lattice_bb(int,int);
+	void map_particles_on_lattice_ellipse_bb(int,int);
 	void cover_uncover_bb(int,int);
 	void compute_density_bb(int,int);
 	void correct_density_totals_bb(int,int);

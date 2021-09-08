@@ -1,5 +1,5 @@
 
-# include "mcmp_2D_capbridge_shear_bb.cuh"
+# include "mcmp_2D_ellipse_shear_bb.cuh"
 # include "../IO/GetPot"
 # include <math.h>
 # include <string> 
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-mcmp_2D_capbridge_shear_bb::mcmp_2D_capbridge_shear_bb() : lbm()
+mcmp_2D_ellipse_shear_bb::mcmp_2D_ellipse_shear_bb() : lbm()
 {	
 	
 	// ----------------------------------------------
@@ -50,7 +50,7 @@ mcmp_2D_capbridge_shear_bb::mcmp_2D_capbridge_shear_bb() : lbm()
 	// Particles parameters:
 	// ----------------------------------------------
 	
-	nParts = inputParams("Particles/nParts",2);	
+	nParts = inputParams("Particles/nParts",1);	
 	pvel = inputParams("Particles/pvel",0.0);
 	Khertz = inputParams("Particles/Khertz",0.0);
 	halo = inputParams("Particles/halo",0.0);			
@@ -81,7 +81,7 @@ mcmp_2D_capbridge_shear_bb::mcmp_2D_capbridge_shear_bb() : lbm()
 // Destructor:
 // --------------------------------------------------------
 
-mcmp_2D_capbridge_shear_bb::~mcmp_2D_capbridge_shear_bb()
+mcmp_2D_ellipse_shear_bb::~mcmp_2D_ellipse_shear_bb()
 {
 	lbm.deallocate();
 }
@@ -92,7 +92,7 @@ mcmp_2D_capbridge_shear_bb::~mcmp_2D_capbridge_shear_bb()
 // Initialize system:
 // --------------------------------------------------------
 
-void mcmp_2D_capbridge_shear_bb::initSystem()
+void mcmp_2D_ellipse_shear_bb::initSystem()
 {
 	
 	// ----------------------------------------------
@@ -115,33 +115,16 @@ void mcmp_2D_capbridge_shear_bb::initSystem()
 	
 	float xpos0 = inputParams("Particles/xpos0",100.0);
 	float ypos0 = inputParams("Particles/ypos0",100.0);
-	float rad0 = inputParams("Particles/rad0",10.0);
+	float pa = inputParams("Particles/a",10.0);
+	float pb = inputParams("Particles/b",10.0);
+	float theta = inputParams("Particles/theta",0.0);
 	
 	lbm.setPrx(0,xpos0);
 	lbm.setPry(0,ypos0);
-	lbm.setPrad(0,rad0);
-	lbm.setPa(0,rad0);
-	lbm.setPb(0,rad0);
-	lbm.setPtheta(0,0.0);
-	lbm.setPmass(0,3.14159*rad0*rad0);
-	lbm.setPvx(0,0.0);
-	lbm.setPvy(0,0.0);
-	lbm.setPomega(0,0.0);
-	
-	float xpos1 = inputParams("Particles/xpos1",200.0);
-	float ypos1 = inputParams("Particles/ypos1",100.0);
-	float rad1 = inputParams("Particles/rad1",10.0);
-	
-	lbm.setPrx(1,xpos1);
-	lbm.setPry(1,ypos1);
-	lbm.setPrad(1,rad1);
-	lbm.setPa(1,rad0);
-	lbm.setPb(1,rad0);
-	lbm.setPtheta(1,0.0);
-	lbm.setPmass(1,3.14159*rad1*rad1);
-	lbm.setPvx(1,0.0);
-	lbm.setPvy(1,0.0);
-	lbm.setPomega(1,0.0);
+	lbm.setPa(0,pa);
+	lbm.setPb(0,pb);
+	lbm.setPmass(0,3.14159*pa*pb);
+	lbm.setPtheta(0,theta);	
 			
 	// ----------------------------------------------			
 	// initialize macros: 
@@ -157,8 +140,13 @@ void mcmp_2D_capbridge_shear_bb::initSystem()
 			for (int p=0; p<nParts; p++) {
 				float dx = float(i) - lbm.getPrx(p);
 				float dy = float(j) - lbm.getPry(p);
-				float rr = sqrt(dx*dx + dy*dy);
-				if (rr <= lbm.getPrad(p)) lbm.setS(ndx,1); 
+				float sth = sin(lbm.getPtheta(p));
+				float cth = cos(lbm.getPtheta(p));
+				float dxp = cth*dx + sth*dy;
+				float dyp = sth*dx - cth*dy;
+				if (dxp*dxp/lbm.getPa(p)/lbm.getPa(p) + dyp*dyp/lbm.getPb(p)/lbm.getPb(p) <= 1.0) {
+					lbm.setS(ndx,1);
+				}		
 			}			
 		}
 	}
@@ -168,9 +156,11 @@ void mcmp_2D_capbridge_shear_bb::initSystem()
 		for (int i=0; i<Nx; i++) {
 			int ndx = j*Nx + i;
 			float sij = float(lbm.getS(ndx));			
-			if (i > 430 && i < 570 && j > 280 && j < 320) {
-				lbm.setRA(ndx,1.00*(1.0-sij));
-				lbm.setRB(ndx,0.02*(1.0-sij));	
+			if (i > 230 && i < 370 && j > 280 && j < 320) {
+				//lbm.setRA(ndx,1.00*(1.0-sij));
+				//lbm.setRB(ndx,0.02*(1.0-sij));	
+				lbm.setRA(ndx,0.02*(1.0-sij));
+				lbm.setRB(ndx,1.00*(1.0-sij));				
 			}
 			else {
 				lbm.setRA(ndx,0.02*(1.0-sij));
@@ -216,7 +206,7 @@ void mcmp_2D_capbridge_shear_bb::initSystem()
 	// ----------------------------------------------
 	
 	lbm.initial_equilibrium_bb(nBlocks,nThreads);
-	lbm.map_particles_on_lattice_bb(nBlocks,nThreads);
+	lbm.map_particles_on_lattice_ellipse_bb(nBlocks,nThreads);
 		
 }
 
@@ -228,7 +218,7 @@ void mcmp_2D_capbridge_shear_bb::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void mcmp_2D_capbridge_shear_bb::cycleForward(int stepsPerCycle, int currentCycle)
+void mcmp_2D_ellipse_shear_bb::cycleForward(int stepsPerCycle, int currentCycle)
 {
 	
 	// ----------------------------------------------
@@ -264,7 +254,7 @@ void mcmp_2D_capbridge_shear_bb::cycleForward(int stepsPerCycle, int currentCycl
 		// ------------------------------
 				
 		//lbm.update_particles_on_lattice_bb(nBlocks,nThreads);
-		lbm.map_particles_on_lattice_bb(nBlocks,nThreads);
+		lbm.map_particles_on_lattice_ellipse_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 		lbm.cover_uncover_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
@@ -323,7 +313,7 @@ void mcmp_2D_capbridge_shear_bb::cycleForward(int stepsPerCycle, int currentCycl
 // Write output:
 // --------------------------------------------------------
 
-void mcmp_2D_capbridge_shear_bb::writeOutput(std::string tagname, int step)
+void mcmp_2D_ellipse_shear_bb::writeOutput(std::string tagname, int step)
 {
 	
 	// ----------------------------------------------
