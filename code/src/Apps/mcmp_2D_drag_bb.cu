@@ -112,12 +112,8 @@ void mcmp_2D_drag_bb::initSystem()
 	float xpos = inputParams("Particles/xpos",100.0);
 	float ypos = inputParams("Particles/ypos",100.0);
 	float rad = inputParams("Particles/rad",10.0);
-	
-	lbm.setPrx(0,xpos);
-	lbm.setPry(0,ypos);
-	lbm.setPrad(0,rad);
-	lbm.setPmass(0,3.14159*rad*rad);
-			
+	lbm.set_particle_circular(0,xpos,ypos,rad);
+				
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------	

@@ -67,6 +67,36 @@ __global__ void mcmp_fix_particle_velocity_bb_D3Q19(particle3D_bb* pt,
 
 
 // --------------------------------------------------------
+// Calculate particle-particle forces:
+// --------------------------------------------------------
+
+__global__ void mcmp_particle_particle_forces_bb_D3Q19(particle3D_bb* pt,
+                                                       float K,
+													   float halo,
+   								                       int nParts)
+{
+	// define particle:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nParts) {	
+		for (int j=0; j<nParts; j++) {
+			if (i==j) continue;
+			float3 rij = pt[i].r - pt[j].r;
+			float rr = length(rij);
+			// -----------------------
+			// Hertz contact force:
+			// -----------------------
+			float twoRadii = pt[i].rad + pt[j].rad + halo;
+			if (rr < twoRadii) {
+				float fmag = 2.5*K*pow(twoRadii - rr,1.5);
+				pt[i].f += fmag*(rij/rr);
+			}			
+		}		
+	}
+}
+
+
+
+// --------------------------------------------------------
 // D3Q19 kernel to update the particle fields on the lattice: 
 // --------------------------------------------------------
 
@@ -98,6 +128,250 @@ __global__ void mcmp_map_particles_to_lattice_bb_D3Q19(particle3D_bb* pt,
 				s[i] = 1;
 				pIDgrid[i] = j;	
 			}			
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to cover/uncover voxels as particles move: 
+// --------------------------------------------------------
+
+__global__ void mcmp_cover_uncover_bb_D3Q19(int* s,
+                                            int* sprev,
+										    int* nList,
+										    float* u,
+										    float* v,
+											float* w,
+										    float* rA,
+										    float* rB,
+										    float* fA,
+										    float* fB,
+										    int nVoxels)
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nVoxels) {
+		if (sprev[i] == 1 && s[i] == 1) stay_covered_D3Q19(i,fA,fB);		
+		if (sprev[i] == 0 && s[i] == 1) cover_voxel_D3Q19(i,s,sprev,nList,u,v,w,rA,rB,fA,fB);
+		if (sprev[i] == 1 && s[i] == 0) uncover_voxel_D3Q19(i,s,sprev,nList,u,v,w,rA,rB,fA,fB);			
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to keep solid site populations zero: 
+// --------------------------------------------------------
+	
+__device__ void stay_covered_D3Q19(int i,
+                                   float* fA,
+								   float* fB)
+{
+	int offst = 19*i;		
+	for (int n=0; n<19; n++) {
+		fA[offst+n] = 0.0;
+		fB[offst+n] = 0.0;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to cover lattice site: 
+// --------------------------------------------------------
+
+__device__ void cover_voxel_D3Q19(int i,
+                                  int* s,
+								  int* sprev,
+								  int* nList,
+								  float* u,
+								  float* v,
+								  float* w,
+								  float* rA,
+								  float* rB,
+								  float* fA,
+								  float* fB)
+{
+	
+	// --------------------------------------------	
+	// sum up all the neighbors that are fluid:
+	// --------------------------------------------
+	
+	int offst = 19*i;
+	
+	/*
+	int nfn = 0;	
+	for (int n=1; n<19; n++) {
+		int nabor = nList[offst+n];
+		if (sprev[nabor] == 0 && s[nabor] == 0) nfn++;
+	}
+	
+	// --------------------------------------------	
+	// determine the density to distribute to each
+	// neighbor:
+	// --------------------------------------------
+	
+	float rAdist = 0.0;
+	float rBdist = 0.0;
+	if (nfn > 0) {
+		rAdist = rA[i]/float(nfn);
+		rBdist = rB[i]/float(nfn);
+	}
+	
+	// --------------------------------------------	
+	// add current voxel's density to neighboring
+	// fluid voxel densities:
+	// --------------------------------------------
+		
+	for (int n=1; n<19; n++) {
+		int nabor = nList[offst+n];
+		if (sprev[nabor] == 0 && s[nabor] == 0) {
+			add_density_to_populations_D3Q19(nabor,rAdist,rBdist,u[nabor],v[nabor],w[nabor],fA,fB);
+		}
+	}
+	*/
+	
+	// --------------------------------------------	
+	// zero the populations for this voxel:
+	// --------------------------------------------
+	
+	for (int n=0; n<19; n++) {
+		fA[offst+n] = 0.0;
+		fB[offst+n] = 0.0;
+	}
+		
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to cover lattice site: 
+// --------------------------------------------------------
+
+__device__ void uncover_voxel_D3Q19(int i,
+                                    int* s,
+								    int* sprev,
+								    int* nList,
+								    float* u,
+								    float* v,
+									float* w,
+								    float* rA,
+								    float* rB,
+								    float* fA,
+								    float* fB)
+{
+	
+	// --------------------------------------------	
+	// sum up all the neighbors that are fluid:
+	// --------------------------------------------
+	
+	int nfn = 0;
+	int offst = 19*i;
+	float avenbrRA = 0.0;
+	float avenbrRB = 0.0;
+	for (int n=1; n<19; n++) {
+		int nabor = nList[offst+n];
+		if (sprev[nabor] == 0 && s[nabor] == 0) {
+			nfn++;
+			avenbrRA += rA[nabor];
+			avenbrRB += rB[nabor];
+		}
+	}
+	avenbrRA /= float(nfn);
+	avenbrRB /= float(nfn);
+	
+	// --------------------------------------------	
+	// assign the equilibrium populations:
+	// --------------------------------------------
+	
+	equilibrium_populations_bb_D3Q19(fA,fB,avenbrRA,avenbrRB,u[i],v[i],w[i],offst);
+	
+	// --------------------------------------------	
+	// reduce neighboring fluid densities to
+	// conserve mass:
+	// --------------------------------------------
+	
+	/*
+	float rAdist = -avenbrRA/float(nfn);
+	float rBdist = -avenbrRB/float(nfn);
+	for (int n=1; n<19; n++) {
+		int nabor = nList[offst+n];
+		if (sprev[nabor] == 0 && s[nabor] == 0) {
+			add_density_to_populations_D3Q19(nabor,rAdist,rBdist,u[nabor],v[nabor],w[nabor],fA,fB);
+		}
+	}
+	*/
+	
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to update the particle fields on the lattice: 
+// --------------------------------------------------------
+
+__global__ void mcmp_correct_density_totals_D3Q19(float* fA,
+                                                  float* fB,
+												  float* rA,
+												  float* rB,												 
+												  float delrA,
+												  float delrB,
+												  int nVoxels)
+{
+	// define current voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {
+		const int offst = 19*i;
+		const float w0 = 1.0/3.0;
+		const float ws = 1.0/18.0;
+		const float wd = 1.0/36.0;	
+		if (rA[i] > 0.5) {
+			float rAadd = -delrA/float(nVoxels);
+			rA[i] += rAadd;
+			fA[offst+0] += w0*rAadd;
+			fA[offst+1] += ws*rAadd;
+			fA[offst+2] += ws*rAadd;
+			fA[offst+3] += ws*rAadd;
+			fA[offst+4] += ws*rAadd;
+			fA[offst+5] += ws*rAadd;
+			fA[offst+6] += ws*rAadd;
+			fA[offst+7] += wd*rAadd;
+			fA[offst+8] += wd*rAadd;
+			fA[offst+9] += wd*rAadd;
+			fA[offst+10] += wd*rAadd;
+			fA[offst+11] += wd*rAadd;
+			fA[offst+12] += wd*rAadd;
+			fA[offst+13] += wd*rAadd;
+			fA[offst+14] += wd*rAadd;
+			fA[offst+15] += wd*rAadd;
+			fA[offst+16] += wd*rAadd;
+			fA[offst+17] += wd*rAadd;
+			fA[offst+18] += wd*rAadd;
+		}
+		if (rB[i] > 0.5) {
+			float rBadd = -delrB/float(nVoxels);
+			rB[i] += rBadd;
+			fB[offst+0] += w0*rBadd;
+			fB[offst+1] += ws*rBadd;
+			fB[offst+2] += ws*rBadd;
+			fB[offst+3] += ws*rBadd;
+			fB[offst+4] += ws*rBadd;
+			fB[offst+5] += ws*rBadd;
+			fB[offst+6] += ws*rBadd;
+			fB[offst+7] += wd*rBadd;
+			fB[offst+8] += wd*rBadd;
+			fB[offst+9] += wd*rBadd;
+			fB[offst+10] += wd*rBadd;
+			fB[offst+11] += wd*rBadd;
+			fB[offst+12] += wd*rBadd;
+			fB[offst+13] += wd*rBadd;
+			fB[offst+14] += wd*rBadd;
+			fB[offst+15] += wd*rBadd;
+			fB[offst+16] += wd*rBadd;
+			fB[offst+17] += wd*rBadd;
+			fB[offst+18] += wd*rBadd;
 		}
 	}
 }
@@ -390,11 +664,14 @@ __global__ void mcmp_compute_velocity_bb_D3Q19(float* fA,
 		}
 		
 		// --------------------------------------------------	
-		// if this is a fluid site:
+		// if this is a solid site:
 		// --------------------------------------------------
 		
-		if (s[i] == 1) {
-				
+		else if (s[i] == 1) {
+			int pID = pIDgrid[i];
+			u[i] = pt[pID].v.x;  // - pt[pID].omega*(float(y[i]) - pt[pID].r.y);
+			v[i] = pt[pID].v.y;  // + pt[pID].omega*(float(x[i]) - pt[pID].r.x);
+			w[i] = pt[pID].v.z;
 		}
 			
 	}
@@ -433,6 +710,66 @@ __global__ void mcmp_set_boundary_velocity_bb_D3Q19(float uBC,
 			float fxBC = (uBC - u[i])*2.0*rTotal;
 			float fyBC = (vBC - v[i])*2.0*rTotal;
 			float fzBC = (wBC - w[i])*2.0*rTotal;
+			u[i] += 0.5*fxBC/rTotal;
+			v[i] += 0.5*fyBC/rTotal;
+			w[i] += 0.5*fzBC/rTotal;
+			FxA[i] += fxBC*(rA[i]/rTotal);
+			FxB[i] += fxBC*(rB[i]/rTotal);
+			FyA[i] += fyBC*(rA[i]/rTotal);
+			FyB[i] += fyBC*(rB[i]/rTotal);
+			FzA[i] += fzBC*(rA[i]/rTotal);
+			FzB[i] += fzBC*(rB[i]/rTotal);
+		}		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 set shear velocity on the y=0 and y=Ny-1 boundaries: 
+// --------------------------------------------------------
+
+__global__ void mcmp_set_boundary_shear_velocity_bb_D3Q19(float uBot,
+                                                          float uTop,
+	                                                      float* rA,
+										                  float* rB,
+										                  float* FxA,
+										                  float* FxB,
+										                  float* FyA,
+										                  float* FyB,
+										                  float* FzA,
+										                  float* FzB,
+										                  float* u,
+										                  float* v,
+														  float* w,
+												          int* y,											        
+											              int Ny,
+										                  int nVoxels) 
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {
+		if (y[i] == 0) {
+			float rTotal = rA[i] + rB[i];
+			float fxBC = (uBot - u[i])*2.0*rTotal;
+			float fyBC = (0.0  - v[i])*2.0*rTotal;
+			float fzBC = (0.0  - w[i])*2.0*rTotal;
+			u[i] += 0.5*fxBC/rTotal;
+			v[i] += 0.5*fyBC/rTotal;
+			w[i] += 0.5*fzBC/rTotal;
+			FxA[i] += fxBC*(rA[i]/rTotal);
+			FxB[i] += fxBC*(rB[i]/rTotal);
+			FyA[i] += fyBC*(rA[i]/rTotal);
+			FyB[i] += fyBC*(rB[i]/rTotal);
+			FzA[i] += fzBC*(rA[i]/rTotal);
+			FzB[i] += fzBC*(rB[i]/rTotal);
+		} 
+		if (y[i] == Ny-1) {
+			float rTotal = rA[i] + rB[i];
+			float fxBC = (uTop - u[i])*2.0*rTotal;
+			float fyBC = (0.0  - v[i])*2.0*rTotal;
+			float fzBC = (0.0  - w[i])*2.0*rTotal;
 			u[i] += 0.5*fxBC/rTotal;
 			v[i] += 0.5*fyBC/rTotal;
 			w[i] += 0.5*fzBC/rTotal;
@@ -570,10 +907,10 @@ __global__ void mcmp_compute_virtual_density_bb_D3Q19(float* rAvirt,
 			float sumWS = s1+s2+s3+s4+s5+s6+s7+s8+s9+s10+s11+s12+s13+s14+s15+s16+s17+s18;	
 				
 			if (sumWS > 0.0) {
-				//rAvirt[i] = sumRA/sumWS*(1.0+omega);
-				//rBvirt[i] = sumRB/sumWS*(1.0-omega);	
-				rAvirt[i] = sumRA/sumWS + omega; 
-				rBvirt[i] = sumRB/sumWS; // - omega; 	
+				rAvirt[i] = sumRA/sumWS*(1.0+omega);
+				rBvirt[i] = sumRB/sumWS*(1.0-omega);	
+				//rAvirt[i] = sumRA/sumWS + omega; 
+				//rBvirt[i] = sumRB/sumWS; // - omega; 	
 			}	
 			else {
 				rAvirt[i] = 0.0;

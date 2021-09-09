@@ -105,6 +105,8 @@ public:
 	void setPb(int,float);
 	void setPtheta(int,float);
 	void setPomega(int,float);
+	void set_particle_circular(int,float,float,float);
+	void set_particle_ellipse(int,float,float,float,float,float);
 	float getU(int);
 	float getV(int);
 	int   getS(int);

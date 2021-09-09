@@ -23,6 +23,8 @@ private:
 	float nu;
 	float gAB;	
 	float omega;
+	float rAsum,rAsum0;
+	float rBsum,rBsum0;
 		
 	// host arrays:
 	float* uH;
@@ -84,6 +86,7 @@ public:
 	void create_lattice_file();
 	void stream_index_push();
 	void stream_index_pull();
+	void calculate_initial_density_sums();
 	void read_iolet_info(int,const char*);
 	void setU(int,float);
 	void setV(int,float);
@@ -124,19 +127,24 @@ public:
 	void initial_equilibrium_bb(int,int);
 	void compute_density_bb(int,int);
 	void compute_virtual_density_bb(int,int);
+	void correct_density_totals_bb(int,int);
 	void map_particles_to_lattice_bb(int,int);
+	void cover_uncover_bb(int,int);
 	void update_particles_on_lattice_bb(int,int);
 	void compute_SC_forces_bb(int,int);
 	void compute_velocity_bb(int,int);
 	void compute_velocity_bb_2(int,int);
 	void set_boundary_velocity_bb(float,float,float,int,int);
+	void set_boundary_shear_velocity_bb(float,float,int,int);
 	void collide_stream_bb(int,int);
 	void bounce_back(int,int);
 	void bounce_back_moving(int,int);
 	void zero_particle_forces_bb(int,int);
 	void move_particles_bb(int,int);
 	void fix_particle_velocity_bb(float,int,int);
-	void swap_populations();		
+	void particle_particle_forces_bb(float,float,int,int);
+	void swap_populations();
+	void sum_fluid_densities_bb(int,int);
 	void write_output(std::string,int,int,int,int);
 
 };

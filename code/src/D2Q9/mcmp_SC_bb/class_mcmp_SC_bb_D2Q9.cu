@@ -1,7 +1,7 @@
 
 # include "class_mcmp_SC_bb_D2Q9.cuh"
 # include "../../IO/GetPot"
-# include "../../Utils/gpu_parallel_reduction.h"
+# include "../../Utils/gpu_parallel_reduction.cuh"
 # include <math.h>
 using namespace std;  
 
@@ -429,6 +429,34 @@ void class_mcmp_SC_bb_D2Q9::setPtheta(int i, float val)
 void class_mcmp_SC_bb_D2Q9::setPomega(int i, float val)
 {
 	ptH[i].omega = val;
+}
+
+void class_mcmp_SC_bb_D2Q9::set_particle_circular(int i, float rx, float ry, float rad)
+{
+	ptH[i].r.x = rx;
+	ptH[i].r.y = ry;
+	ptH[i].rad = rad;	
+	ptH[i].a = rad;
+	ptH[i].b = rad;
+	ptH[i].theta = 0.0;
+	ptH[i].mass = 3.14159*rad*rad;
+	ptH[i].v.x = 0.0;
+	ptH[i].v.y = 0.0;
+	ptH[i].omega = 0.0;	
+}
+
+void class_mcmp_SC_bb_D2Q9::set_particle_ellipse(int i, float rx, float ry, float a, float b, float theta)
+{
+	ptH[i].r.x = rx;
+	ptH[i].r.y = ry;
+	ptH[i].rad = (a+b)/2.0;	
+	ptH[i].a = a;
+	ptH[i].b = b;
+	ptH[i].theta = theta;
+	ptH[i].mass = 3.14159*a*b;
+	ptH[i].v.x = 0.0;
+	ptH[i].v.y = 0.0;
+	ptH[i].omega = 0.0;	
 }
 
 

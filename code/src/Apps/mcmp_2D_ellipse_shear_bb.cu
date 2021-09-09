@@ -118,14 +118,8 @@ void mcmp_2D_ellipse_shear_bb::initSystem()
 	float pa = inputParams("Particles/a",10.0);
 	float pb = inputParams("Particles/b",10.0);
 	float theta = inputParams("Particles/theta",0.0);
-	
-	lbm.setPrx(0,xpos0);
-	lbm.setPry(0,ypos0);
-	lbm.setPa(0,pa);
-	lbm.setPb(0,pb);
-	lbm.setPmass(0,3.14159*pa*pb);
-	lbm.setPtheta(0,theta);	
-			
+	lbm.set_particle_ellipse(0,xpos0,ypos0,pa,pb,theta);
+				
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------	

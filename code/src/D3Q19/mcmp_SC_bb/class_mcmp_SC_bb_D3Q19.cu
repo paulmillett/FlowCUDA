@@ -1,6 +1,7 @@
 
 # include "class_mcmp_SC_bb_D3Q19.cuh"
 # include "../../IO/GetPot"
+# include "../../Utils/gpu_parallel_reduction.cuh"
 # include <math.h>
 using namespace std;  
 
@@ -319,6 +320,22 @@ void class_mcmp_SC_bb_D3Q19::swap_populations()
 
 
 // --------------------------------------------------------
+// Calculate initial density sums for both A and B:
+// --------------------------------------------------------
+
+void class_mcmp_SC_bb_D3Q19::calculate_initial_density_sums()
+{
+	rAsum0 = 0.0;
+	rBsum0 = 0.0;
+	for (int i=0; i<nVoxels; i++) {
+		rAsum0 += rAH[i];
+		rBsum0 += rBH[i];
+	}
+}
+
+
+
+// --------------------------------------------------------
 // Setters for host arrays:
 // --------------------------------------------------------
 
@@ -536,6 +553,14 @@ void class_mcmp_SC_bb_D3Q19::compute_density_bb(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,nVoxels);
 }
 
+void class_mcmp_SC_bb_D3Q19::correct_density_totals_bb(int nBlocks, int nThreads)
+{
+	float delrA = rAsum - rAsum0;
+	float delrB = rBsum - rBsum0;
+	mcmp_correct_density_totals_D3Q19
+	<<<nBlocks,nThreads>>> (f1A,f1B,rA,rB,delrA,delrB,nVoxels);
+}
+
 void class_mcmp_SC_bb_D3Q19::compute_virtual_density_bb(int nBlocks, int nThreads)
 {
 	mcmp_compute_virtual_density_bb_D3Q19
@@ -546,6 +571,12 @@ void class_mcmp_SC_bb_D3Q19::map_particles_to_lattice_bb(int nBlocks, int nThrea
 {
 	mcmp_map_particles_to_lattice_bb_D3Q19
 	<<<nBlocks,nThreads>>> (pt,x,y,z,s,sprev,pIDgrid,nVoxels,nParts);
+}
+
+void class_mcmp_SC_bb_D3Q19::cover_uncover_bb(int nBlocks, int nThreads)
+{
+	mcmp_cover_uncover_bb_D3Q19
+	<<<nBlocks,nThreads>>> (s,sprev,nList,u,v,w,rA,rB,f1A,f1B,nVoxels);
 }
 
 void class_mcmp_SC_bb_D3Q19::update_particles_on_lattice_bb(int nBlocks, int nThreads)
@@ -573,6 +604,12 @@ void class_mcmp_SC_bb_D3Q19::set_boundary_velocity_bb(float uBC, float vBC, floa
 {
 	mcmp_set_boundary_velocity_bb_D3Q19 
 	<<<nBlocks,nThreads>>> (uBC,vBC,wBC,rA,rB,FxA,FxB,FyA,FyB,FzA,FzB,u,v,w,y,Ny,nVoxels);
+}
+
+void class_mcmp_SC_bb_D3Q19::set_boundary_shear_velocity_bb(float uBot, float uTop, int nBlocks, int nThreads)
+{
+	mcmp_set_boundary_shear_velocity_bb_D3Q19 
+	<<<nBlocks,nThreads>>> (uBot,uTop,rA,rB,FxA,FxB,FyA,FyB,FzA,FzB,u,v,w,y,Ny,nVoxels);
 }
 
 void class_mcmp_SC_bb_D3Q19::collide_stream_bb(int nBlocks, int nThreads)
@@ -609,6 +646,37 @@ void class_mcmp_SC_bb_D3Q19::zero_particle_forces_bb(int nBlocks, int nThreads)
 {
 	mcmp_zero_particle_forces_bb_D3Q19
 	<<<nBlocks,nThreads>>> (pt,nParts);
+}
+
+void class_mcmp_SC_bb_D3Q19::particle_particle_forces_bb(float K, float halo, int nBlocks, int nThreads)
+{
+	mcmp_particle_particle_forces_bb_D3Q19
+	<<<nBlocks,nThreads>>> (pt,K,halo,nParts);
+}
+
+
+
+// --------------------------------------------------------
+// Calls to Kernels: sum fluid density
+// --------------------------------------------------------
+
+void class_mcmp_SC_bb_D3Q19::sum_fluid_densities_bb(int nBlocks, int nThreads)
+{
+	// allocate memory for partialSum array:
+	float* partialSum;
+	cudaMalloc((void**)&partialSum, sizeof(float)*nBlocks);
+	// fluid A:
+	add_array_elements<<<nBlocks,nThreads,nThreads*sizeof(float)>>>(rA,        nVoxels,partialSum);
+	add_array_elements<<<1,      nThreads,nThreads*sizeof(float)>>>(partialSum,nBlocks,partialSum);
+	cudaDeviceSynchronize();
+	cudaMemcpy(&rAsum, partialSum, sizeof(float), cudaMemcpyDeviceToHost);
+	// fluid B:
+	add_array_elements<<<nBlocks,nThreads,nThreads*sizeof(float)>>>(rB,        nVoxels,partialSum);
+	add_array_elements<<<1,      nThreads,nThreads*sizeof(float)>>>(partialSum,nBlocks,partialSum);
+	cudaDeviceSynchronize();
+	cudaMemcpy(&rBsum, partialSum, sizeof(float), cudaMemcpyDeviceToHost);
+	// deallocate memory:
+	cudaFree(partialSum);
 }
 
 

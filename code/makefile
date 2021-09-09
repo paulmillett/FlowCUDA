@@ -36,6 +36,7 @@ CU_FILES = $(wildcard	src/D2Q9/*.cu \
 						src/IO/*.cu \
 						src/Apps/*.cu \
 						src/Base/*.cu \
+						src/Utils/*.cu \
 						)
 
 #################

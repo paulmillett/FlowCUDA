@@ -35,7 +35,14 @@ __global__ void mcmp_fix_particle_velocity_bb_D3Q19(
 	particle3D_bb*,
 	float,
 	int);
-		
+
+
+__global__ void mcmp_particle_particle_forces_bb_D3Q19(
+	particle3D_bb*,
+	float,
+	float,
+	int);
+															   		
 		
 __global__ void mcmp_map_particles_to_lattice_bb_D3Q19(
 	particle3D_bb*,
@@ -47,6 +54,64 @@ __global__ void mcmp_map_particles_to_lattice_bb_D3Q19(
 	int*,
 	int,
     int);
+
+
+__global__ void mcmp_cover_uncover_bb_D3Q19(
+	int*,
+    int*,
+    int*,
+    float*,
+    float*,
+	float*,
+    float*,
+    float*,
+    float*,
+    float*,
+    int);
+
+
+__device__ void stay_covered_D3Q19(
+	int,
+	float*,
+	float*);
+																						   
+																						   
+__device__ void cover_voxel_D3Q19(
+	int,
+	int*,
+	int*,
+	int*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*);
+
+
+__device__ void uncover_voxel_D3Q19(
+	int,
+    int*,
+    int*,
+    int*,
+    float*,
+    float*,
+	float*,
+    float*,
+    float*,
+    float*,
+    float*);
+
+
+__global__ void mcmp_correct_density_totals_D3Q19(
+	float*,
+	float*,
+	float*,
+	float*,												 
+	float,
+	float,
+	int);
 
 
 __global__ void mcmp_update_particles_on_lattice_bb_D3Q19(
@@ -87,6 +152,25 @@ __global__ void mcmp_set_boundary_velocity_bb_D3Q19(
 	int,
 	int);
 
+
+__global__ void mcmp_set_boundary_shear_velocity_bb_D3Q19(
+	float,
+	float,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	int*,											        
+	int,
+	int);
+																  
 
 __global__ void mcmp_initial_equilibrium_bb_D3Q19(
 	float*,

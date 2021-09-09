@@ -115,34 +115,14 @@ void mcmp_2D_capbridge_shear_bb::initSystem()
 	
 	float xpos0 = inputParams("Particles/xpos0",100.0);
 	float ypos0 = inputParams("Particles/ypos0",100.0);
-	float rad0 = inputParams("Particles/rad0",10.0);
-	
-	lbm.setPrx(0,xpos0);
-	lbm.setPry(0,ypos0);
-	lbm.setPrad(0,rad0);
-	lbm.setPa(0,rad0);
-	lbm.setPb(0,rad0);
-	lbm.setPtheta(0,0.0);
-	lbm.setPmass(0,3.14159*rad0*rad0);
-	lbm.setPvx(0,0.0);
-	lbm.setPvy(0,0.0);
-	lbm.setPomega(0,0.0);
-	
+	float rad0 = inputParams("Particles/rad0",10.0);	
+	lbm.set_particle_circular(0,xpos0,ypos0,rad0);
+		
 	float xpos1 = inputParams("Particles/xpos1",200.0);
 	float ypos1 = inputParams("Particles/ypos1",100.0);
 	float rad1 = inputParams("Particles/rad1",10.0);
-	
-	lbm.setPrx(1,xpos1);
-	lbm.setPry(1,ypos1);
-	lbm.setPrad(1,rad1);
-	lbm.setPa(1,rad0);
-	lbm.setPb(1,rad0);
-	lbm.setPtheta(1,0.0);
-	lbm.setPmass(1,3.14159*rad1*rad1);
-	lbm.setPvx(1,0.0);
-	lbm.setPvy(1,0.0);
-	lbm.setPomega(1,0.0);
-			
+	lbm.set_particle_circular(1,xpos1,ypos1,rad1);
+				
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------	

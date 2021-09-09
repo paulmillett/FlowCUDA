@@ -1,6 +1,5 @@
-# ifndef GPU_PARALLEL_REDUCTION_H
-# define GPU_PARALLEL_REDUCTION_H
-# include <cuda.h>
+
+# include "gpu_parallel_reduction.cuh"
 
 
 
@@ -36,7 +35,3 @@ __global__ void add_array_elements(const float* gArr,
 	// final result:
 	if (thIdx == 0) gOut[blockIdx.x] = shArr[0];
 }
-
-
-
-# endif  // GPU_PARALLEL_REDUCTION_H
