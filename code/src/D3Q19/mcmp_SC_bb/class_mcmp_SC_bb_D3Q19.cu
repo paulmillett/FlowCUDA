@@ -429,6 +429,17 @@ void class_mcmp_SC_bb_D3Q19::setPmass(int i, float val)
 	ptH[i].mass = val;
 }
 
+void class_mcmp_SC_bb_D3Q19::set_particle_sphere(int i, float x, float y, float z, float rad)
+{
+	ptH[i].r.x = x;
+	ptH[i].r.y = y;
+	ptH[i].r.z = z;
+	ptH[i].rad = rad;
+	ptH[i].mass = 4.0*3.14159*rad*rad*rad/3.0;
+	ptH[i].v.x = 0.0;
+	ptH[i].v.y = 0.0;
+	ptH[i].v.z = 0.0;	
+}
 
 
 // --------------------------------------------------------
@@ -567,7 +578,7 @@ void class_mcmp_SC_bb_D3Q19::compute_virtual_density_bb(int nBlocks, int nThread
 	<<<nBlocks,nThreads>>> (rAvirt,rBvirt,rA,rB,s,nList,omega,nVoxels);	
 }
 
-void class_mcmp_SC_bb_D3Q19::map_particles_to_lattice_bb(int nBlocks, int nThreads)
+void class_mcmp_SC_bb_D3Q19::map_particles_on_lattice_bb(int nBlocks, int nThreads)
 {
 	mcmp_map_particles_to_lattice_bb_D3Q19
 	<<<nBlocks,nThreads>>> (pt,x,y,z,s,sprev,pIDgrid,nVoxels,nParts);

@@ -106,6 +106,7 @@ public:
 	void setPvz(int,float);
 	void setPrad(int,float);
 	void setPmass(int,float);
+	void set_particle_sphere(int,float,float,float,float);
 	float getU(int);
 	float getV(int);
 	float getW(int);
@@ -128,7 +129,7 @@ public:
 	void compute_density_bb(int,int);
 	void compute_virtual_density_bb(int,int);
 	void correct_density_totals_bb(int,int);
-	void map_particles_to_lattice_bb(int,int);
+	void map_particles_on_lattice_bb(int,int);
 	void cover_uncover_bb(int,int);
 	void update_particles_on_lattice_bb(int,int);
 	void compute_SC_forces_bb(int,int);

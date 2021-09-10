@@ -36,6 +36,7 @@
 # include "../Apps/scsp_3D_leftvent_ibm.cuh"
 # include "../Apps/mcmp_3D_capbridge_dip.cuh"
 # include "../Apps/mcmp_3D_capbridge_bb.cuh"
+# include "../Apps/mcmp_3D_capbridge_shear_bb.cuh"
 
 
 
@@ -84,6 +85,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_leftvent_ibm") return new scsp_3D_leftvent_ibm();
 	if (specifier == "mcmp_3D_capbridge_dip") return new mcmp_3D_capbridge_dip();
 	if (specifier == "mcmp_3D_capbridge_bb") return new mcmp_3D_capbridge_bb();
+	if (specifier == "mcmp_3D_capbridge_shear_bb") return new mcmp_3D_capbridge_shear_bb();
    
 	// -----------------------------------
 	// if input file doesn't have a 

@@ -1,5 +1,5 @@
 
-# include "mcmp_3D_capbridge_bb.cuh"
+# include "mcmp_3D_capbridge_shear_bb.cuh"
 # include "../IO/GetPot"
 # include <math.h>
 # include <string> 
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-mcmp_3D_capbridge_bb::mcmp_3D_capbridge_bb() : lbm()
+mcmp_3D_capbridge_shear_bb::mcmp_3D_capbridge_shear_bb() : lbm()
 {	
 	
 	// ----------------------------------------------
@@ -43,19 +43,25 @@ mcmp_3D_capbridge_bb::mcmp_3D_capbridge_bb() : lbm()
 	
 	nu = inputParams("LBM/nu",0.1666666);
 	gAB = inputParams("LBM/gAB",6.0);
+	shearVel = inputParams("LBM/shearVel",0.0);
 		
 	// ----------------------------------------------
 	// Particles parameters:
 	// ----------------------------------------------
 	
 	nParts = inputParams("Particles/nParts",2);	
-	pvel = inputParams("Particles/pvel",0.0);			
+	pvel = inputParams("Particles/pvel",0.0);
+	Khertz = inputParams("Particles/Khertz",0.0);
+	halo = inputParams("Particles/halo",0.0);			
 	
 	// ----------------------------------------------
 	// output parameters:
 	// ----------------------------------------------
 	
 	vtkFormat = inputParams("Output/format","structured");
+	iskip = inputParams("Output/iskip",1);
+	jskip = inputParams("Output/jskip",1);
+	kskip = inputParams("Output/kskip",1);	
 	
 	// ----------------------------------------------
 	// allocate array memory (host & device):
@@ -77,7 +83,7 @@ mcmp_3D_capbridge_bb::mcmp_3D_capbridge_bb() : lbm()
 // Destructor:
 // --------------------------------------------------------
 
-mcmp_3D_capbridge_bb::~mcmp_3D_capbridge_bb()
+mcmp_3D_capbridge_shear_bb::~mcmp_3D_capbridge_shear_bb()
 {
 	lbm.deallocate();
 }
@@ -88,7 +94,7 @@ mcmp_3D_capbridge_bb::~mcmp_3D_capbridge_bb()
 // Initialize system:
 // --------------------------------------------------------
 
-void mcmp_3D_capbridge_bb::initSystem()
+void mcmp_3D_capbridge_shear_bb::initSystem()
 {
 	
 	// ----------------------------------------------
@@ -112,24 +118,14 @@ void mcmp_3D_capbridge_bb::initSystem()
 	float ypos0 = inputParams("Particles/ypos0",100.0);
 	float zpos0 = inputParams("Particles/zpos0",100.0);
 	float rad0 = inputParams("Particles/rad0",10.0);
-	
-	lbm.setPrx(0,xpos0);
-	lbm.setPry(0,ypos0);
-	lbm.setPrz(0,zpos0);
-	lbm.setPrad(0,rad0);
-	lbm.setPmass(0,4.0*3.14159*rad0*rad0*rad0/3.0);
-	
+	lbm.set_particle_sphere(0,xpos0,ypos0,zpos0,rad0);
+		
 	float xpos1 = inputParams("Particles/xpos1",200.0);
 	float ypos1 = inputParams("Particles/ypos1",100.0);
 	float zpos1 = inputParams("Particles/zpos1",100.0);
 	float rad1 = inputParams("Particles/rad1",10.0);
-	
-	lbm.setPrx(1,xpos1);
-	lbm.setPry(1,ypos1);
-	lbm.setPrz(1,zpos1);
-	lbm.setPrad(1,rad1);
-	lbm.setPmass(1,4.0*3.14159*rad1*rad1*rad1/3.0);
-			
+	lbm.set_particle_sphere(1,xpos1,ypos1,zpos1,rad1);
+				
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------	
@@ -160,6 +156,15 @@ void mcmp_3D_capbridge_bb::initSystem()
 			for (int i=0; i<Nx; i++) {		
 				int ndx = k*Nx*Ny + j*Nx + i;	
 				float sij = float(lbm.getS(ndx));
+				if (i > 46 && i < 54 && j > 32 && j < 68 && k > 32 && k < 68) {			
+					lbm.setRA(ndx,1.00*(1.0-sij));
+					lbm.setRB(ndx,0.02*(1.0-sij));				
+				}
+				else {
+					lbm.setRA(ndx,0.02*(1.0-sij));
+					lbm.setRB(ndx,1.00*(1.0-sij));
+				}
+				/*								
 				if (i > 96 && i < 104 && j > 22 && j < 78 && k > 22 && k < 78) {			
 					lbm.setRA(ndx,1.00*(1.0-sij));
 					lbm.setRB(ndx,0.02*(1.0-sij));				
@@ -167,7 +172,8 @@ void mcmp_3D_capbridge_bb::initSystem()
 				else {
 					lbm.setRA(ndx,0.02*(1.0-sij));
 					lbm.setRB(ndx,1.00*(1.0-sij));
-				}								
+				}
+				*/								
 			}					
 		}
 	}
@@ -178,6 +184,12 @@ void mcmp_3D_capbridge_bb::initSystem()
 		lbm.setV(i,0.0);
 		lbm.setW(i,0.0);
 	}	
+	
+	// ----------------------------------------------		
+	// calculate initial density sums:  
+	// ----------------------------------------------
+	
+	lbm.calculate_initial_density_sums();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -214,7 +226,7 @@ void mcmp_3D_capbridge_bb::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void mcmp_3D_capbridge_bb::cycleForward(int stepsPerCycle, int currentCycle)
+void mcmp_3D_capbridge_shear_bb::cycleForward(int stepsPerCycle, int currentCycle)
 {
 	
 	// ----------------------------------------------
@@ -248,38 +260,37 @@ void mcmp_3D_capbridge_bb::cycleForward(int stepsPerCycle, int currentCycle)
 		// ------------------------------
 		// update density fields:
 		// ------------------------------
-		
-		lbm.update_particles_on_lattice_bb(nBlocks,nThreads);
+				
+		lbm.map_particles_on_lattice_bb(nBlocks,nThreads);
+		cudaDeviceSynchronize();
+		lbm.cover_uncover_bb(nBlocks,nThreads);
+		cudaDeviceSynchronize();
 		lbm.compute_density_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 		lbm.compute_virtual_density_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
-		
+		lbm.sum_fluid_densities_bb(nBlocks,nThreads);
+		lbm.correct_density_totals_bb(nBlocks,nThreads);
+				
 		// ------------------------------
 		// update fluid fields:											   
 		// ------------------------------ 
-		
+				
 		lbm.compute_SC_forces_bb(nBlocks,nThreads);
 		lbm.compute_velocity_bb(nBlocks,nThreads);
+		lbm.set_boundary_shear_velocity_bb(-shearVel,shearVel,nBlocks,nThreads);
 		lbm.collide_stream_bb(nBlocks,nThreads);
 		lbm.bounce_back_moving(nBlocks,nThreads);
 		lbm.swap_populations();	
-		
-		// ------------------------------
-		// write particle drag force to file:											   
-		// ------------------------------ 
-		
-		lbm.memcopy_device_to_host_particles();		
-		outfile << lbm.getPfx(0) << endl;	
-		
+				
 		// ------------------------------
 		// update particles:											   
 		// ------------------------------ 
 		
-		lbm.fix_particle_velocity_bb(pvel,nBlocks,nThreads);
+		lbm.particle_particle_forces_bb(Khertz,halo,nBlocks,nThreads);
 		lbm.move_particles_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
-				
+						
 	}
 	
 	// ----------------------------------------------
@@ -308,7 +319,7 @@ void mcmp_3D_capbridge_bb::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output:
 // --------------------------------------------------------
 
-void mcmp_3D_capbridge_bb::writeOutput(std::string tagname, int step)
+void mcmp_3D_capbridge_shear_bb::writeOutput(std::string tagname, int step)
 {
 	
 	// ----------------------------------------------
@@ -317,7 +328,7 @@ void mcmp_3D_capbridge_bb::writeOutput(std::string tagname, int step)
 	// "io/write_vtk_output.cuh"
 	// ----------------------------------------------
 	
-	lbm.write_output(tagname,step,1,1,1); 
+	lbm.write_output(tagname,step,iskip,jskip,kskip); 
 	float rATotal = lbm.calculate_fluid_A_volume();
 	cout << rATotal << endl;
 
