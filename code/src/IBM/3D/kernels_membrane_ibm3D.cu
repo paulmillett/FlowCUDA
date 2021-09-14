@@ -243,8 +243,8 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	    // Derivatives of Skalak energy density E used in chain rule below: eq. (C.14)
 	    float dEdI1 = gs*(i1 + 1.0)/2.0;     //gs*(i1 + 1.0)/6.0;
 	    float dEdI2 = gs*(C*i2 - 1.0)/2.0;   //(ga*i2 - gs)/6.0;
-		dEdI1 *= 2.0;          // for some reason, this correction is necessary.  Need to investigate!
-		dEdI2 *= 2.0;          // "                                            "
+		//dEdI1 *= 2.0;          // for some reason, this correction is necessary.  Need to investigate!
+		//dEdI2 *= 2.0;          // "                                            "
 		// Derivatives of Neo-Hookean energy density E used in chain rule below: eq. (C.14)
 	    //const float dEdI1 = gs/6.0;
 	    //const float dEdI2 = -gs/(6.0*(i2+1.0)*(i2+1.0));

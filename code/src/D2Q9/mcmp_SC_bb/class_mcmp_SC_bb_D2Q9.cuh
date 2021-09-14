@@ -82,6 +82,7 @@ public:
 	void create_lattice_box();
 	void create_lattice_box_periodic();
 	void create_lattice_box_shear();
+	void create_lattice_box_enclosed();
 	void create_lattice_file();
 	void stream_index_push();
 	void stream_index_pull();
@@ -139,6 +140,7 @@ public:
 	void compute_velocity_bb(int,int);
 	void set_boundary_velocity_bb(float,float,int,int);
 	void set_boundary_shear_velocity_bb(float,float,int,int);
+	void set_boundary_extensional_velocity_bb(float,float,float,int,int,int);
 	void collide_stream_bb(int,int);
 	void bounce_back(int,int);
 	void bounce_back_moving(int,int);

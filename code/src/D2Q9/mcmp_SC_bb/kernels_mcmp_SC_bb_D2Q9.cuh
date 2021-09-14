@@ -222,6 +222,24 @@ __global__ void mcmp_set_boundary_shear_velocity_bb_D2Q9(
 	int*,
 	int,
 	int);
+
+
+__global__ void mcmp_set_boundary_extensional_velocity_bb_D2Q9(
+	float,
+	float,
+	float,	
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	int*,
+	int*,										        
+	int,
+	int,
+	int,
+	int);
 		
 		
 __global__ void mcmp_compute_density_bb_D2Q9(

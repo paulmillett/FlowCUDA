@@ -824,6 +824,71 @@ __global__ void mcmp_set_boundary_shear_velocity_bb_D2Q9(float uBot,
 
 
 // --------------------------------------------------------
+// D2Q9 set extensional velocity on all four boundaries: 
+// --------------------------------------------------------
+
+__global__ void mcmp_set_boundary_extensional_velocity_bb_D2Q9(
+	float velInOut,
+	float rAbc,
+	float rBbc,	
+	float* rA,
+	float* rB,
+	float* fA,
+	float* fB,
+	float* u,
+	float* v,
+	int* x,
+	int* y,											        
+	int Nx,
+	int Ny,	
+	int widthInOut,
+	int nVoxels) 
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {					
+		int offst = 9*i;
+		int xi = x[i];
+		int yi = y[i];
+		int xmin = Nx/2 - widthInOut/2;
+		int xmax = Nx - xmin;
+		int ymin = Ny/2 - widthInOut/2;
+		int ymax = Ny - ymin;	
+		if (yi == 0 && xi > xmin && xi < xmax) {
+			u[i] = 0.0;
+			v[i] = velInOut;
+			rA[i] = rAbc;
+			rB[i] = rBbc;
+			equilibrium_populations_bb_D2Q9(fA,fB,rA[i],rB[i],u[i],v[i],offst);			
+		}
+		if (yi == Ny-1 && xi > xmin && xi < xmax) {
+			u[i] = 0.0;
+			v[i] = -velInOut;
+			rA[i] = rAbc;
+			rB[i] = rBbc;
+			equilibrium_populations_bb_D2Q9(fA,fB,rA[i],rB[i],u[i],v[i],offst);
+		}		
+		if (xi == 0 && yi > ymin && yi < ymax) {
+			u[i] = -velInOut;
+			v[i] = 0.0;
+			rA[i] = rAbc;
+			rB[i] = rBbc;
+			equilibrium_populations_bb_D2Q9(fA,fB,rA[i],rB[i],u[i],v[i],offst);
+		}
+		if (xi == Nx-1 && yi > ymin && yi < ymax) {
+			u[i] = velInOut;
+			v[i] = 0.0;
+			rA[i] = rAbc;
+			rB[i] = rBbc;
+			equilibrium_populations_bb_D2Q9(fA,fB,rA[i],rB[i],u[i],v[i],offst);
+		}		
+	}
+}
+
+
+
+// --------------------------------------------------------
 // D2Q9 compute density for each component: 
 // --------------------------------------------------------
 

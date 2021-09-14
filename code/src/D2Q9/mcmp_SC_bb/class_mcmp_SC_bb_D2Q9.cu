@@ -229,6 +229,17 @@ void class_mcmp_SC_bb_D2Q9::create_lattice_box_shear()
 
 
 // --------------------------------------------------------
+// Initialize lattice as a "box" set up for enclosed flow:
+// --------------------------------------------------------
+
+void class_mcmp_SC_bb_D2Q9::create_lattice_box_enclosed()
+{
+	build_box_lattice_enclosed_D2Q9(nVoxels,Nx,Ny,voxelTypeH,nListH);
+}
+
+
+
+// --------------------------------------------------------
 // Initialize lattice from "file":
 // --------------------------------------------------------
 
@@ -619,6 +630,13 @@ void class_mcmp_SC_bb_D2Q9::set_boundary_shear_velocity_bb(float uBot, float uTo
 {
 	mcmp_set_boundary_shear_velocity_bb_D2Q9 
 	<<<nBlocks,nThreads>>> (uBot,uTop,rA,rB,FxA,FxB,FyA,FyB,u,v,y,Ny,nVoxels);
+}
+
+void class_mcmp_SC_bb_D2Q9::set_boundary_extensional_velocity_bb(float velInOut, float rAbc, float rBbc, 
+	int widthInOut, int nBlocks, int nThreads)
+{
+	mcmp_set_boundary_extensional_velocity_bb_D2Q9 
+	<<<nBlocks,nThreads>>> (velInOut,rAbc,rBbc,rA,rB,f1A,f1B,u,v,x,y,Nx,Ny,widthInOut,nVoxels);
 }
 
 void class_mcmp_SC_bb_D2Q9::collide_stream_bb(int nBlocks, int nThreads)
