@@ -1,5 +1,5 @@
 
-# include "mcmp_2D_drag_bb.cuh"
+# include "mcmp_2D_doublet_shear_bb.cuh"
 # include "../IO/GetPot"
 # include <math.h>
 # include <string> 
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-mcmp_2D_drag_bb::mcmp_2D_drag_bb() : lbm()
+mcmp_2D_doublet_shear_bb::mcmp_2D_doublet_shear_bb() : lbm()
 {	
 	
 	// ----------------------------------------------
@@ -43,14 +43,17 @@ mcmp_2D_drag_bb::mcmp_2D_drag_bb() : lbm()
 	nu = inputParams("LBM/nu",0.1666666);
 	gAB = inputParams("LBM/gAB",6.0);
 	gAS = inputParams("LBM/gAS",6.0);
-	gBS = inputParams("LBM/gBS",6.0); 	
+	gBS = inputParams("LBM/gBS",6.0); 
+	shearVel = inputParams("LBM/shearVel",0.0);
 	
 	// ----------------------------------------------
 	// Particles parameters:
 	// ----------------------------------------------
 	
-	nParts = inputParams("Particles/nParts",1);	
-	pvel = inputParams("Particles/pvel",0.0);			
+	nParts = inputParams("Particles/nParts",2);	
+	pvel = inputParams("Particles/pvel",0.0);
+	khook = inputParams("Particles/khook",0.0);
+	rr0 = inputParams("Particles/rr0",0.0);			
 	
 	// ----------------------------------------------
 	// output parameters:
@@ -68,7 +71,7 @@ mcmp_2D_drag_bb::mcmp_2D_drag_bb() : lbm()
 	// delete "drag.txt" file from previous simulations:
 	// ----------------------------------------------
 	
-	std::system("exec rm -rf drag.txt"); 
+	std::system("exec rm -rf force.txt"); 
 	
 }
 
@@ -78,7 +81,7 @@ mcmp_2D_drag_bb::mcmp_2D_drag_bb() : lbm()
 // Destructor:
 // --------------------------------------------------------
 
-mcmp_2D_drag_bb::~mcmp_2D_drag_bb()
+mcmp_2D_doublet_shear_bb::~mcmp_2D_doublet_shear_bb()
 {
 	lbm.deallocate();
 }
@@ -89,7 +92,7 @@ mcmp_2D_drag_bb::~mcmp_2D_drag_bb()
 // Initialize system:
 // --------------------------------------------------------
 
-void mcmp_2D_drag_bb::initSystem()
+void mcmp_2D_doublet_shear_bb::initSystem()
 {
 	
 	// ----------------------------------------------
@@ -100,19 +103,25 @@ void mcmp_2D_drag_bb::initSystem()
 	string latticeSource = inputParams("Lattice/source","box");	
 	
 	// ----------------------------------------------
-	// create the periodic lattice:
+	// create the shear-flow lattice:
 	// ----------------------------------------------	
 	
-	lbm.create_lattice_box_periodic();	
+	lbm.create_lattice_box_shear();
+	//lbm.create_lattice_box_periodic();
 	
 	// ----------------------------------------------
 	// initialize particle information:
 	// ----------------------------------------------
 	
-	float xpos = inputParams("Particles/xpos",100.0);
-	float ypos = inputParams("Particles/ypos",100.0);
-	float rad = inputParams("Particles/rad",10.0);
-	lbm.set_particle_circular(0,xpos,ypos,rad);
+	float xpos0 = inputParams("Particles/xpos0",100.0);
+	float ypos0 = inputParams("Particles/ypos0",100.0);
+	float rad0 = inputParams("Particles/rad0",10.0);	
+	lbm.set_particle_circular(0,xpos0,ypos0,rad0);
+		
+	float xpos1 = inputParams("Particles/xpos1",200.0);
+	float ypos1 = inputParams("Particles/ypos1",100.0);
+	float rad1 = inputParams("Particles/rad1",10.0);
+	lbm.set_particle_circular(1,xpos1,ypos1,rad1);
 				
 	// ----------------------------------------------			
 	// initialize macros: 
@@ -125,10 +134,12 @@ void mcmp_2D_drag_bb::initSystem()
 			lbm.setX(ndx,i);
 			lbm.setY(ndx,j);
 			lbm.setS(ndx,0);
-			float dx = float(i) - lbm.getPrx(0);
-			float dy = float(j) - lbm.getPry(0);
-			float rr = sqrt(dx*dx + dy*dy);
-			if (rr <= lbm.getPrad(0)) lbm.setS(ndx,1); 
+			for (int p=0; p<nParts; p++) {
+				float dx = float(i) - lbm.getPrx(p);
+				float dy = float(j) - lbm.getPry(p);
+				float rr = sqrt(dx*dx + dy*dy);
+				if (rr <= lbm.getPrad(p)) lbm.setS(ndx,1); 
+			}			
 		}
 	}
 		
@@ -136,11 +147,9 @@ void mcmp_2D_drag_bb::initSystem()
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {
 			int ndx = j*Nx + i;
-			int sij = lbm.getS(ndx);			
-			float rhoA = 1.00;
-			float rhoB = 0.00;					
-			lbm.setRA(ndx,rhoA*float(1 - sij));
-			lbm.setRB(ndx,rhoB*float(1 - sij));						
+			float sij = float(lbm.getS(ndx));			
+			lbm.setRA(ndx,0.001*(1.0-sij));
+			lbm.setRB(ndx,1.000*(1.0-sij));			
 		}
 	}
 		
@@ -151,10 +160,17 @@ void mcmp_2D_drag_bb::initSystem()
 	}	
 	
 	// ----------------------------------------------		
+	// calculate initial density sums:  
+	// ----------------------------------------------
+	
+	lbm.calculate_initial_density_sums();
+	
+	// ----------------------------------------------		
 	// build the streamIndex[] array.  
 	// ----------------------------------------------
 	
-	lbm.stream_index_push();	
+	lbm.stream_index_push_bb();	
+	//lbm.stream_index_push();	
 			
 	// ----------------------------------------------
 	// write initial output file:
@@ -185,7 +201,7 @@ void mcmp_2D_drag_bb::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void mcmp_2D_drag_bb::cycleForward(int stepsPerCycle, int currentCycle)
+void mcmp_2D_doublet_shear_bb::cycleForward(int stepsPerCycle, int currentCycle)
 {
 	
 	// ----------------------------------------------
@@ -200,7 +216,7 @@ void mcmp_2D_drag_bb::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 	
 	ofstream outfile;
-	outfile.open ("drag.txt", ios::out | ios::app);
+	outfile.open ("force.txt", ios::out | ios::app);
 	
 	// ----------------------------------------------
 	// loop through this cycle:
@@ -219,34 +235,35 @@ void mcmp_2D_drag_bb::cycleForward(int stepsPerCycle, int currentCycle)
 		// ------------------------------
 		// update density fields:
 		// ------------------------------
-		
-		lbm.update_particles_on_lattice_bb(nBlocks,nThreads);
+				
+		//lbm.update_particles_on_lattice_bb(nBlocks,nThreads);
+		lbm.map_particles_on_lattice_bb(nBlocks,nThreads);
+		cudaDeviceSynchronize();
+		lbm.cover_uncover_bb(nBlocks,nThreads);
+		cudaDeviceSynchronize();
 		lbm.compute_density_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
+		lbm.compute_virtual_density_bb(nBlocks,nThreads);
+		cudaDeviceSynchronize();
+		lbm.sum_fluid_densities_bb(nBlocks,nThreads);
+		lbm.correct_density_totals_bb(nBlocks,nThreads);
 		
 		// ------------------------------
 		// update fluid fields:											   
 		// ------------------------------ 
 		
-		lbm.compute_SC_forces_bb(nBlocks,nThreads);
+		lbm.compute_SC_forces_bb_2(nBlocks,nThreads);
 		lbm.compute_velocity_bb(nBlocks,nThreads);
-		lbm.set_boundary_velocity_bb(0.0,0.0,nBlocks,nThreads);
+		lbm.set_boundary_shear_velocity_bb(-shearVel,shearVel,nBlocks,nThreads);
 		lbm.collide_stream_bb(nBlocks,nThreads);
 		lbm.bounce_back_moving(nBlocks,nThreads);
 		lbm.swap_populations();	
-		
-		// ------------------------------
-		// write particle drag force to file:											   
-		// ------------------------------ 
-		
-		lbm.memcopy_device_to_host_particles();		
-		outfile << lbm.getPfx(0) << endl;	
-		
+				
 		// ------------------------------
 		// update particles:											   
 		// ------------------------------ 
 		
-		if (cummulativeSteps < 10000) lbm.fix_particle_velocity_angular_bb(0.0,-0.02,0.0,nBlocks,nThreads);
+		lbm.particle_particle_forces_Hookean_bb(khook,rr0,nBlocks,nThreads);
 		lbm.move_particles_bb(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 				
@@ -262,7 +279,8 @@ void mcmp_2D_drag_bb::cycleForward(int stepsPerCycle, int currentCycle)
 	// write output from this cycle:
 	// ----------------------------------------------
 	
-	writeOutput("macros",cummulativeSteps);	
+	cout << "time step = " << cummulativeSteps << endl;	
+	writeOutput("macros",cummulativeSteps);		
 	
 	// ----------------------------------------------
 	// close file that stores drag force data:
@@ -278,7 +296,7 @@ void mcmp_2D_drag_bb::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output:
 // --------------------------------------------------------
 
-void mcmp_2D_drag_bb::writeOutput(std::string tagname, int step)
+void mcmp_2D_doublet_shear_bb::writeOutput(std::string tagname, int step)
 {
 	
 	// ----------------------------------------------
@@ -288,6 +306,7 @@ void mcmp_2D_drag_bb::writeOutput(std::string tagname, int step)
 	// ----------------------------------------------
 	
 	lbm.write_output(tagname,step); 
+	lbm.write_density_sums(step);
 
 }
 

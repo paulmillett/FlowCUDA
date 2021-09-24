@@ -72,7 +72,30 @@ __global__ void mcmp_fix_particle_velocity_bb_D2Q9(particle2D_bb* pt,
 
 
 // --------------------------------------------------------
-// Calculate particle-particle forces:
+// Fix particle velocity & angular velocity:
+// --------------------------------------------------------
+
+__global__ void mcmp_fix_particle_velocity_angular_bb_D2Q9(particle2D_bb* pt,
+                                                           float pvx,
+														   float pvy,
+														   float pomega,
+   								                           int nParts)
+{
+	// define particle:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nParts) {	
+		pt[i].f = make_float2(0.0);
+		pt[i].T = 0.0;
+		pt[i].v.x = pvx;
+		pt[i].v.y = pvy;
+		pt[i].omega = pomega;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Calculate particle-particle forces (Hertz contact):
 // --------------------------------------------------------
 
 __global__ void mcmp_particle_particle_forces_bb_D2Q9(particle2D_bb* pt,
@@ -87,26 +110,34 @@ __global__ void mcmp_particle_particle_forces_bb_D2Q9(particle2D_bb* pt,
 			if (i==j) continue;
 			float2 rij = pt[i].r - pt[j].r;
 			float rr = length(rij);
-			// -----------------------
-			// Hertz contact force:
-			// -----------------------
 			float twoRadii = pt[i].rad + pt[j].rad + halo;
 			if (rr < twoRadii) {
 				float fmag = 2.5*K*pow(twoRadii - rr,1.5);
 				pt[i].f += fmag*(rij/rr);
 			}			
-			// -----------------------
-			// LJ force:
-			// -----------------------
-			/*
-			float sigma = pt[i].rad + pt[j].rad + halo;
-			float epsilon = 0.5;				
-			float r2Inv = sigma*sigma/(rr*rr);
-			float attract = r2Inv*r2Inv*r2Inv;
-			float repel = attract*attract;
-			float fmag = epsilon*24.0*(2*repel - attract)*r2Inv;
-			pt[i].f += fmag*rij;
-			*/
+		}		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Calculate particle-particle forces (Hookean spring):
+// --------------------------------------------------------
+
+__global__ void mcmp_particle_particle_forces_Hookean_bb_D2Q9(particle2D_bb* pt,
+                                                              float k,
+													          float rr0,
+   								                              int nParts)
+{
+	// define particle:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nParts) {	
+		for (int j=0; j<nParts; j++) {
+			if (i==j) continue;
+			float2 rij = pt[i].r - pt[j].r;
+			float rr = length(rij);
+			pt[i].f += -k*(rr - rr0)*(rij/rr);			
 		}		
 	}
 }

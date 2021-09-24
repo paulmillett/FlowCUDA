@@ -669,6 +669,13 @@ void class_mcmp_SC_bb_D2Q9::fix_particle_velocity_bb(float pvel, int nBlocks, in
 	<<<nBlocks,nThreads>>> (pt,pvel,nParts);
 }
 
+void class_mcmp_SC_bb_D2Q9::fix_particle_velocity_angular_bb(float pvx, float pvy, float pomega,
+	int nBlocks, int nThreads)
+{
+	mcmp_fix_particle_velocity_angular_bb_D2Q9
+	<<<nBlocks,nThreads>>> (pt,pvx,pvy,pomega,nParts);
+}
+
 void class_mcmp_SC_bb_D2Q9::zero_particle_forces_bb(int nBlocks, int nThreads)
 {
 	mcmp_zero_particle_forces_bb_D2Q9
@@ -679,6 +686,12 @@ void class_mcmp_SC_bb_D2Q9::particle_particle_forces_bb(float K, float halo, int
 {
 	mcmp_particle_particle_forces_bb_D2Q9
 	<<<nBlocks,nThreads>>> (pt,K,halo,nParts);
+}
+
+void class_mcmp_SC_bb_D2Q9::particle_particle_forces_Hookean_bb(float k, float rr0, int nBlocks, int nThreads)
+{
+	mcmp_particle_particle_forces_Hookean_bb_D2Q9
+	<<<nBlocks,nThreads>>> (pt,k,rr0,nParts);
 }
 
 

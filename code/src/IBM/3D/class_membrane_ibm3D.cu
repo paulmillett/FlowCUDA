@@ -270,7 +270,7 @@ void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 			
 		}
 		cellCOM[c] = shift;		
-		shift_node_positions(c,shift.x,shift.y,shift.z);
+		rotate_and_shift_node_positions(c,shift.x,shift.y,shift.z);
 	}
 	
 	// last, copy node positions from host to device:
@@ -303,6 +303,30 @@ void class_membrane_ibm3D::shift_node_positions(int cellID, float xsh, float ysh
 		rH[indx].x += xsh;
 		rH[indx].y += ysh;
 		rH[indx].z += zsh;		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Shift IBM start positions by specified amount:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::rotate_and_shift_node_positions(int cellID, float xsh, float ysh, float zsh)
+{
+	float a = M_PI*(float)rand()/RAND_MAX;  // alpha
+	float b = M_PI*(float)rand()/RAND_MAX;  // beta
+	float g = M_PI*(float)rand()/RAND_MAX;  // gamma
+	for (int i=0; i<nNodesPerCell; i++) {
+		int indx = i + cellID*nNodesPerCell;
+		// rotate:
+		float xrot = rH[indx].x*(cos(a)*cos(b)) + rH[indx].y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + rH[indx].z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
+		float yrot = rH[indx].x*(sin(a)*cos(b)) + rH[indx].y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + rH[indx].z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
+		float zrot = rH[indx].x*(-sin(b))       + rH[indx].y*(cos(b)*sin(g))                      + rH[indx].z*(cos(b)*cos(g));
+		// shift:		 
+		rH[indx].x = xrot + xsh;
+		rH[indx].y = yrot + ysh;
+		rH[indx].z = zrot + zsh;		
 	}
 }
 
@@ -402,6 +426,40 @@ void class_membrane_ibm3D::relax_node_positions(int nIts, float scale, float M, 
 		reset_bin_lists(nBlocks,nThreads);		
 		build_bin_lists(nBlocks,nThreads);		
 		compute_node_forces(nBlocks,nThreads);		
+		nonbonded_node_interactions(nBlocks,nThreads);		
+		wall_forces_ydir(nBlocks,nThreads);		
+		update_node_positions_vacuum(M,nBlocks,nThreads);		
+		cudaDeviceSynchronize();
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// For a certain number of iterations, relax the 
+// the node positions (for example, after cells are shrunk 
+// to allow them to readjust to their regular volume):
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::relax_node_positions_skalak(int nIts, float scale, float M, int nBlocks, int nThreads) 
+{
+	// per iteraction scale factor:
+	float power = 1.0/float(nIts);
+	float scalePerIter = powf(scale,power);
+	
+	// make sure node coordinates are wrapped for 
+	// PBC's prior to building bin-lists the first time:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
+	
+	// iterate to relax node positions while scaling equilibirum
+	// cell size:
+	for (int i=0; i<nIts; i++) {
+		if (i%10000 == 0) cout << "relax step " << i << endl;		
+		scale_equilibrium_cell_size(scalePerIter,nBlocks,nThreads);		
+		reset_bin_lists(nBlocks,nThreads);		
+		build_bin_lists(nBlocks,nThreads);		
+		compute_node_forces_skalak(nBlocks,nThreads);		
 		nonbonded_node_interactions(nBlocks,nThreads);		
 		wall_forces_ydir(nBlocks,nThreads);		
 		update_node_positions_vacuum(M,nBlocks,nThreads);		

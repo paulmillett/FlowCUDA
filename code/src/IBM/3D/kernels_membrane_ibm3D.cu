@@ -793,7 +793,11 @@ __global__ void scale_face_areas_IBM3D(
 	int nFaces)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;	
-	if (i < nFaces) faces[i].area0 *= scale*scale;
+	if (i < nFaces) {
+		faces[i].area0 *= scale*scale;
+		faces[i].l0 *= scale;
+		faces[i].lp0 *= scale;
+	}
 }
 
 

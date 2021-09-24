@@ -40,9 +40,24 @@ __global__ void mcmp_fix_particle_velocity_bb_D2Q9(
 	particle2D_bb*,
 	float,
 	int);
+	
+	
+__global__ void mcmp_fix_particle_velocity_angular_bb_D2Q9(
+	particle2D_bb*,
+	float,
+	float,
+	float,
+	int);
 
 
 __global__ void mcmp_particle_particle_forces_bb_D2Q9(
+	particle2D_bb*,
+	float,
+	float,
+	int);
+	
+
+__global__ void mcmp_particle_particle_forces_Hookean_bb_D2Q9(
 	particle2D_bb*,
 	float,
 	float,

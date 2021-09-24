@@ -126,7 +126,9 @@ public:
 	void zero_particle_forces_bb(int,int);
 	void move_particles_bb(int,int);
 	void fix_particle_velocity_bb(float,int,int);
+	void fix_particle_velocity_angular_bb(float,float,float,int,int);
 	void particle_particle_forces_bb(float,float,int,int);
+	void particle_particle_forces_Hookean_bb(float,float,int,int);
 	void initial_equilibrium_bb(int,int);
 	void map_particles_on_lattice_bb(int,int);
 	void map_particles_on_lattice_ellipse_bb(int,int);

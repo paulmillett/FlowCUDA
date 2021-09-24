@@ -68,6 +68,7 @@ class class_membrane_ibm3D {
 	void assign_cellIDs_to_nodes();
 	void duplicate_cells();	
 	void shift_node_positions(int,float,float,float);
+	void rotate_and_shift_node_positions(int,float,float,float);
 	void rest_geometries(int,int);
 	void rest_geometries_skalak(int,int);
 	void shrink_and_randomize_cells(float,float,float);
@@ -77,6 +78,7 @@ class class_membrane_ibm3D {
 	void update_node_positions(int,int);
 	void update_node_positions_dt(int,int);
 	void relax_node_positions(int,float,float,int,int);
+	void relax_node_positions_skalak(int,float,float,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
 	void extrapolate_force(float*,float*,float*,int,int);	
