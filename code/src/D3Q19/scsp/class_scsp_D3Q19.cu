@@ -24,6 +24,7 @@ class_scsp_D3Q19::class_scsp_D3Q19()
 	forceFlag = false;
 	velIBFlag = false;
 	inoutFlag = false;
+	solidFlag = false;
 	xyzFlag = false;	
 }
 
@@ -134,6 +135,21 @@ void class_scsp_D3Q19::allocate_inout()
 
 
 // --------------------------------------------------------
+// Allocate solidH[] and solid[] arrays (to declare if
+// voxel is fluid or solid).
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::allocate_solid()
+{
+	// allocate inout arrays (host & device):
+	solidH = (int*)malloc(nVoxels*sizeof(int));
+	cudaMalloc((void **) &solid, nVoxels*sizeof(int));	
+	solidFlag = true;
+}
+
+
+
+// --------------------------------------------------------
 // Deallocate arrays:
 // --------------------------------------------------------
 
@@ -155,6 +171,9 @@ void class_scsp_D3Q19::deallocate()
 	}
 	if (inoutFlag) {
 		free(inoutH);
+	}
+	if (solidFlag) {
+		free(solidH);
 	}
 			
 	// free array memory (device):
@@ -180,6 +199,9 @@ void class_scsp_D3Q19::deallocate()
 	}
 	if (inoutFlag) {
 		cudaFree(inout);
+	}	
+	if (solidFlag) {
+		cudaFree(solid);
 	}	
 }
 
@@ -209,6 +231,17 @@ void class_scsp_D3Q19::memcopy_host_to_device()
 void class_scsp_D3Q19::memcopy_host_to_device_iolets()
 {
 	cudaMemcpy(iolets, ioletsH, sizeof(iolet)*numIolets, cudaMemcpyHostToDevice);
+}
+
+
+
+// --------------------------------------------------------
+// Copy arrays from host to device (just solid array):
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::memcopy_host_to_device_solid()
+{
+    cudaMemcpy(solid, solidH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
 }
 
 
@@ -278,6 +311,18 @@ void class_scsp_D3Q19::create_lattice_box_periodic()
 void class_scsp_D3Q19::create_lattice_box_shear()
 {
 	build_box_lattice_shear_D3Q19(nVoxels,Nx,Ny,Nz,voxelTypeH,nListH);
+}
+
+
+
+// --------------------------------------------------------
+// Initialize lattice as a "box" with periodic BC's, and
+// internal solid walls:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::create_lattice_box_periodic_solid_walls()
+{
+	build_box_lattice_solid_walls_D3Q19(nVoxels,Nx,Ny,Nz,voxelTypeH,solidH,nListH);
 }
 
 
@@ -372,6 +417,11 @@ void class_scsp_D3Q19::setW(int i, float val)
 void class_scsp_D3Q19::setR(int i, float val)
 {
 	rH[i] = val;
+}
+
+void class_scsp_D3Q19::setS(int i, int val)
+{
+	solidH[i] = val;
 }
 
 void class_scsp_D3Q19::setVoxelType(int i, int val)
@@ -499,11 +549,12 @@ void class_scsp_D3Q19::stream_collide_save_forcing(int nBlocks, int nThreads)
 // Call to "scsp_stream_collide_save_forcing_dt_D3Q19" kernel:
 // --------------------------------------------------------
 
-void class_scsp_D3Q19::stream_collide_save_forcing_dt(int nBlocks, int nThreads)
+void class_scsp_D3Q19::stream_collide_save_forcing_solid(int nBlocks, int nThreads)
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
-	scsp_stream_collide_save_forcing_dt_D3Q19 
-	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,Fx,Fy,Fz,streamIndex,voxelType,iolets,nu,dt,nVoxels);
+	if (!solidFlag) cout << "Warning: LBM solid arrays have not been initialized" << endl;
+	scsp_stream_collide_save_forcing_solid_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,Fx,Fy,Fz,streamIndex,voxelType,solid,iolets,nu,dt,nVoxels);
 	float* temp = f1;
 	f1 = f2;
 	f2 = temp;
@@ -612,6 +663,20 @@ void class_scsp_D3Q19::zero_forces_with_IBM(int nBlocks, int nThreads)
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	scsp_zero_forces_D3Q19
 	<<<nBlocks,nThreads>>> (Fx,Fy,Fz,uIBvox,vIBvox,wIBvox,weights,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_add_body_forces_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::add_body_force(float bx, float by, float bz, int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	if (!solidFlag) cout << "Warning: LBM solid arrays have not been initialized" << endl;
+	scsp_add_body_force_D3Q19 
+	<<<nBlocks,nThreads>>> (bx,by,bz,Fx,Fy,Fz,solid,nVoxels);
 }
 
 

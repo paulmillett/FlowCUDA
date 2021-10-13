@@ -717,6 +717,7 @@ __global__ void unwrap_node_coordinates_IBM3D(
 	cell* cells,
 	int* cellIDs,
 	float3 Box,
+	int3 pbcFlag,
 	int nNodes)
 {
 	// define node:
@@ -725,7 +726,7 @@ __global__ void unwrap_node_coordinates_IBM3D(
 		int c = cellIDs[i];
 		int j = cells[c].refNode;
 		float3 rij = r[j] - r[i];		
-		r[i] = r[i] + roundf(rij/Box)*Box; // PBC's
+		r[i] = r[i] + roundf(rij/Box)*Box*pbcFlag; // PBC's
 	}
 }
 
@@ -738,12 +739,13 @@ __global__ void unwrap_node_coordinates_IBM3D(
 __global__ void wrap_node_coordinates_IBM3D(
 	float3* r,	
 	float3 Box,
+	int3 pbcFlag,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {	
-		r[i] = r[i] - floorf(r[i]/Box)*Box;		
+		r[i] = r[i] - floorf(r[i]/Box)*Box*pbcFlag;		
 	}
 }
 

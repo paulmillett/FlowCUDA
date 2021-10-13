@@ -34,6 +34,7 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	Box.x = float(N.x);   // assume dx=1
 	Box.y = float(N.y);
 	Box.z = float(N.z);
+	pbcFlag = make_int3(1,1,1);  
 		
 	// if we need bins, do some calculations:
 	binsFlag = false;
@@ -156,6 +157,17 @@ void class_membrane_ibm3D::memcopy_device_to_host()
 void class_membrane_ibm3D::read_ibm_information(std::string tagname)
 {
 	read_ibm_information_long(tagname,nNodesPerCell,nFacesPerCell,nEdgesPerCell,rH,facesH,edgesH);
+}
+
+
+
+// --------------------------------------------------------
+// set pbcFlag values:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::set_pbcFlag(int x, int y, int z)
+{
+	pbcFlag.x = x; pbcFlag.y = y; pbcFlag.z = z;
 }
 
 
@@ -416,7 +428,7 @@ void class_membrane_ibm3D::relax_node_positions(int nIts, float scale, float M, 
 	// make sure node coordinates are wrapped for 
 	// PBC's prior to building bin-lists the first time:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
 	
 	// iterate to relax node positions while scaling equilibirum
 	// cell size:
@@ -450,7 +462,7 @@ void class_membrane_ibm3D::relax_node_positions_skalak(int nIts, float scale, fl
 	// make sure node coordinates are wrapped for 
 	// PBC's prior to building bin-lists the first time:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
 	
 	// iterate to relax node positions while scaling equilibirum
 	// cell size:
@@ -479,7 +491,7 @@ void class_membrane_ibm3D::update_node_positions_vacuum(float M, int nBlocks, in
 	<<<nBlocks,nThreads>>> (r,f,M,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
 }
 
 
@@ -494,7 +506,7 @@ void class_membrane_ibm3D::update_node_positions(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (r,v,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
 }
 
 
@@ -509,7 +521,7 @@ void class_membrane_ibm3D::update_node_positions_dt(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (r,v,dt,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,nNodes);	
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
 }
 
 
@@ -605,7 +617,7 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 	
 	// Second, unwrap node coordinates:
 	unwrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Box,nNodes);	
+	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Box,pbcFlag,nNodes);	
 					
 	// Third, compute the area dilation force for each face:
 	compute_node_force_membrane_area_IBM3D
@@ -628,7 +640,7 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 		
 	// Seventh, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,nNodes);
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);
 			
 }
 
@@ -650,7 +662,7 @@ void class_membrane_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 	
 	// Second, unwrap node coordinates:
 	unwrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Box,nNodes);	
+	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Box,pbcFlag,nNodes);	
 					
 	// Third, compute the Skalak forces for each face:
 	compute_node_force_membrane_skalak_IBM3D
@@ -666,7 +678,7 @@ void class_membrane_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 			
 	// Sixth, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,nNodes);
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);
 			
 }
 
@@ -738,7 +750,7 @@ void class_membrane_ibm3D::unwrap_node_coordinates()
 		int c = cellIDsH[i];
 		int j = cellsH[c].refNode;
 		float3 rij = rH[j] - rH[i];
-		rH[i] = rH[i] + roundf(rij/Box)*Box; // PBC's		
+		rH[i] = rH[i] + roundf(rij/Box)*Box*pbcFlag; // PBC's		
 	}	
 }
 

@@ -35,6 +35,7 @@ class class_membrane_ibm3D {
 	float C;
 	float dt;
 	float3 Box;
+	int3 pbcFlag;
 	bool binsFlag;
 			
 	// host arrays:
@@ -64,6 +65,7 @@ class class_membrane_ibm3D {
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
 	void read_ibm_information(std::string);
+	void set_pbcFlag(int,int,int);
 	void assign_refNode_to_cells();
 	void assign_cellIDs_to_nodes();
 	void duplicate_cells();	

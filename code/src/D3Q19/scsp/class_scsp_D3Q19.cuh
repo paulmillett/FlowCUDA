@@ -28,6 +28,7 @@ private:
 	bool forceFlag;
 	bool velIBFlag;
 	bool inoutFlag;
+	bool solidFlag;
 	bool xyzFlag;
 		
 	// host arrays:
@@ -41,6 +42,7 @@ private:
 	int* nListH;
 	int* voxelTypeH;
 	int* streamIndexH;
+	int* solidH;
 	int* inoutH;
 	iolet* ioletsH;
 	
@@ -63,6 +65,7 @@ private:
 	int* z;
 	int* voxelType;
 	int* streamIndex;
+	int* solid;
 	int* inout;
 	iolet* iolets;
 	
@@ -76,13 +79,16 @@ public:
 	void allocate_IB_velocities();
 	void allocate_voxel_positions();
 	void allocate_inout();
+	void allocate_solid();
 	void memcopy_host_to_device();
 	void memcopy_host_to_device_iolets();
+	void memcopy_host_to_device_solid();
 	void memcopy_device_to_host();
-	void memcopy_device_to_host_inout();
+	void memcopy_device_to_host_inout();	
 	void create_lattice_box();
 	void create_lattice_box_periodic();
 	void create_lattice_box_shear();
+	void create_lattice_box_periodic_solid_walls();
 	void bounding_box_nList_construct();
 	void stream_index_push();
 	void stream_index_pull();
@@ -91,6 +97,7 @@ public:
 	void setV(int,float);
 	void setW(int,float);
 	void setR(int,float);
+	void setS(int,int);
 	void setVoxelType(int,int);
 	void setIoletU(int,float);
 	void setIoletV(int,float);
@@ -108,11 +115,12 @@ public:
 	void initial_equilibrium(int,int);
 	void stream_collide_save(int,int,bool);	
 	void stream_collide_save_forcing(int,int);
-	void stream_collide_save_forcing_dt(int,int);
+	void stream_collide_save_forcing_solid(int,int);
 	void stream_collide_save_IBforcing(int,int);
 	void set_boundary_shear_velocity(float,float,int,int);
 	void zero_forces(int,int);
 	void zero_forces_with_IBM(int,int);	
+	void add_body_force(float,float,float,int,int);	
 	void extrapolate_velocity_from_IBM(int,int,float3*,float3*,int);
 	void interpolate_velocity_to_IBM(int,int,float3*,float3*,int);
 	void extrapolate_forces_from_IBM(int,int,float3*,float3*,int);

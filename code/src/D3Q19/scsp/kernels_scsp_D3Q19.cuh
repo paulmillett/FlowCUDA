@@ -40,7 +40,18 @@ __device__ void equilibrium_populations_bb_D3Q19(
 	const float,
 	const float,
 	const int);
-														 
+
+
+__global__ void scsp_add_body_force_D3Q19(
+	float,
+	float,
+	float,
+	float*,
+	float*,
+	float*,
+	int*,
+	int);
+												 
 
 __global__ void scsp_set_boundary_shear_velocity_D3Q19(
 	float,
@@ -88,7 +99,7 @@ __global__ void scsp_stream_collide_save_forcing_D3Q19(
 	int);
 	
 	
-__global__ void scsp_stream_collide_save_forcing_dt_D3Q19(
+__global__ void scsp_stream_collide_save_forcing_solid_D3Q19(
 	float*,
 	float*,
 	float*,
@@ -98,6 +109,7 @@ __global__ void scsp_stream_collide_save_forcing_dt_D3Q19(
 	float*,
 	float*,
 	float*,
+	int*,
 	int*,
 	int*,
 	iolet*,
