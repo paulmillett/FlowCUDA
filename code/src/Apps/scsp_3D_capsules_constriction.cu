@@ -188,6 +188,7 @@ void scsp_3D_capsules_constriction::initSystem()
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();	
 	ibm.shift_node_positions(0,30.0,49.5,12.5);
+	ibm.shift_node_positions(1,90.0,49.5,12.5);
 		
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
@@ -278,7 +279,7 @@ void scsp_3D_capsules_constriction::cycleForward(int stepsPerCycle, int currentC
 				
 		// compute IBM node forces:
 		ibm.compute_node_forces_skalak(nBlocks,nThreads);
-		//ibm.nonbonded_node_interactions(nBlocks,nThreads);
+		ibm.nonbonded_node_interactions(nBlocks,nThreads);
 		//ibm.wall_forces_ydir(nBlocks,nThreads);
 				
 		// update fluid:

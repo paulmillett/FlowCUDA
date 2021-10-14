@@ -46,6 +46,7 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	    numBins.y = int(floor(N.y/sizeBins));
 	    numBins.z = int(floor(N.z/sizeBins));
 		nBins = numBins.x*numBins.y*numBins.z;
+		nnbins = 26;
 	}
 }
 
@@ -558,6 +559,10 @@ void class_membrane_ibm3D::extrapolate_force(float* fxLBM, float* fyLBM,
 
 void class_membrane_ibm3D::build_binMap(int nBlocks, int nThreads)
 {
+	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+	
+	cout << "nnbins = " << nnbins << endl;
+	
 	build_binMap_IBM3D
 	<<<nBlocks,nThreads>>> (binMap,numBins,nnbins,nBins);
 }
@@ -570,6 +575,7 @@ void class_membrane_ibm3D::build_binMap(int nBlocks, int nThreads)
 
 void class_membrane_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 {
+	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 	reset_bin_lists_IBM3D
 	<<<nBlocks,nThreads>>> (binOccupancy,binMembers,binMax,nBins);
 }
@@ -582,6 +588,7 @@ void class_membrane_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 
 void class_membrane_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 {
+	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 	build_bin_lists_IBM3D
 	<<<nBlocks,nThreads>>> (r,binOccupancy,binMembers,numBins,sizeBins,nNodes,binMax);
 }
@@ -594,9 +601,10 @@ void class_membrane_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 
 void class_membrane_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads)
 {
+	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 	nonbonded_node_interactions_IBM3D
 	<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,numBins,sizeBins,
-	                        nNodes,binMax,nnbins,Box);
+	                        nNodes,binMax,nnbins,Box,pbcFlag);
 }
 
 
@@ -685,7 +693,7 @@ void class_membrane_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
-// Call to kernel that calculates nonbonded forces:
+// Call to kernel that calculates wall forces in y-dir:
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)

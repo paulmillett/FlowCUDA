@@ -35,7 +35,8 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	int,
 	int,
 	int,
-	float3);
+	float3,
+	int3);
 
 
 __device__ inline void pairwise_interaction_forces(
@@ -43,7 +44,8 @@ __device__ inline void pairwise_interaction_forces(
 	const int, 
 	const float3*,
 	float3*,
-	float3);
+	float3,
+	int3);
 
 
 __global__ void wall_forces_ydir_IBM3D(
