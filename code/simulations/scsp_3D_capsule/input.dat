@@ -1,0 +1,51 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsule
+	nu = 0.166666666
+	shearVel = 0.05
+[]
+
+
+[IBM]
+	nNodesPerCell = 642
+	nFacesPerCell = 1280
+	nEdgesPerCell = 1920
+	nCells = 1
+	ks = 0.005
+	kb = 0.003
+	ka = 0.03
+	kv = 0.9
+	kag = 0.0 #0.9
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 216000
+	Nx = 60
+	Ny = 60
+	Nz = 60
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 3000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 1
+	jskip = 1
+	kskip = 1 
+[]
+

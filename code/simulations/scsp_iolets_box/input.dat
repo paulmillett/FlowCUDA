@@ -1,0 +1,49 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_iolets
+	nu = 0.166666666
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 320000
+	Nx = 40
+	Ny = 200
+	Nz = 40
+	flowDir = 1
+	numIolets = 2
+	yLBC = 1
+	yUBC = 2
+[]
+
+
+[Iolet1]
+	type = 14
+	rBC = 1.0
+[]
+
+
+[Iolet2]
+	type = 3
+	vBC = -0.01
+[]
+
+
+[Time]
+	nSteps = 1000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+[]
+

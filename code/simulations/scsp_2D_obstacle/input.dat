@@ -1,0 +1,54 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_2D_obstacle
+	nu = 0.166666666
+[]
+
+
+[IBM]
+	nNodes = 36
+	kstiff = 0.03
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 30000
+	Nx = 300
+	Ny = 100
+	flowDir = 0
+	numIolets = 2
+	xLBC = 1
+	xUBC = 2
+[]
+
+
+[Iolet1]
+	type = 2
+	uBC = 0.01
+[]
+
+
+[Iolet2]
+	type = 11
+	rBC = 1.0
+[]
+
+
+[Time]
+	nSteps = 100000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+[]
+

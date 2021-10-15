@@ -1,0 +1,54 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_2D_expand
+	nu = 0.166666666
+[]
+
+
+[IBM]
+	nNodes = 120
+	kstiff = 0.1
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 40000
+	Nx = 200
+	Ny = 200
+	flowDir = 1
+	numIolets = 2
+	yLBC = 1
+	yUBC = 2
+[]
+
+
+[Iolet1]
+	type = 14
+	rBC = 1.0
+[]
+
+
+[Iolet2]
+	type = 13
+	rBC = 1.0
+[]
+
+
+[Time]
+	nSteps = 1500
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+[]
+

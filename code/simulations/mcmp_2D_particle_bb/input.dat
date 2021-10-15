@@ -1,0 +1,40 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_2D_particle_bb
+	nu = 0.166666666
+	gAB = 6.5
+	gAS = 0.0 #-0.5
+	gBS = 0.0 #0.5	
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 60000
+	Nx = 400
+	Ny = 150
+	Nz = 1	
+[]
+
+
+[Particles]
+	nParts = 1
+[]
+
+
+[Time]
+	nSteps = 30000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+[]

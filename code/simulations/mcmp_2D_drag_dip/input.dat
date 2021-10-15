@@ -1,0 +1,48 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_2D_drag_dip
+	nu = 0.166666666
+	gAB = 6.5
+	gAS = 4.5
+	gBS = 4.5
+	omega = 0.0	
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 600000
+	Nx = 800
+	Ny = 750
+	Nz = 1	
+[]
+
+
+[Particles]
+	nParts = 1
+	rApart = 0.05
+	rBpart = 0.05
+	pvel = 0.04
+	xpos = 750.0
+	ypos = 374.5
+	rInner = 10.0
+	rOuter = 15.0 
+[]
+
+
+[Time]
+	nSteps = 30000
+[]
+
+
+[Output]
+	nOutputs = 1 
+	format = structured
+	fName = macros
+[]

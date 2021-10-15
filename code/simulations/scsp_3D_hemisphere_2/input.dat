@@ -1,0 +1,58 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_hemisphere_2
+	nu = 0.1  #0.166666666
+[]
+
+
+[IBM]
+	nNodes = 5201
+	nFaces = 10240
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 8000000
+	Nx = 200
+	Ny = 200
+	Nz = 200
+	flowDir = 2
+	numIolets = 2
+	zLBC = 1
+	zUBC = 2
+[]
+
+
+[Iolet1]
+	type = 16
+	rBC = 1.0
+[]
+
+
+[Iolet2]
+	type = 15
+	rBC = 1.0
+[]
+
+
+[Time]
+	nSteps = 3000
+[]
+
+
+[Output]
+	nOutputs = 20
+	format = structured
+	fName = macros
+	iskip = 4
+	jskip = 4
+	kskip = 4
+[]
+

@@ -1,0 +1,48 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_2D_ellipse_shear_bb
+	nu = 0.166666666
+	gAB = 6.5
+	omega = 0.6
+	shearVel = 0.10
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 600000
+	Nx = 1000
+	Ny = 600
+	Nz = 1	
+[]
+
+
+[Particles]
+	nParts = 1
+	pvel = 0.0
+	xpos0 = 500.0
+	ypos0 = 299.5
+	a = 60.0
+	b = 40.0
+	theta = 0.7854
+	Khertz = 1.0
+	halo = 4.0
+[]
+
+
+[Time]
+	nSteps = 200000
+[]
+
+
+[Output]
+	nOutputs = 40
+	format = structured
+	fName = macros
+[]

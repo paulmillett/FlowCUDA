@@ -1,0 +1,37 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 40000
+	Nx = 200
+	Ny = 200
+	Nz = 1	
+[]
+
+
+[LBM]
+	App = mcmp_2D_basic
+	nu = 0.166666666
+	potType = 1
+	gAB = 6.5
+	initType = droplet
+	rInner = 20.0
+	rOuter = 25.0 
+[]
+
+
+[Time]
+	nSteps = 500000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+[]

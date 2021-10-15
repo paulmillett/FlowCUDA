@@ -1,0 +1,54 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_3D_capbridge_shear_bb
+	nu = 0.166666666
+	gAB = 6.5
+	omega = 0.6
+	shearVel = 0.05
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 1000000
+	Nx = 100
+	Ny = 100
+	Nz = 100	
+[]
+
+
+[Particles]
+	nParts = 2
+	pvel = 0.0
+	xpos0 = 30.0  #63.875
+	ypos0 = 49.5
+	zpos0 = 49.5
+	rad0 = 15.0
+	xpos1 = 70.0  #135.125
+	ypos1 = 49.5
+	zpos1 = 49.5
+	rad1 = 15.0
+	Khertz = 1.0
+	halo = 4.0
+[]
+
+
+[Time]
+	nSteps = 40000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2
+[]

@@ -1,0 +1,58 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_swell_ibm
+	nu = 0.166666666
+[]
+
+
+[IBM]
+	nNodes = 30153
+	nFaces = 60116
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 3052800
+	Nx = 212
+	Ny = 120
+	Nz = 120
+	flowDir = 0
+	numIolets = 2
+	xLBC = 1
+	xUBC = 2
+[]
+
+
+[Iolet1]
+	type = 2
+	uBC = 0.2
+[]
+
+
+[Iolet2]
+	type = 1
+	uBC = 0.2
+[]
+
+
+[Time]
+	nSteps = 6000 
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2
+[]
+

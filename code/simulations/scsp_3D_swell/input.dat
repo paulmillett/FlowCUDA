@@ -1,0 +1,44 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_bulge
+	nu = 0.166666666
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = file
+	nVoxels = 162151
+	numIolets = 2
+[]
+
+
+[Iolet1]
+	type = 12 #2
+	rBC = 1.04
+	#uBC = 0.02
+[]
+
+
+[Iolet2]
+	type = 11
+	rBC = 1.0
+[]
+
+
+[Time]
+	nSteps = 20000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = polydata
+	fName = macros
+[]
+

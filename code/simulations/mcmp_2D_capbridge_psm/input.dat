@@ -1,0 +1,43 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_2D_capbridge_psm
+	nu = 0.166666666
+	gAB = 6.5	
+	gAS = 4.5
+	gBS = 4.5
+	omega = -0.4
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 500000
+	Nx = 1000
+	Ny = 500
+	Nz = 1	
+[]
+
+
+[Particles]
+	nParts = 2
+	rApart = 0.05
+	rBpart = 0.05
+[]
+
+
+[Time]
+	nSteps = 25000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+[]

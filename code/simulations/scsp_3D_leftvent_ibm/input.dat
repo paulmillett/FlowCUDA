@@ -1,0 +1,58 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_leftvent_ibm
+	nu = 0.166666666
+[]
+
+
+[IBM]
+	nNodes = 53699
+	nFaces = 107242
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 4810000
+	Nx = 130
+	Ny = 370
+	Nz = 100
+	flowDir = 1
+	numIolets = 2
+	yLBC = 1
+	yUBC = 2
+[]
+
+
+[Iolet1]
+	type = 3
+	vBC = -0.20
+[]
+
+
+[Iolet2]
+	type = 3
+	vBC = 0.20
+[]
+
+
+[Time]
+	nSteps = 6000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2
+[]
+

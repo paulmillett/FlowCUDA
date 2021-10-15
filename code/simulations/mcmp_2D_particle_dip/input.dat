@@ -1,0 +1,43 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_2D_particle_dip
+	nu = 0.166666666
+	gAB = 6.5
+	gAS = 4.5
+	gBS = 4.5
+	omega = 0.0	
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 60000
+	Nx = 400
+	Ny = 150
+	Nz = 1	
+[]
+
+
+[Particles]
+	nParts = 1
+	rApart = 0.05
+	rBpart = 0.05
+[]
+
+
+[Time]
+	nSteps = 20000
+[]
+
+
+[Output]
+	nOutputs = 20
+	format = structured
+	fName = macros
+[]

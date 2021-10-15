@@ -1,0 +1,40 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_2D_dropsurface
+	nu = 0.166666666
+	potType = 1
+	gAB = 7.0
+	gAS = 4.0  
+	gBS = 7.0
+	rAinS = 0.16
+	rBinS = 0.05
+	rInner = 25.0
+	rOuter = 30.0 
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 60000
+	Nx = 400
+	Ny = 150
+	Nz = 1	
+[]
+
+
+[Time]
+	nSteps = 10000
+[]
+
+
+[Output]
+	nOutputs = 10  
+	format = structured
+	fName = macros
+[]

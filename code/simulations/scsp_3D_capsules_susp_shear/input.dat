@@ -1,0 +1,53 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsules_susp_shear
+	nu = 0.166666666
+	shearVel = 0.02
+[]
+
+
+[IBM]
+	nNodesPerCell = 642
+	nFacesPerCell = 1280
+	nEdgesPerCell = 1920
+	nCells = 72
+	ks = 0.0005
+	kb = 0.003 
+	ka = 0.0007
+	kv = 0.9
+	kag = 0.0
+	sizeBins = 4.0
+	binMax = 35
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 1728000
+	Nx = 120
+	Ny = 120
+	Nz = 120
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 100000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+

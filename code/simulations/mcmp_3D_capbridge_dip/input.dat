@@ -1,0 +1,43 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_3D_capbridge_dip
+	nu = 0.166666666
+	gAB = 6.5	
+	gAS = 4.5
+	gBS = 4.5
+	omega = -0.4
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 4500000
+	Nx = 200
+	Ny = 150
+	Nz = 150	
+[]
+
+
+[Particles]
+	nParts = 2
+	rApart = 0.05
+	rBpart = 0.05
+[]
+
+
+[Time]
+	nSteps = 10000
+[]
+
+
+[Output]
+	nOutputs = 1
+	format = structured
+	fName = macros
+[]

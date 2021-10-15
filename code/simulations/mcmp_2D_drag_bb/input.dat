@@ -1,0 +1,44 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_2D_drag_bb
+	nu = 0.166666666
+	gAB = 6.5
+	gAS = 0.0
+	gBS = 0.0
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 80000
+	Nx = 100 #800
+	Ny = 800 #100
+	Nz = 1	
+[]
+
+
+[Particles]
+	nParts = 1
+	pvel = 0.00667
+	xpos = 49.5 #750.0
+	ypos = 750.0 #49.5
+	rad = 20.0
+[]
+
+
+[Time]
+	nSteps = 20000
+[]
+
+
+[Output]
+	nOutputs = 20
+	format = structured
+	fName = macros
+[]

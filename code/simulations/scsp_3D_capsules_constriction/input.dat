@@ -1,0 +1,58 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsules_constriction
+	nu = 0.166666666
+	bodyForx = 0.00001
+[]
+
+
+[IBM]
+	nNodesPerCell = 642
+	nFacesPerCell = 1280
+	nEdgesPerCell = 1920
+	nCells = 2
+	ks = 0.001
+	C = 1.0
+	kb = 0.001 
+	ka = 0.0007
+	kv = 0.9
+	kag = 0.0
+	sizeBins = 4.0
+	binMax = 35
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 1560000
+	Nx = 600
+	Ny = 100
+	Nz = 26
+	iNarBegin = 200
+	iNarEnd = 400
+	jNarBegin = 33
+	jNarEnd = 66
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 300000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+

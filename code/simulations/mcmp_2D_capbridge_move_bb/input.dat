@@ -1,0 +1,48 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = mcmp_2D_capbridge_move_bb
+	nu = 0.166666666
+	gAB = 6.5
+	omega = 0.6
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 180000
+	Nx = 600
+	Ny = 300
+	Nz = 1	
+[]
+
+
+[Particles]
+	nParts = 2
+	pvel = 0.002
+	xpos0 = 230.0
+	ypos0 = 149.5
+	rad0 = 60.0
+	xpos1 = 370.0
+	ypos1 = 149.5
+	rad1 = 60.0
+	Khertz = 1.0
+	halo = 4.0
+[]
+
+
+[Time]
+	nSteps = 20000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+[]
