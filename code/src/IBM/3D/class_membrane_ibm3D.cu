@@ -838,7 +838,7 @@ void class_membrane_ibm3D::unwrap_node_coordinates()
 
 // --------------------------------------------------------
 // Calculate various geometry properties of capsules,
-// including center-of-mass, Taylor deformation index, ...
+// including center-of-mass, Taylor deformation index, etc.
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::membrane_geometry_analysis()
@@ -849,10 +849,13 @@ void class_membrane_ibm3D::membrane_geometry_analysis()
 	float*  D13 = (float*)malloc(nCells*sizeof(float));
 	float*  D23 = (float*)malloc(nCells*sizeof(float));
 	
-	// loop over the capsules:		
+	// Loop over the capsules, calculate center-of-mass
+	// and Taylor deformation parameter.  Here, I'm using
+	// the method described in: Eberly D, Polyhedral Mass
+	// Properties (Revisited), Geometric Tools, Redmond WA	
 	for (int c=0; c<nCells; c++) {
 		
-		float mult[10] = {1/6,1/24,1/24,1/24,1/60,1/60,1/60,1/120,1/120,1/120};
+		float mult[10] = {1.0/6.0,1.0/24.0,1.0/24.0,1.0/24.0,1.0/60.0,1.0/60.0,1.0/60.0,1.0/120.0,1.0/120.0,1.0/120.0};
 		float intg[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 		
 		for (int f=0; f<nFacesPerCell; f++) {
@@ -897,7 +900,7 @@ void class_membrane_ibm3D::membrane_geometry_analysis()
 			intg[6] += d2*f3z;
 			intg[7] += d0*(y0*g0x + y1*g1x + y2*g2x);
 			intg[8] += d1*(z0*g0y + z1*g1y + z2*g2y);
-			intg[9] += d2*(x0*g0z + x1*g1z + x2*g2z);   
+			intg[9] += d2*(x0*g0z + x1*g1z + x2*g2z); 			
 		}
 		
 		for (int i=0; i<10; i++) intg[i] *= mult[i];
@@ -908,6 +911,8 @@ void class_membrane_ibm3D::membrane_geometry_analysis()
 		com[c].x = intg[1]/mass;
 		com[c].y = intg[2]/mass;
 		com[c].z = intg[3]/mass;
+		
+		cout << "Volume = " << V << endl;
 		
 		// inertia tensor relative to center of mass:
 		float Ixx = intg[5] + intg[6] - mass*(com[c].y*com[c].y + com[c].z*com[c].z);
@@ -935,7 +940,9 @@ void class_membrane_ibm3D::membrane_geometry_analysis()
 		D12[c] = (L1-L2)/(L1+L2);
 		D13[c] = (L1-L3)/(L1+L3);
 		D23[c] = (L2-L3)/(L2+L3);
-
+		
+		cout << D12[c] << " " << D13[c] << " " << D23[c] << endl;
+		
 		// calculate the inclination angle:
 		//phi = 0.5*atan(2*Ixy/(Ixx-Iyy));
 		//phi = phi/pi;

@@ -235,10 +235,10 @@ void scsp_3D_capsule_skalak::cycleForward(int stepsPerCycle, int currentCycle)
 
 void scsp_3D_capsule_skalak::writeOutput(std::string tagname, int step)
 {	
-	// ----------------------------------------------
-	// decide which VTK file format to use for output
-	// ----------------------------------------------
+	// analyze the capsule:
+	ibm.membrane_geometry_analysis();
 	
+	// write output for LBM and IBM:	
 	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
 	ibm.write_output("ibm",step);		
 }
