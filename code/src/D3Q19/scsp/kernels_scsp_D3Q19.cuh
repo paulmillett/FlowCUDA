@@ -42,7 +42,7 @@ __device__ void equilibrium_populations_bb_D3Q19(
 	const int);
 
 
-__global__ void scsp_add_body_force_D3Q19(
+__global__ void scsp_add_body_force_solid_D3Q19(
 	float,
 	float,
 	float,
@@ -50,6 +50,16 @@ __global__ void scsp_add_body_force_D3Q19(
 	float*,
 	float*,
 	int*,
+	int);
+	
+	
+__global__ void scsp_add_body_force_D3Q19(
+	float,
+	float,
+	float,
+	float*,
+	float*,
+	float*,
 	int);
 												 
 

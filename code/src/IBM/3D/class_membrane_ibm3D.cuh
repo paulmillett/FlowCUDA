@@ -91,10 +91,13 @@ class class_membrane_ibm3D {
 	void compute_node_forces(int,int);
 	void compute_node_forces_skalak(int,int);
 	void wall_forces_ydir(int,int);
+	void wall_forces_ydir_zdir(int,int);
 	void change_cell_volume(float,int,int);
 	void scale_equilibrium_cell_size(float,int,int); 
 	void scale_edge_lengths(float,int,int);
 	void unwrap_node_coordinates();
+	void membrane_geometry_analysis();
+	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);
 	
 };
 

@@ -157,6 +157,30 @@ __global__ void scsp_add_body_force_D3Q19(
 	float* fx,
 	float* fy,
 	float* fz,
+	int nVoxels)
+{
+	// define current voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
+	if (i < nVoxels) {	
+		fx[i] += bx;
+		fy[i] += by;
+		fz[i] += bz;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 add body force to fluid nodes:
+// --------------------------------------------------------
+
+__global__ void scsp_add_body_force_solid_D3Q19(
+	float bx,
+	float by,
+	float bz,
+	float* fx,
+	float* fy,
+	float* fz,
 	int* solid,
 	int nVoxels)
 {

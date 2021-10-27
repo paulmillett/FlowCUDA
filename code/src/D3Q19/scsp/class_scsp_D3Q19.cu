@@ -316,6 +316,18 @@ void class_scsp_D3Q19::create_lattice_box_shear()
 
 
 // --------------------------------------------------------
+// Initialize lattice as a "box" set up for channel flow
+// in the x-direction:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::create_lattice_box_channel()
+{
+	build_box_lattice_channel_D3Q19(nVoxels,Nx,Ny,Nz,voxelTypeH,nListH);
+}
+
+
+
+// --------------------------------------------------------
 // Initialize lattice as a "box" with periodic BC's, and
 // internal solid walls:
 // --------------------------------------------------------
@@ -674,8 +686,21 @@ void class_scsp_D3Q19::zero_forces_with_IBM(int nBlocks, int nThreads)
 void class_scsp_D3Q19::add_body_force(float bx, float by, float bz, int nBlocks, int nThreads)
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
-	if (!solidFlag) cout << "Warning: LBM solid arrays have not been initialized" << endl;
 	scsp_add_body_force_D3Q19 
+	<<<nBlocks,nThreads>>> (bx,by,bz,Fx,Fy,Fz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_add_body_forces_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::add_body_force_with_solid(float bx, float by, float bz, int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	if (!solidFlag) cout << "Warning: LBM solid arrays have not been initialized" << endl;
+	scsp_add_body_force_solid_D3Q19 
 	<<<nBlocks,nThreads>>> (bx,by,bz,Fx,Fy,Fz,solid,nVoxels);
 }
 

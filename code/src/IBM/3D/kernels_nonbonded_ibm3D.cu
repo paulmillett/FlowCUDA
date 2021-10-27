@@ -210,6 +210,50 @@ __global__ void wall_forces_ydir_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void wall_forces_ydir_zdir_IBM3D(
+	float3* R,
+	float3* F,
+	float3 Box,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		const float d = 2.0;
+		const float A = 2.0;
+		const float yi = R[i].y;
+		const float zi = R[i].z;
+		// bottom wall
+		if (yi < d) {
+			const float force = A/pow(yi,2) - A/pow(d,2);
+			F[i].y += force;
+		}
+		// top wall
+		else if (yi > Box.y-d) {
+			const float bmyi = Box.y - yi;
+			const float force = A/pow(bmyi,2) - A/pow(d,2);
+			F[i].y -= force;
+		}
+		// back wall
+		if (zi < d) {
+			const float force = A/pow(zi,2) - A/pow(d,2);
+			F[i].z += force;
+		}
+		// front wall
+		else if (zi > Box.z-d) {
+			const float bmzi = Box.z - zi;
+			const float force = A/pow(bmzi,2) - A/pow(d,2);
+			F[i].z -= force;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to build the binMap array:
 // --------------------------------------------------------
 
@@ -274,4 +318,5 @@ __device__ inline int bin_index(
     if (k >= size.z) k -= size.z;
     return i*size.z*size.y + j*size.z + k;
 }
+
 

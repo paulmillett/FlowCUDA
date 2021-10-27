@@ -1,5 +1,5 @@
 
-# include "scsp_3D_capsules_constriction.cuh"
+# include "scsp_3D_capsules_channel.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_constriction::scsp_3D_capsules_constriction() : lbm(),ibm()
+scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -85,7 +85,6 @@ scsp_3D_capsules_constriction::scsp_3D_capsules_constriction() : lbm(),ibm()
 	
 	lbm.allocate();
 	lbm.allocate_forces();
-	lbm.allocate_solid();
 	ibm.allocate();	
 	
 }
@@ -96,7 +95,7 @@ scsp_3D_capsules_constriction::scsp_3D_capsules_constriction() : lbm(),ibm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_constriction::~scsp_3D_capsules_constriction()
+scsp_3D_capsules_channel::~scsp_3D_capsules_channel()
 {
 	lbm.deallocate();
 	ibm.deallocate();	
@@ -108,7 +107,7 @@ scsp_3D_capsules_constriction::~scsp_3D_capsules_constriction()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_constriction::initSystem()
+void scsp_3D_capsules_channel::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -117,51 +116,12 @@ void scsp_3D_capsules_constriction::initSystem()
 	
 	GetPot inputParams("input.dat");
 	string latticeSource = inputParams("Lattice/source","box");	
-	
+		
 	// ----------------------------------------------
-	// define solid voxels:
+	// create the lattice for channel flow:
 	// ----------------------------------------------	
 	
-	int iNarBegin = inputParams("Lattice/iNarBegin",0);
-	int iNarEnd = inputParams("Lattice/iNarEnd",Nx-1);
-	int jNarBegin = inputParams("Lattice/jNarBegin",0);
-	int jNarEnd = inputParams("Lattice/jNarEnd",Ny-1);
-	
-	for (int k=0; k<Nz; k++) {
-		for (int j=0; j<Ny; j++) {
-			for (int i=0; i<Nx; i++) {		
-				int ndx = k*Nx*Ny + j*Nx + i;	
-				// default fluid nodes:
-				lbm.setR(ndx,1.0);
-				lbm.setS(ndx,0);
-				// top/bottom walls:
-				if (k == 0 || k == Nz-1) {
-					lbm.setR(ndx,0.0);
-					lbm.setS(ndx,1);
-				}
-				if (j == 0 || j == Ny-1) {
-					lbm.setR(ndx,0.0);
-					lbm.setS(ndx,1);
-				}
-				// constriction:
-				if (i >= iNarBegin && i <= iNarEnd && j < jNarBegin) {
-					lbm.setR(ndx,0.0);
-					lbm.setS(ndx,1);
-				}
-				if (i >= iNarBegin && i <= iNarEnd && j > jNarEnd) {
-					lbm.setR(ndx,0.0);
-					lbm.setS(ndx,1);
-				}				
-			}
-		}
-	}
-	
-	// ----------------------------------------------
-	// create the lattice taking into account solid
-	// walls:
-	// ----------------------------------------------	
-	
-	lbm.create_lattice_box_periodic_solid_walls();
+	lbm.create_lattice_box_channel();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -176,7 +136,8 @@ void scsp_3D_capsules_constriction::initSystem()
 	for (int i=0; i<nVoxels; i++) {
 		lbm.setU(i,0.0);
 		lbm.setV(i,0.0);
-		lbm.setW(i,0.0);		
+		lbm.setW(i,0.0);
+		lbm.setR(i,1.0);		
 	}
 	
 	// ----------------------------------------------			
@@ -187,9 +148,7 @@ void scsp_3D_capsules_constriction::initSystem()
 	ibm.duplicate_cells();
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();	
-	ibm.shift_node_positions(0,30.0,49.5,12.5);
-	ibm.shift_node_positions(1,90.0,49.5,12.5);
-		
+			
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
@@ -201,7 +160,6 @@ void scsp_3D_capsules_constriction::initSystem()
 	// ----------------------------------------------
 	
 	lbm.memcopy_host_to_device();
-	lbm.memcopy_host_to_device_solid();
 	ibm.memcopy_host_to_device();
 		
 	// ----------------------------------------------
@@ -219,23 +177,19 @@ void scsp_3D_capsules_constriction::initSystem()
 	// ----------------------------------------------
 	// shrink and randomly disperse cells: 
 	// ----------------------------------------------
-	
-	/*
+		
 	float scale = 0.7;
 	ibm.shrink_and_randomize_cells(scale,16.0,11.0);
 	ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
-	*/
-	
+		
 	// ----------------------------------------------
 	// relax node positions: 
 	// ----------------------------------------------
-	
-	/*	
+			
 	scale = 1.0/0.7;
 	ibm.relax_node_positions_skalak(90000,scale,0.02,nBlocks,nThreads);	
 	ibm.relax_node_positions_skalak(90000,1.0,0.02,nBlocks,nThreads);
-	*/
-				
+					
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
@@ -253,7 +207,7 @@ void scsp_3D_capsules_constriction::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_capsules_constriction::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -280,12 +234,12 @@ void scsp_3D_capsules_constriction::cycleForward(int stepsPerCycle, int currentC
 		// compute IBM node forces:
 		ibm.compute_node_forces_skalak(nBlocks,nThreads);
 		ibm.nonbonded_node_interactions(nBlocks,nThreads);
-		//ibm.wall_forces_ydir(nBlocks,nThreads);
+		ibm.wall_forces_ydir_zdir(nBlocks,nThreads);
 				
 		// update fluid:
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
-		lbm.add_body_force_with_solid(bodyForx,0.0,0.0,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);
+		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+		lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		
 		// update membrane:
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
@@ -318,7 +272,7 @@ void scsp_3D_capsules_constriction::cycleForward(int stepsPerCycle, int currentC
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_capsules_constriction::writeOutput(std::string tagname, int step)
+void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 {	
 	// ----------------------------------------------
 	// decide which VTK file format to use for output

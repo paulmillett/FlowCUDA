@@ -1,6 +1,7 @@
 
 # include "class_membrane_ibm3D.cuh"
 # include "../../IO/GetPot"
+# include "../../Utils/eig3.cuh"
 # include <math.h>
 using namespace std;  
 
@@ -147,7 +148,29 @@ void class_membrane_ibm3D::memcopy_device_to_host()
 	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);	
 	//cudaMemcpy(facesH, faces, sizeof(triangle)*nFaces, cudaMemcpyDeviceToHost);
 	//cudaMemcpy(edgesH, edges, sizeof(edge)*nEdges, cudaMemcpyDeviceToHost);
+	
+	// unwrap coordinate positions:
+	unwrap_node_coordinates(); 
 }
+
+
+
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Initialization Stuff...
+// **********************************************************************************************
+
+
+
+
+
+
 
 
 
@@ -270,7 +293,7 @@ void class_membrane_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 			// get random position
 			shift.x = (float)rand()/RAND_MAX*Box.x;
 			shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
-			shift.z = (float)rand()/RAND_MAX*Box.z;
+			shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
 			// check with other cells
 			for (int d=0; d<c; d++) {
 				float sep = calc_separation_pbc(shift,cellCOM[d]);
@@ -351,9 +374,6 @@ void class_membrane_ibm3D::rotate_and_shift_node_positions(int cellID, float xsh
 
 void class_membrane_ibm3D::write_output(std::string tagname, int tagnum)
 {
-	// first unwrap coordinate positions:
-	unwrap_node_coordinates(); 
-	// write ouput:
 	write_vtk_immersed_boundary_3D(tagname,tagnum,
 	nNodes,nFaces,rH,facesH);
 }
@@ -367,9 +387,6 @@ void class_membrane_ibm3D::write_output(std::string tagname, int tagnum)
 
 void class_membrane_ibm3D::write_output_long(std::string tagname, int tagnum)
 {
-	// first unwrap coordinate positions:
-	unwrap_node_coordinates(); 
-	// write ouput:
 	write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
 	nNodes,nFaces,nEdges,rH,facesH,edgesH);
 }
@@ -479,6 +496,26 @@ void class_membrane_ibm3D::relax_node_positions_skalak(int nIts, float scale, fl
 		cudaDeviceSynchronize();
 	}	
 }
+
+
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Calls to CUDA kernels for main calculations
+// **********************************************************************************************
+
+
+
+
+
+
+
+
 
 
 
@@ -705,6 +742,19 @@ void class_membrane_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to kernel that calculates wall forces in y-dir
+// and z-dir:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
+{
+	wall_forces_ydir_zdir_IBM3D
+	<<<nBlocks,nThreads>>> (r,f,Box,nNodes);
+}
+
+
+
+// --------------------------------------------------------
 // Call to kernel that changes the default cell volume:
 // --------------------------------------------------------
 
@@ -747,6 +797,28 @@ void class_membrane_ibm3D::scale_edge_lengths(float scale, int nBlocks, int nThr
 
 
 
+
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Analysis and Geometry calculations done by the host (CPU)
+// **********************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
 // --------------------------------------------------------
 // Unwrap node coordinates based on difference between node
 // position and the cell's reference node position:
@@ -763,5 +835,146 @@ void class_membrane_ibm3D::unwrap_node_coordinates()
 }
 
 
+
+// --------------------------------------------------------
+// Calculate various geometry properties of capsules,
+// including center-of-mass, Taylor deformation index, ...
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::membrane_geometry_analysis()
+{
+	// allocate arrays:
+	float3* com = (float3*)malloc(nCells*sizeof(float3));
+	float*  D12 = (float*)malloc(nCells*sizeof(float));
+	float*  D13 = (float*)malloc(nCells*sizeof(float));
+	float*  D23 = (float*)malloc(nCells*sizeof(float));
+	
+	// loop over the capsules:		
+	for (int c=0; c<nCells; c++) {
+		
+		float mult[10] = {1/6,1/24,1/24,1/24,1/60,1/60,1/60,1/120,1/120,1/120};
+		float intg[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+		
+		for (int f=0; f<nFacesPerCell; f++) {
+			// get vertices of triangle i:
+			int fID = f + c*nFacesPerCell;
+			int v0 = facesH[fID].v0;
+			int v1 = facesH[fID].v1;
+			int v2 = facesH[fID].v2;
+			float x0 = rH[v0].x;
+			float y0 = rH[v0].y;
+			float z0 = rH[v0].z;
+			float x1 = rH[v1].x;
+			float y1 = rH[v1].y;
+			float z1 = rH[v1].z;
+			float x2 = rH[v2].x;
+			float y2 = rH[v2].y;
+			float z2 = rH[v2].z;
+			// get edges and cross product of edges:
+			float a1 = x1-x0;
+			float b1 = y1-y0;
+			float c1 = z1-z0;
+			float a2 = x2-x0;
+			float b2 = y2-y0;
+			float c2 = z2-z0;
+			float d0 = b1*c2-b2*c1;
+			float d1 = a2*c1-a1*c2;
+			float d2 = a1*b2-a2*b1;
+			// compute integral terms:
+			float f1x,f2x,f3x,g0x,g1x,g2x;
+			float f1y,f2y,f3y,g0y,g1y,g2y;
+			float f1z,f2z,f3z,g0z,g1z,g2z;
+			subexpressions(x0,x1,x2,f1x,f2x,f3x,g0x,g1x,g2x);
+			subexpressions(y0,y1,y2,f1y,f2y,f3y,g0y,g1y,g2y);
+			subexpressions(z0,z1,z2,f1z,f2z,f3z,g0z,g1z,g2z);
+			// update integrals:
+			intg[0] += d0*f1x;
+			intg[1] += d0*f2x;
+			intg[2] += d1*f2y;
+			intg[3] += d2*f2z;
+			intg[4] += d0*f3x;
+			intg[5] += d1*f3y;
+			intg[6] += d2*f3z;
+			intg[7] += d0*(y0*g0x + y1*g1x + y2*g2x);
+			intg[8] += d1*(z0*g0y + z1*g1y + z2*g2y);
+			intg[9] += d2*(x0*g0z + x1*g1z + x2*g2z);   
+		}
+		
+		for (int i=0; i<10; i++) intg[i] *= mult[i];
+		
+		// center of mass:
+		float mass = intg[0];
+		float V = mass;   // assume density = 1
+		com[c].x = intg[1]/mass;
+		com[c].y = intg[2]/mass;
+		com[c].z = intg[3]/mass;
+		
+		// inertia tensor relative to center of mass:
+		float Ixx = intg[5] + intg[6] - mass*(com[c].y*com[c].y + com[c].z*com[c].z);
+		float Iyy = intg[4] + intg[6] - mass*(com[c].z*com[c].z + com[c].x*com[c].x);
+		float Izz = intg[4] + intg[5] - mass*(com[c].x*com[c].x + com[c].y*com[c].y);
+		float Ixy = -(intg[7] - mass*com[c].x*com[c].y);
+		float Iyz = -(intg[8] - mass*com[c].y*com[c].z);
+		float Ixz = -(intg[9] - mass*com[c].x*com[c].z);
+		float I[3][3] = {{Ixx,Ixy,Ixz}, {Ixy,Iyy,Iyz}, {Ixz,Iyz,Izz}};
+		
+		// calculate longest and shortest axes of capsule:
+		// S = sqrt((5/2/V)*(Ixx + Iyy - sqrt((Ixx-Iyy)^2 + 4*Ixy^2))/2);
+		// L = sqrt((5/2/V)*(Ixx + Iyy + sqrt((Ixx-Iyy)^2 + 4*Ixy^2))/2);
+		// Dsl = (L-S)/(L+S)
+
+		// calculate eigenvalues of inertia tensor:
+		float eigvals[3] = {0.0,0.0,0.0}; 
+		float eigvecs[3][3] = {{0.0,0.0,0.0}, {0.0,0.0,0.0}, {0.0,0.0,0.0}};
+		eigen_decomposition(I,eigvecs,eigvals);
+		float L1 = sqrt(5/2/V*(eigvals[1] + eigvals[2] - eigvals[0]));
+		float L2 = sqrt(5/2/V*(eigvals[0] + eigvals[2] - eigvals[1]));
+		float L3 = sqrt(5/2/V*(eigvals[0] + eigvals[1] - eigvals[2]));
+
+		// calculate Taylor deformation parameters:
+		D12[c] = (L1-L2)/(L1+L2);
+		D13[c] = (L1-L3)/(L1+L3);
+		D23[c] = (L2-L3)/(L2+L3);
+
+		// calculate the inclination angle:
+		//phi = 0.5*atan(2*Ixy/(Ixx-Iyy));
+		//phi = phi/pi;
+						
+	}
+	
+	// print data:
+	
+	
+	// deallocate arrays:
+	free(com);
+	free(D12);
+	free(D13);
+	free(D23);
+	
+}
+
+
+
+void class_membrane_ibm3D::subexpressions(
+	const float w0,
+	const float w1,
+	const float w2,
+	float& f1,
+	float& f2,
+	float& f3,
+	float& g0,
+	float& g1,
+	float& g2)
+{
+    float temp0 = w0 + w1;
+    float temp1 = w0*w0;
+    float temp2 = temp1 + w1*temp0;
+    f1 = temp0 + w2;
+	f2 = temp2 + w2*f1;
+    f3 = w0*temp1 + w1*temp2 + w2*f2;
+    g0 = f2 + w0*(f1 + w0); 
+    g1 = f2 + w1*(f1 + w1);
+    g2 = f2 + w2*(f1 + w2);	
+}
 
 
