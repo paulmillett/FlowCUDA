@@ -2,7 +2,32 @@
 # include "class_scsp_D3Q19.cuh"
 # include "../../IO/GetPot"
 # include <math.h>
+# include <iostream>
+# include <iomanip>
+# include <fstream>
+# include <string>
+# include <sstream>
+# include <stdlib.h>
 using namespace std;  
+
+
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Constructor, destructor, and array allocations...
+// **********************************************************************************************
+
+
+
+
+
+
+
 
 
 
@@ -271,6 +296,26 @@ void class_scsp_D3Q19::memcopy_device_to_host_inout()
 
 
 
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Initialization Stuff...
+// **********************************************************************************************
+
+
+
+
+
+
+
+
+
+
 // --------------------------------------------------------
 // Initialize lattice as a "box":
 // --------------------------------------------------------
@@ -514,6 +559,26 @@ int class_scsp_D3Q19::getNList(int i)
 
 
 
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Calls to CUDA kernels for main calculations
+// **********************************************************************************************
+
+
+
+
+
+
+
+
+
+
 // --------------------------------------------------------
 // Call to "scsp_initial_equilibrium_D3Q19" kernel:
 // --------------------------------------------------------
@@ -716,6 +781,86 @@ void class_scsp_D3Q19::inside_hemisphere(int nBlocks, int nThreads)
 	inside_hemisphere_D3Q19
 	<<<nBlocks,nThreads>>> (weights,inout,Nx,Ny,Nz,nVoxels);
 }
+
+
+
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Analysis of flow field done by the host (CPU)
+// **********************************************************************************************
+
+
+
+
+
+
+
+
+
+
+void class_scsp_D3Q19::calculate_flow_rate_xdir(std::string tagname, int tagnum)
+{
+	
+	// define the file location and name:
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// create variables for this calculation:
+	float* velx = (float*)malloc(Ny*Nz*sizeof(float));
+	for (int i=0; i<Ny*Nz; i++) velx[i] = 0.0;
+	
+	// loop over grid and calculate average x-vel for each voxel
+	// on the yz-plane:
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			float vxsum = 0.0;
+			for (int i=0; i<Nx; i++) {		
+				vxsum += uH[k*Nx*Ny + j*Nx + i];
+			}
+			velx[k*Ny + j] = vxsum/float(Nx);
+		}
+	}
+	
+	// calculate overall x-dir. volumetric flow rate:
+	float Qx = 0.0;
+	for (int i=0; i<Ny*Nz; i++) Qx += velx[i];  // assume dx=dy=dz=1
+	
+	// print results:
+	outfile << fixed << setprecision(4) << Qx << endl;
+	for (int i=0; i<Ny*Nz; i++) {
+		outfile << fixed << setprecision(4) << velx[i] << endl;
+	}
+	
+}
+
+
+
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Input/output calls
+// **********************************************************************************************
+
+
+
+
+
+
+
 
 
 

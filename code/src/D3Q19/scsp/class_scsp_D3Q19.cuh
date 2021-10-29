@@ -127,6 +127,7 @@ public:
 	void interpolate_velocity_to_IBM(int,int,float3*,float3*,int);
 	void extrapolate_forces_from_IBM(int,int,float3*,float3*,int);
 	void inside_hemisphere(int,int);
+	void calculate_flow_rate_xdir(std::string,int);
 	void read_lattice_geometry(int);
 	void vtk_structured_output_ruvw(std::string,int,int,int,int);
 	void vtk_structured_output_iuvw_inout(std::string,int,int,int,int);
