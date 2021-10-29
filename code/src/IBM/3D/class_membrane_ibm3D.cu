@@ -3,7 +3,29 @@
 # include "../../IO/GetPot"
 # include "../../Utils/eig3.cuh"
 # include <math.h>
+# include <iostream>
+# include <iomanip>
+# include <fstream>
+# include <string>
+# include <sstream>
+# include <stdlib.h>
 using namespace std;  
+
+
+
+
+
+
+
+
+// **********************************************************************************************
+// Constructor, destructor, and array allocations...
+// **********************************************************************************************
+
+
+
+
+
 
 
 
@@ -49,6 +71,10 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 		nBins = numBins.x*numBins.y*numBins.z;
 		nnbins = 26;
 	}
+	
+	// create output directory
+	std::system("mkdir -p geomemoutput");
+ 	std::system("exec rm -rf geomemoutput/*.dat");  
 }
 
 
@@ -162,9 +188,12 @@ void class_membrane_ibm3D::memcopy_device_to_host()
 
 
 
+
 // **********************************************************************************************
 // Initialization Stuff...
 // **********************************************************************************************
+
+
 
 
 
@@ -841,23 +870,29 @@ void class_membrane_ibm3D::unwrap_node_coordinates()
 // including center-of-mass, Taylor deformation index, etc.
 // --------------------------------------------------------
 
-void class_membrane_ibm3D::membrane_geometry_analysis()
+void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int tagnum)
 {
-	// allocate arrays:
-	float3* com = (float3*)malloc(nCells*sizeof(float3));
-	float*  D12 = (float*)malloc(nCells*sizeof(float));
-	float*  D13 = (float*)malloc(nCells*sizeof(float));
-	float*  D23 = (float*)malloc(nCells*sizeof(float));
 	
+	// Define the file location and name:
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "geomemoutput/" << tagname << "_" << tagnum << ".dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+		
 	// Loop over the capsules, calculate center-of-mass
 	// and Taylor deformation parameter.  Here, I'm using
 	// the method described in: Eberly D, Polyhedral Mass
 	// Properties (Revisited), Geometric Tools, Redmond WA	
 	for (int c=0; c<nCells; c++) {
 		
+		float D12 = 0.0;
+		float D13 = 0.0;
+		float D23 = 0.0;
+		float3 com = make_float3(0.0,0.0,0.0);
 		float mult[10] = {1.0/6.0,1.0/24.0,1.0/24.0,1.0/24.0,1.0/60.0,1.0/60.0,1.0/60.0,1.0/120.0,1.0/120.0,1.0/120.0};
 		float intg[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
-		
+				
 		for (int f=0; f<nFacesPerCell; f++) {
 			// get vertices of triangle i:
 			int fID = f + c*nFacesPerCell;
@@ -907,56 +942,50 @@ void class_membrane_ibm3D::membrane_geometry_analysis()
 		
 		// center of mass:
 		float mass = intg[0];
-		float V = mass;   // assume density = 1
-		com[c].x = intg[1]/mass;
-		com[c].y = intg[2]/mass;
-		com[c].z = intg[3]/mass;
-		
-		cout << "Volume = " << V << endl;
+		float vol = mass;   // assume density = 1
+		com.x = intg[1]/mass;
+		com.y = intg[2]/mass;
+		com.z = intg[3]/mass;
 		
 		// inertia tensor relative to center of mass:
-		float Ixx = intg[5] + intg[6] - mass*(com[c].y*com[c].y + com[c].z*com[c].z);
-		float Iyy = intg[4] + intg[6] - mass*(com[c].z*com[c].z + com[c].x*com[c].x);
-		float Izz = intg[4] + intg[5] - mass*(com[c].x*com[c].x + com[c].y*com[c].y);
-		float Ixy = -(intg[7] - mass*com[c].x*com[c].y);
-		float Iyz = -(intg[8] - mass*com[c].y*com[c].z);
-		float Ixz = -(intg[9] - mass*com[c].x*com[c].z);
+		float Ixx = intg[5] + intg[6] - mass*(com.y*com.y + com.z*com.z);
+		float Iyy = intg[4] + intg[6] - mass*(com.z*com.z + com.x*com.x);
+		float Izz = intg[4] + intg[5] - mass*(com.x*com.x + com.y*com.y);
+		float Ixy = -(intg[7] - mass*com.x*com.y);
+		float Iyz = -(intg[8] - mass*com.y*com.z);
+		float Ixz = -(intg[9] - mass*com.x*com.z);
 		float I[3][3] = {{Ixx,Ixy,Ixz}, {Ixy,Iyy,Iyz}, {Ixz,Iyz,Izz}};
 		
 		// calculate longest and shortest axes of capsule:
-		// S = sqrt((5/2/V)*(Ixx + Iyy - sqrt((Ixx-Iyy)^2 + 4*Ixy^2))/2);
-		// L = sqrt((5/2/V)*(Ixx + Iyy + sqrt((Ixx-Iyy)^2 + 4*Ixy^2))/2);
+		// S = sqrt((5/2/vol)*(Ixx + Iyy - sqrt((Ixx-Iyy)^2 + 4*Ixy^2))/2);
+		// L = sqrt((5/2/vol)*(Ixx + Iyy + sqrt((Ixx-Iyy)^2 + 4*Ixy^2))/2);
 		// Dsl = (L-S)/(L+S)
 
 		// calculate eigenvalues of inertia tensor:
 		float eigvals[3] = {0.0,0.0,0.0}; 
 		float eigvecs[3][3] = {{0.0,0.0,0.0}, {0.0,0.0,0.0}, {0.0,0.0,0.0}};
 		eigen_decomposition(I,eigvecs,eigvals);
-		float L1 = sqrt(5/2/V*(eigvals[1] + eigvals[2] - eigvals[0]));
-		float L2 = sqrt(5/2/V*(eigvals[0] + eigvals[2] - eigvals[1]));
-		float L3 = sqrt(5/2/V*(eigvals[0] + eigvals[1] - eigvals[2]));
+		float L1 = sqrt(5/2/vol*(eigvals[1] + eigvals[2] - eigvals[0]));
+		float L2 = sqrt(5/2/vol*(eigvals[0] + eigvals[2] - eigvals[1]));
+		float L3 = sqrt(5/2/vol*(eigvals[0] + eigvals[1] - eigvals[2]));
 
 		// calculate Taylor deformation parameters:
-		D12[c] = (L1-L2)/(L1+L2);
-		D13[c] = (L1-L3)/(L1+L3);
-		D23[c] = (L2-L3)/(L2+L3);
-		
-		cout << D12[c] << " " << D13[c] << " " << D23[c] << endl;
+		D12 = (L1-L2)/(L1+L2);
+		D13 = (L1-L3)/(L1+L3);
+		D23 = (L2-L3)/(L2+L3);
 		
 		// calculate the inclination angle:
 		//phi = 0.5*atan(2*Ixy/(Ixx-Iyy));
 		//phi = phi/pi;
+		
+		// print data:
+		outfile << fixed << setprecision(4) << vol << "  " << com.x << "  " << com.y << "  " << com.z << "  "
+		        << D12 << "  " << D13 << "  " << D23 << endl;
 						
 	}
-	
-	// print data:
-	
-	
-	// deallocate arrays:
-	free(com);
-	free(D12);
-	free(D13);
-	free(D23);
+		
+	// close file
+	outfile.close();
 	
 }
 
