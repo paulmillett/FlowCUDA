@@ -91,6 +91,9 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	int* cellIDs,
 	int3 numBins,	
 	float sizeBins,
+	float repA,
+	float repD,
+	float repFmax,
 	int nNodes,
 	int binMax,
 	int nnbins,
@@ -121,12 +124,12 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			printf("Warning: linked-list bin has exceeded max capacity.  Occup. # = %i \n",occup);
 		}
 		*/
-				
+						
 		for (int k=offst; k<offst+occup; k++) {
 			int j = binMembers[k];
 			if (i==j) continue;
 			if (cellIDs[i]==cellIDs[j]) continue;
-			pairwise_interaction_forces(i,j,vertR,vertF,Box,pbcFlag);			
+			pairwise_interaction_forces(i,j,repA,repD,repFmax,vertR,vertF,Box,pbcFlag);			
 		}
 		
 		// -------------------------------
@@ -142,7 +145,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			for (int k=offst; k<offst+occup; k++) {
 				int j = binMembers[k];
 				if (cellIDs[i]==cellIDs[j]) continue;				
-				pairwise_interaction_forces(i,j,vertR,vertF,Box,pbcFlag);			
+				pairwise_interaction_forces(i,j,repA,repD,repFmax,vertR,vertF,Box,pbcFlag);			
 			}
 		}
 				
@@ -157,20 +160,21 @@ __global__ void nonbonded_node_interactions_IBM3D(
 
 __device__ inline void pairwise_interaction_forces(
 	const int i, 
-	const int j, 
+	const int j,
+	const float repA,
+	const float repD,
+	const float repFmax,
 	const float3* R,
 	float3* F,
 	float3 Box,
 	int3 pbcFlag)
 {
-	const float d = 2.0;
-	const float A = 2.0;
 	float3 rij = R[i] - R[j];
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);
-	if (r < d) {
-		float force = A/pow(r,2) - A/pow(d,2);
-		if (force > 0.2) force = 0.2;
+	if (r < repD) {
+		float force = repA/pow(r,2) - repA/pow(repD,2);
+		if (force > repFmax) force = repFmax;
 		F[i] += force*(rij/r);
 	} 	
 }
@@ -217,13 +221,15 @@ __global__ void wall_forces_ydir_zdir_IBM3D(
 	float3* R,
 	float3* F,
 	float3 Box,
+	float repA,
+	float repD,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		const float d = 2.0;
-		const float A = 2.0;
+		const float d = repD;
+		const float A = repA;
 		const float yi = R[i].y;
 		const float zi = R[i].z;
 		// bottom wall

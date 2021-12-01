@@ -240,6 +240,7 @@ void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		lbm.set_channel_wall_velocity(0.0,nBlocks,nThreads);
 		
 		// update membrane:
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
@@ -274,10 +275,11 @@ void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
 
 void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 {	
-	// ----------------------------------------------
-	// decide which VTK file format to use for output
-	// ----------------------------------------------
+	// analyze the system:
+	ibm.membrane_geometry_analysis("capdata",step);
+	lbm.calculate_flow_rate_xdir("flowdata",step);
 	
+	// write output for LBM and IBM:	
 	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
 	ibm.write_output("ibm",step);		
 }

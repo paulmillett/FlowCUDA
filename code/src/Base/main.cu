@@ -20,7 +20,8 @@ int main(int argc, char *argv[])
 	// ----------------------------------------------------
 	
 	std::system("mkdir -p vtkoutput");
- 	std::system("exec rm -rf vtkoutput/*.vtk");   
+ 	std::system("exec rm -rf vtkoutput/*.vtk");
+	std::system("exec rm -rf vtkoutput/*.dat");
 	
 	// ----------------------------------------------------
 	// create the FlowCUDA object:

@@ -242,6 +242,67 @@ __global__ void scsp_set_boundary_shear_velocity_D3Q19(float uBot,
 
 
 // --------------------------------------------------------
+// D3Q19 kernel to set the channel velocities at the y=0,
+// y=Ny-1, z=0, and z=Nz-1 boundaries.  The velocity 
+// direction is the x-dir.
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+__global__ void scsp_set_channel_wall_velocity_D3Q19(float uWall,
+													 float* f1,													   
+													 float* u,
+													 float* v,
+													 float* w,
+													 float* r,
+													 int Nx,
+													 int Ny,
+													 int Nz,
+													 int nVoxels)
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {		
+		// 3D indices assuming data is ordered first x, then y, then z
+		//int xi = i%Nx;
+		int yi = (i/Nx)%Ny;
+		int zi = i/(Nx*Ny);  
+		if (yi == 0) {
+			int offst = 19*i;
+			u[i] = uWall;
+			v[i] = 0.0;
+			w[i] = 0.0;
+			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
+		} 
+		if (yi == Ny-1) {
+			int offst = 19*i;
+			u[i] = uWall;
+			v[i] = 0.0;
+			w[i] = 0.0;
+			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
+		}		
+		if (zi == 0) {
+			int offst = 19*i;
+			u[i] = uWall;
+			v[i] = 0.0;
+			w[i] = 0.0;
+			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
+		} 
+		if (zi == Nz-1) {
+			int offst = 19*i;
+			u[i] = uWall;
+			v[i] = 0.0;
+			w[i] = 0.0;
+			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
+		}		
+	}		
+}
+
+
+
+// --------------------------------------------------------
 // D3Q19 update kernel.
 // This algorithm is based on the optimized "stream-collide-
 // save" algorithm recommended by T. Kruger in the 

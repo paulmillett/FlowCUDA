@@ -48,6 +48,9 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	kag = inputParams("IBM/kag",0.0);
 	kv = inputParams("IBM/kv",0.0);
 	C  = inputParams("IBM/C",0.0);
+	repA = inputParams("IBM/repA",0.0);
+	repD = inputParams("IBM/repD",0.0);
+	repFmax = inputParams("IBM/repFmax",0.0);
 	N.x = inputParams("Lattice/Nx",1);
 	N.y = inputParams("Lattice/Ny",1);
 	N.z = inputParams("Lattice/Nz",1);	
@@ -70,11 +73,7 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	    numBins.z = int(floor(N.z/sizeBins));
 		nBins = numBins.x*numBins.y*numBins.z;
 		nnbins = 26;
-	}
-	
-	// create output directory
-	std::system("mkdir -p geomemoutput");
- 	std::system("exec rm -rf geomemoutput/*.dat");  
+	}	
 }
 
 
@@ -486,7 +485,8 @@ void class_membrane_ibm3D::relax_node_positions(int nIts, float scale, float M, 
 		build_bin_lists(nBlocks,nThreads);		
 		compute_node_forces(nBlocks,nThreads);		
 		nonbonded_node_interactions(nBlocks,nThreads);		
-		wall_forces_ydir(nBlocks,nThreads);		
+		//wall_forces_ydir(nBlocks,nThreads);		
+		wall_forces_ydir_zdir(nBlocks,nThreads);
 		update_node_positions_vacuum(M,nBlocks,nThreads);		
 		cudaDeviceSynchronize();
 	}	
@@ -520,7 +520,8 @@ void class_membrane_ibm3D::relax_node_positions_skalak(int nIts, float scale, fl
 		build_bin_lists(nBlocks,nThreads);		
 		compute_node_forces_skalak(nBlocks,nThreads);		
 		nonbonded_node_interactions(nBlocks,nThreads);		
-		wall_forces_ydir(nBlocks,nThreads);		
+		//wall_forces_ydir(nBlocks,nThreads);
+		wall_forces_ydir_zdir(nBlocks,nThreads);
 		update_node_positions_vacuum(M,nBlocks,nThreads);		
 		cudaDeviceSynchronize();
 	}	
@@ -670,7 +671,7 @@ void class_membrane_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads
 	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 	nonbonded_node_interactions_IBM3D
 	<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,numBins,sizeBins,
-	                        nNodes,binMax,nnbins,Box,pbcFlag);
+	                        repA,repD,repFmax,nNodes,binMax,nnbins,Box,pbcFlag);
 }
 
 
@@ -778,7 +779,7 @@ void class_membrane_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)
 void class_membrane_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 {
 	wall_forces_ydir_zdir_IBM3D
-	<<<nBlocks,nThreads>>> (r,f,Box,nNodes);
+	<<<nBlocks,nThreads>>> (r,f,Box,repA,repD,nNodes);
 }
 
 
@@ -876,7 +877,7 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 	// Define the file location and name:
 	ofstream outfile;
 	std::stringstream filenamecombine;
-	filenamecombine << "geomemoutput/" << tagname << "_" << tagnum << ".dat";
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".dat";
 	string filename = filenamecombine.str();
 	outfile.open(filename.c_str(), ios::out | ios::app);
 		

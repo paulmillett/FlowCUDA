@@ -77,6 +77,19 @@ __global__ void scsp_set_boundary_shear_velocity_D3Q19(
 	int);
 
 
+__global__ void scsp_set_channel_wall_velocity_D3Q19(
+	float,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,											  
+	int,
+	int,
+	int,
+	int);
+
+
 __global__ void scsp_stream_collide_save_D3Q19(
 	float*,
 	float*,

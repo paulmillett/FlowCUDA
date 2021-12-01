@@ -34,6 +34,9 @@ class class_membrane_ibm3D {
 	float ks,kb,ka,kag,kv;
 	float C;
 	float dt;
+	float repA;
+	float repD;
+	float repFmax;
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;

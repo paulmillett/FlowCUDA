@@ -1,4 +1,3 @@
-
 # include "class_scsp_D3Q19.cuh"
 # include "../../IO/GetPot"
 # include <math.h>
@@ -671,6 +670,21 @@ void class_scsp_D3Q19::set_boundary_shear_velocity(float uBot, float uTop, int n
 
 
 // --------------------------------------------------------
+// Call to "scsp_set_channel_wall_velocity_D3Q19" kernel:
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::set_channel_wall_velocity(float uWall, int nBlocks, int nThreads)
+{
+	scsp_set_channel_wall_velocity_D3Q19 
+	<<<nBlocks,nThreads>>> (uWall,f1,u,v,w,r,Nx,Ny,Nz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "extrapolate_velocity_IBM3D" kernel.  
 // Note: this kernel is in the IBM/3D folder, and one
 //       should use nBlocks as if calling an IBM kernel.
@@ -835,7 +849,8 @@ void class_scsp_D3Q19::calculate_flow_rate_xdir(std::string tagname, int tagnum)
 	for (int i=0; i<Ny*Nz; i++) Qx += velx[i];  // assume dx=dy=dz=1
 	
 	// print results:
-	outfile << fixed << setprecision(4) << Qx << endl;
+	outfile << Ny << " " << Nz << endl;
+	//outfile << fixed << setprecision(4) << Qx << endl;
 	for (int i=0; i<Ny*Nz; i++) {
 		outfile << fixed << setprecision(4) << velx[i] << endl;
 	}

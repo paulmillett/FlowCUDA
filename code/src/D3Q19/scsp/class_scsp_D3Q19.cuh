@@ -119,6 +119,7 @@ public:
 	void stream_collide_save_forcing_solid(int,int);
 	void stream_collide_save_IBforcing(int,int);
 	void set_boundary_shear_velocity(float,float,int,int);
+	void set_channel_wall_velocity(float,int,int);
 	void zero_forces(int,int);
 	void zero_forces_with_IBM(int,int);	
 	void add_body_force(float,float,float,int,int);
