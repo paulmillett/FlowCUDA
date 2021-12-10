@@ -239,6 +239,15 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	    // Strain invariants, C.11 and C.12
 	    const float i1 = (Gxx + Gyy) - 2.0;
 	    const float i2 = (Gxx*Gyy - Gxy*Gyx) - 1.0;
+		
+	    // Principal stretch ratios, lambda1,2 = sqrt(eigenvalues of G tensor)
+	    float lamb1 = sqrt(0.5*( Gxx + Gyy + sqrt((Gxx-Gyy)*(Gxx-Gyy) + 4.0*Gxy*Gxy)));		
+	    float lamb2 = sqrt(0.5*( Gxx + Gyy - sqrt((Gxx-Gyy)*(Gxx-Gyy) + 4.0*Gxy*Gxy)));
+		
+		// Principal tension (Skalak model)
+		const float J = lamb1*lamb2;
+		faces[i].T1 = (gs/J)*(lamb1*lamb1*(lamb1*lamb1-1.0) + C*J*J*(J*J-1.0));
+		faces[i].T1 /= gs;
 
 	    // Derivatives of Skalak energy density E used in chain rule below: eq. (C.14)
 	    float dEdI1 = gs*(i1 + 1.0)/2.0;     //gs*(i1 + 1.0)/6.0;
@@ -247,7 +256,7 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	    //const float dEdI1 = gs/6.0;
 	    //const float dEdI2 = -gs/(6.0*(i2+1.0)*(i2+1.0));
 		
-	  // Derivatives of Is (C.15)
+		// Derivatives of Is (C.15)
 	    const float dI1dGxx = 1;
 	    const float dI1dGxy = 0;
 	    const float dI1dGyx = 0;

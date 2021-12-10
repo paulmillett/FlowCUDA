@@ -14,6 +14,7 @@ struct triangle {
 	float l0,lp0;
 	float cosphi0;
 	float sinphi0;
+	float T1;
 	float3 norm;
 };
 

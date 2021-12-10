@@ -171,7 +171,7 @@ void class_membrane_ibm3D::memcopy_host_to_device()
 void class_membrane_ibm3D::memcopy_device_to_host()
 {
 	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);	
-	//cudaMemcpy(facesH, faces, sizeof(triangle)*nFaces, cudaMemcpyDeviceToHost);
+	cudaMemcpy(facesH, faces, sizeof(triangle)*nFaces, cudaMemcpyDeviceToHost);
 	//cudaMemcpy(edgesH, edges, sizeof(edge)*nEdges, cudaMemcpyDeviceToHost);
 	
 	// unwrap coordinate positions:

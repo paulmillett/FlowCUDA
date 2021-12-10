@@ -4,7 +4,7 @@
 
 
 [LBM]
-	App = scsp_3D_capsules_constriction
+	App = scsp_3D_capsules_channel
 	nu = 0.166666666
 	bodyForx = 0.00001
 []
@@ -14,16 +14,16 @@
 	nNodesPerCell = 642
 	nFacesPerCell = 1280
 	nEdgesPerCell = 1920
-	nCells = 2
-	ks = 0.001
+	nCells = 144
+	ks = 0.0005
 	C = 1.0
-	kb = 0.001 
+	kb = 0.01 
 	ka = 0.0007
-	kv = 0.9
+	kv = 0.5
 	kag = 0.0
 	sizeBins = 4.0
 	binMax = 35
-	repA = 1.0
+	repA = 0.1
 	repD = 2.0
 	repFmax = 0.1
 []
@@ -33,25 +33,21 @@
 	D = 3
 	Q = 19
 	source = box
-	nVoxels = 1560000
-	Nx = 600
-	Ny = 100
-	Nz = 26
-	iNarBegin = 200
-	iNarEnd = 400
-	jNarBegin = 33
-	jNarEnd = 66
+	nVoxels = 3456000
+	Nx = 240
+	Ny = 120
+	Nz = 120
 	numIolets = 0
 []
 
 
 [Time]
-	nSteps = 300000
+	nSteps = 100000
 []
 
 
 [Output]
-	nOutputs = 10
+	nOutputs = 30
 	format = structured
 	fName = macros
 	iskip = 2

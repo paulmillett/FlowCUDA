@@ -22,6 +22,9 @@
 	kag = 0.0
 	sizeBins = 4.0
 	binMax = 35
+	repA = 1.0
+	repD = 2.0
+	repFmax = 0.1
 []
 
 

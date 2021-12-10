@@ -833,6 +833,18 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 	}
 	
 	// -----------------------------------------------
+	//	Write the principal tension for each face:
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	outfile << "CELL_DATA " << nFaces << endl;
+	outfile << "SCALARS " << "tension " << "float" << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nFaces; i++) {
+		outfile << faces[i].T1 << endl;
+	}
+	
+	// -----------------------------------------------
 	//	Close the file:
 	// -----------------------------------------------
 		
