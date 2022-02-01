@@ -790,7 +790,7 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes, int nFaces,
                                     float3* r, triangle* faces)
 {
-	
+		
 	// -----------------------------------
 	//	Define the file location and name:
 	// -----------------------------------
@@ -841,7 +841,9 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 	outfile << "SCALARS " << "tension " << "float" << endl;
 	outfile << "LOOKUP_TABLE default" << endl;
 	for (int i=0; i<nFaces; i++) {
-		outfile << faces[i].T1 << endl;
+		float tension = faces[i].T1;
+		if (tension != tension) tension = 0.0;  // this is true if NaN
+		outfile << tension << endl;
 	}
 	
 	// -----------------------------------------------
@@ -849,7 +851,7 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 	// -----------------------------------------------
 		
 	outfile.close();
-	
+		
 }
 
 

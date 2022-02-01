@@ -94,6 +94,7 @@ public:
 	void stream_index_push();
 	void stream_index_pull();
 	void read_iolet_info(int,const char*);
+	void setNu(float);
 	void setU(int,float);
 	void setV(int,float);
 	void setW(int,float);

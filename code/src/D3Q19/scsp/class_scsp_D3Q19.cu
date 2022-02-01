@@ -455,6 +455,11 @@ void class_scsp_D3Q19::read_iolet_info(int i, const char* name)
 // Setters for host arrays:
 // --------------------------------------------------------
 
+void class_scsp_D3Q19::setNu(float val)
+{
+	nu = val;
+}
+
 void class_scsp_D3Q19::setU(int i, float val)
 {
 	uH[i] = val;

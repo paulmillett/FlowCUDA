@@ -49,6 +49,8 @@ scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
 	
 	nu = inputParams("LBM/nu",0.1666666);
 	bodyForx = inputParams("LBM/bodyForx",0.0);
+	float Re = inputParams("LBM/Re",2.0);
+	float umax = inputParams("LBM/umax",0.1);
 	
 	// ----------------------------------------------
 	// Immersed-Boundary parameters:
@@ -57,6 +59,9 @@ scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
 	int nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
 	int nCells = inputParams("IBM/nCells",1);
 	nNodes = nNodesPerCell*nCells;
+	a = inputParams("IBM/a",10.0);
+	float Ca = inputParams("IBM/Ca",1.0);
+	float ksmax = inputParams("IBM/ksmax",0.002);
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -86,6 +91,13 @@ scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
 	lbm.allocate();
 	lbm.allocate_forces();
 	ibm.allocate();	
+	
+	// ----------------------------------------------
+	// determine membrane parameters (see function
+	// below):
+	// ----------------------------------------------
+	
+	calcMembraneParams(Re,Ca,umax,ksmax);
 	
 }
 
@@ -175,9 +187,15 @@ void scsp_3D_capsules_channel::initSystem()
 	ibm.rest_geometries_skalak(nBlocks,nThreads);
 	
 	// ----------------------------------------------
+	// set the random number seed: 
+	// ----------------------------------------------
+	
+	srand(time(NULL));
+	
+	// ----------------------------------------------
 	// shrink and randomly disperse cells: 
 	// ----------------------------------------------
-		
+			
 	float scale = 0.7;
 	ibm.shrink_and_randomize_cells(scale,16.0,11.0);
 	ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
@@ -284,6 +302,85 @@ void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 	ibm.write_output("ibm",step);		
 }
 
+
+
+// --------------------------------------------------------
+// Calculate membrane elastic parameters.  Here, we
+// calculate the appropriate values of nu, ks, and bodyForx
+// that satisfy the given Re and Ca subject to the 
+// conditions that maximum u < umax and ks < ksmax:
+// --------------------------------------------------------
+
+void scsp_3D_capsules_channel::calcMembraneParams(float Re, float Ca, float umax, float Ksmax)
+{
+	// assumed parameters:
+	float rho = 1.0;
+	float w = float(Ny-1)/2.0;
+	float h = float(Nz-1)/2.0;
+	float Dh = 4.0*(4.0*w*h)/(4.0*(w+h));
+	float infsum = calcInfSum(w,h);
+
+	// set Ks to some large number:
+	float Ks = 1000.0;
+
+	// loop until parameters are acceptable:
+	while (Ks > Ksmax) {		
+		// step 1: calculate nu:
+		nu = umax*Dh/Re;
+		while (nu > 1.0/6.0) {
+		    umax *= 0.9999;
+		    nu = umax*Dh/Re;
+		}	    
+		// step 2: calculate fx:
+		bodyForx = umax*nu*pow(M_PI,3)/(16.0*w*w*infsum);
+		// step 3: calculate Es:
+		Ks = rho*nu*umax*a/(h*Ca);
+		// step 4: if Es > Esmax, reduce umax
+		if (Ks > Ksmax) umax *= 0.9999;
+	}
+
+	// assign values for ks and nu:
+	ibm.set_ks(Ks); 
+	ibm.set_kb(0.01);
+	ibm.set_kv(0.5);
+	ibm.set_ka(0.0007);
+	ibm.set_kag(0.0);
+	ibm.set_C(2.0);
+	lbm.setNu(nu);   
+	
+	// output the results:
+	cout << "  " << endl;
+	cout << "hydraulic diameter = " << Dh << endl;
+	cout << "umax = " << umax << endl;
+	cout << "ks = " << Ks << endl;
+	cout << "nu = " << nu << endl;
+	cout << "fx = " << bodyForx << endl;
+	cout << "  " << endl;
+	cout << "Re = " << umax*Dh/nu << endl;
+	cout << "Ca = " << rho*nu*umax*a/h/Ks << endl;
+	cout << "  " << endl;
+		
+}
+
+
+
+// --------------------------------------------------------
+// Calculate infinite sum associated with solution
+// to velocity profile in rectanglular channel:
+// --------------------------------------------------------
+
+float scsp_3D_capsules_channel::calcInfSum(float w, float h)
+{
+	float outval = 0.0;
+	// take first 40 terms of infinite sum
+	for (int n = 1; n<80; n=n+2) {
+		float nf = float(n);
+		float pref = pow(-1.0,(nf-1.0)/2)/(nf*nf*nf);
+		float term = pref*(1 - 1/cosh(nf*M_PI*h/2.0/w));
+		outval += term;
+	}
+	return outval;
+}
 
 
 

@@ -1,4 +1,4 @@
-
+ 
 # include "class_membrane_ibm3D.cuh"
 # include "../../IO/GetPot"
 # include "../../Utils/eig3.cuh"
@@ -214,12 +214,42 @@ void class_membrane_ibm3D::read_ibm_information(std::string tagname)
 
 
 // --------------------------------------------------------
-// set pbcFlag values:
+// Setters:
 // --------------------------------------------------------
 
 void class_membrane_ibm3D::set_pbcFlag(int x, int y, int z)
 {
 	pbcFlag.x = x; pbcFlag.y = y; pbcFlag.z = z;
+}
+
+void class_membrane_ibm3D::set_ks(float val)
+{
+	ks = val;
+}
+
+void class_membrane_ibm3D::set_ka(float val)
+{
+	ka = val;
+}
+
+void class_membrane_ibm3D::set_kb(float val)
+{
+	kb = val;
+}
+
+void class_membrane_ibm3D::set_kv(float val)
+{
+	kv = val;
+}
+
+void class_membrane_ibm3D::set_kag(float val)
+{
+	kag = val;
+}
+
+void class_membrane_ibm3D::set_C(float val)
+{
+	C = val;
 }
 
 
@@ -880,16 +910,17 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".dat";
 	string filename = filenamecombine.str();
 	outfile.open(filename.c_str(), ios::out | ios::app);
+	outfile << nCells << endl;
 		
+	float yCFL = float(N.y);
+	float zCFL = float(N.z);
 	// Loop over the capsules, calculate center-of-mass
 	// and Taylor deformation parameter.  Here, I'm using
 	// the method described in: Eberly D, Polyhedral Mass
 	// Properties (Revisited), Geometric Tools, Redmond WA	
 	for (int c=0; c<nCells; c++) {
 		
-		float D12 = 0.0;
-		float D13 = 0.0;
-		float D23 = 0.0;
+		float D = 0.0;
 		float3 com = make_float3(0.0,0.0,0.0);
 		float mult[10] = {1.0/6.0,1.0/24.0,1.0/24.0,1.0/24.0,1.0/60.0,1.0/60.0,1.0/60.0,1.0/120.0,1.0/120.0,1.0/120.0};
 		float intg[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
@@ -936,7 +967,14 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 			intg[6] += d2*f3z;
 			intg[7] += d0*(y0*g0x + y1*g1x + y2*g2x);
 			intg[8] += d1*(z0*g0y + z1*g1y + z2*g2y);
-			intg[9] += d2*(x0*g0z + x1*g1z + x2*g2z); 			
+			intg[9] += d2*(x0*g0z + x1*g1z + x2*g2z);
+			// check cell-free layer value:
+			float ypos = (y0+y1+y2)/3.0;
+			float zpos = (z0+z1+z2)/3.0;
+			float ywallsep = std::fmin(ypos-0.0,float(N.y-1)-ypos);
+			float zwallsep = std::fmin(zpos-0.0,float(N.z-1)-zpos);
+			if (ywallsep < yCFL) yCFL = ywallsep;
+			if (zwallsep < zCFL) zCFL = zwallsep;
 		}
 		
 		for (int i=0; i<10; i++) intg[i] *= mult[i];
@@ -971,9 +1009,12 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 		float L3 = sqrt(5/2/vol*(eigvals[0] + eigvals[1] - eigvals[2]));
 
 		// calculate Taylor deformation parameters:
-		D12 = (L1-L2)/(L1+L2);
-		D13 = (L1-L3)/(L1+L3);
-		D23 = (L2-L3)/(L2+L3);
+		float Lmax = std::max({L1,L2,L3});
+		float Lmin = std::min({L1,L2,L3});
+		D = (Lmax-Lmin)/(Lmax+Lmin);
+		//D12 = (L1-L2)/(L1+L2);
+		//D13 = (L1-L3)/(L1+L3);
+		//D23 = (L2-L3)/(L2+L3);
 		
 		// calculate the inclination angle:
 		//phi = 0.5*atan(2*Ixy/(Ixx-Iyy));
@@ -981,9 +1022,12 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 		
 		// print data:
 		outfile << fixed << setprecision(4) << vol << "  " << com.x << "  " << com.y << "  " << com.z << "  "
-		        << D12 << "  " << D13 << "  " << D23 << endl;
+		        << D << "  " << endl;
 						
 	}
+	
+	// print the cell-free layer thickness in the y-dir and z-dir:
+	outfile << fixed << setprecision(4) << yCFL << "  " << zCFL << endl;
 		
 	// close file
 	outfile.close();

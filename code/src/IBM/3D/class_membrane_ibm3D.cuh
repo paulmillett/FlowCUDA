@@ -69,6 +69,12 @@ class class_membrane_ibm3D {
 	void memcopy_device_to_host();
 	void read_ibm_information(std::string);
 	void set_pbcFlag(int,int,int);
+	void set_ks(float);
+	void set_ka(float);
+	void set_kb(float);
+	void set_kv(float);
+	void set_kag(float);
+	void set_C(float);
 	void assign_refNode_to_cells();
 	void assign_cellIDs_to_nodes();
 	void duplicate_cells();	
