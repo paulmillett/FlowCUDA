@@ -164,7 +164,7 @@ __device__ inline void pairwise_interaction_forces(
 	const float repA,
 	const float repD,
 	const float repFmax,
-	const float3* R,
+	float3* R,
 	float3* F,
 	float3 Box,
 	int3 pbcFlag)
@@ -173,9 +173,25 @@ __device__ inline void pairwise_interaction_forces(
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);
 	if (r < repD) {
-		float force = repA/pow(r,2) - repA/pow(repD,2);
-		if (force > repFmax) force = repFmax;
-		F[i] += force*(rij/r);
+		// if separation is too small, we must adjust positions:
+		if (r < 1.732) {
+			float dr = 1.732 - r;
+			// avoid adjusting positions twice:
+			if (i < j) {
+				R[i] += 0.5*dr*(rij/r);
+				atomicAdd(&R[j].x,-0.5*dr*(rij.x/r));
+				atomicAdd(&R[j].y,-0.5*dr*(rij.y/r));
+				atomicAdd(&R[j].z,-0.5*dr*(rij.z/r));
+			}
+		}
+		// otherwise, calculate soft repulsion as usual:
+		else {
+			float force = repA/pow(r,2) - repA/pow(repD,2);
+			if (force > repFmax) force = repFmax;
+			F[i] += force*(rij/r);
+		}
+		
+		if (r < 1.0) printf("separation = %f \n",r);
 	} 	
 }
 

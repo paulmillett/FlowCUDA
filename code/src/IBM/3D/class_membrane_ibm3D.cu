@@ -625,6 +625,45 @@ void class_membrane_ibm3D::update_node_positions_dt(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "update_node_position_verlet_1_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::update_node_positions_verlet_1(int nBlocks, int nThreads)
+{
+	update_node_position_verlet_1_IBM3D
+	<<<nBlocks,nThreads>>> (r,v,f,dt,1.0,nNodes);
+	
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_node_position_verlet_2_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::update_node_positions_verlet_2(int nBlocks, int nThreads)
+{
+	update_node_position_verlet_2_IBM3D
+	<<<nBlocks,nThreads>>> (v,f,dt,1.0,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "zero_velocities_forces_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::zero_velocities_forces(int nBlocks, int nThreads)
+{
+	zero_velocities_forces_IBM3D
+	<<<nBlocks,nThreads>>> (v,f,nNodes);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "interpolate_velocity_IBM3D" kernel:
 // --------------------------------------------------------
 

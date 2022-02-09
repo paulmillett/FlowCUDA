@@ -48,7 +48,7 @@ __device__ inline void pairwise_interaction_forces(
 	const float,
 	const float,
 	const float, 
-	const float3*,
+	float3*,
 	float3*,
 	float3,
 	int3);

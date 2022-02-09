@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_CAPSULES_CHANNEL_H
-# define SCSP_3D_CAPSULES_CHANNEL_H
+# ifndef SCSP_3D_CAPSULE_SKALAK_VERLET_H
+# define SCSP_3D_CAPSULE_SKALAK_VERLET_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_capsules_channel : public FlowBase {
+class scsp_3D_capsule_skalak_verlet : public FlowBase {
 	
 private:
 
@@ -27,8 +27,7 @@ private:
 	int iskip,jskip,kskip;
 	float tau;
 	float nu;
-	float bodyForx;
-	float a;
+	float shearVel;
 	float gam;
 	std::string vtkFormat;
 	
@@ -38,16 +37,12 @@ private:
 		
 public:
 
-	scsp_3D_capsules_channel();
-	~scsp_3D_capsules_channel();
+	scsp_3D_capsule_skalak_verlet();
+	~scsp_3D_capsule_skalak_verlet();
 	void initSystem();
 	void cycleForward(int,int);
-	void stepIBM();
-	void stepVerlet();
 	void writeOutput(std::string,int);
-	void calcMembraneParams(float,float,float,float);
-	float calcInfSum(float,float);
 	
 };
 
-# endif  // SCSP_3D_CAPSULES_CHANNEL_H
+# endif  // SCSP_3D_CAPSULE_SKALAK_VERLET_H

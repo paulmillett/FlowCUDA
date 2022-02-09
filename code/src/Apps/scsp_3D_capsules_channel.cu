@@ -62,6 +62,7 @@ scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
 	a = inputParams("IBM/a",10.0);
 	float Ca = inputParams("IBM/Ca",1.0);
 	float ksmax = inputParams("IBM/ksmax",0.002);
+	gam = inputParams("IBM/gamma",0.1);
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -214,7 +215,13 @@ void scsp_3D_capsules_channel::initSystem()
 	
 	ibm.memcopy_device_to_host();
 	writeOutput("macros",0);
-		
+	
+	// ----------------------------------------------
+	// set IBM velocities & forces to zero: 
+	// ----------------------------------------------
+	
+	ibm.zero_velocities_forces(nBlocks,nThreads);
+	
 }
 
 
@@ -241,31 +248,8 @@ void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
 	
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
-				
-		// zero fluid forces:
-		lbm.zero_forces(nBlocks,nThreads);
-		
-		// re-build bin lists for IBM nodes:
-		ibm.reset_bin_lists(nBlocks,nThreads);
-		ibm.build_bin_lists(nBlocks,nThreads);
-				
-		// compute IBM node forces:
-		ibm.compute_node_forces_skalak(nBlocks,nThreads);
-		ibm.nonbonded_node_interactions(nBlocks,nThreads);
-		ibm.wall_forces_ydir_zdir(nBlocks,nThreads);
-				
-		// update fluid:
-		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
-		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);
-		lbm.set_channel_wall_velocity(0.0,nBlocks,nThreads);
-		
-		// update membrane:
-		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
-		ibm.update_node_positions(nBlocks,nThreads);
-				
-		cudaDeviceSynchronize();
-
+		//stepIBM();
+		stepVerlet();
 	}
 	
 	cout << cummulativeSteps << endl;	
@@ -283,6 +267,76 @@ void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
 	
 	writeOutput("macros",cummulativeSteps);
 		
+}
+
+
+
+// --------------------------------------------------------
+// Take a time-step with the traditional IBM approach:
+// --------------------------------------------------------
+
+void scsp_3D_capsules_channel::stepIBM()
+{
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// re-build bin lists for IBM nodes:
+	ibm.reset_bin_lists(nBlocks,nThreads);
+	ibm.build_bin_lists(nBlocks,nThreads);
+			
+	// compute IBM node forces:
+	ibm.compute_node_forces_skalak(nBlocks,nThreads);
+	ibm.nonbonded_node_interactions(nBlocks,nThreads);
+	ibm.wall_forces_ydir_zdir(nBlocks,nThreads);
+			
+	// update fluid:
+	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
+	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+	lbm.stream_collide_save_forcing(nBlocks,nThreads);
+	lbm.set_channel_wall_velocity(0.0,nBlocks,nThreads);
+	
+	// update membrane:
+	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
+	ibm.update_node_positions(nBlocks,nThreads);
+	
+	// CUDA sync
+	cudaDeviceSynchronize();
+}
+
+
+
+// --------------------------------------------------------
+// Take a time-step with the velocity-Verlet approach for IBM:
+// --------------------------------------------------------
+
+void scsp_3D_capsules_channel::stepVerlet()
+{
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// first step of IBM velocity verlet:
+	ibm.update_node_positions_verlet_1(nBlocks,nThreads);
+	
+	// re-build bin lists for IBM nodes:
+	ibm.reset_bin_lists(nBlocks,nThreads);
+	ibm.build_bin_lists(nBlocks,nThreads);
+			
+	// compute IBM node forces:
+	ibm.compute_node_forces_skalak(nBlocks,nThreads);
+	ibm.nonbonded_node_interactions(nBlocks,nThreads);
+	ibm.wall_forces_ydir_zdir(nBlocks,nThreads);
+			
+	// update fluid:
+	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.r,ibm.v,ibm.f,nNodes);
+	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+	lbm.stream_collide_save_forcing(nBlocks,nThreads);
+	lbm.set_channel_wall_velocity(0.0,nBlocks,nThreads);
+	
+	// second step of IBM velocity verlet:
+	ibm.update_node_positions_verlet_2(nBlocks,nThreads);
+	
+	// CUDA sync		
+	cudaDeviceSynchronize();
 }
 
 
@@ -341,8 +395,8 @@ void scsp_3D_capsules_channel::calcMembraneParams(float Re, float Ca, float umax
 
 	// assign values for ks and nu:
 	ibm.set_ks(Ks); 
-	ibm.set_kb(0.01);
-	ibm.set_kv(0.5);
+	//ibm.set_kb(0.01);
+	//ibm.set_kv(0.5);
 	ibm.set_ka(0.0007);
 	ibm.set_kag(0.0);
 	ibm.set_C(2.0);

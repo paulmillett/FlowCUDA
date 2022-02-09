@@ -737,6 +737,22 @@ void class_scsp_D3Q19::extrapolate_forces_from_IBM(int nBlocks, int nThreads,
 
 
 // --------------------------------------------------------
+// Call to "viscous_force_velocity_difference_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::viscous_force_IBM_LBM(int nBlocks, int nThreads, float gam,
+	                                         float3* rIB, float3* vIB, float3* fIB, int nNodes)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	viscous_force_velocity_difference_IBM3D
+	<<<nBlocks,nThreads>>> (rIB,vIB,fIB,Fx,Fy,Fz,u,v,w,gam,Nx,Ny,Nz,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_zero_forces_D3Q19" kernel:
 // --------------------------------------------------------
 

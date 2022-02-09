@@ -38,6 +38,48 @@ __global__ void update_node_position_dt_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D node update kernel:
+// --------------------------------------------------------
+
+__global__ void update_node_position_verlet_1_IBM3D(
+	float3* r,
+	float3* v,
+	float3* f,
+	float dt,
+	float m,	
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		r[i] += v[i]*dt + 0.5*dt*dt*(f[i]/m);
+		v[i] += 0.5*dt*(f[i]/m);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D node update kernel:
+// --------------------------------------------------------
+
+__global__ void update_node_position_verlet_2_IBM3D(
+	float3* v,
+	float3* f,
+	float dt,
+	float m,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		v[i] += 0.5*dt*(f[i]/m);
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D node update kernel (this uses force and a mobility
 // constant, instead of velocity):
 // --------------------------------------------------------
@@ -52,6 +94,25 @@ __global__ void update_node_position_vacuum_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
 		r[i] += M*f[i];
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D zero the velocities and forces:
+// --------------------------------------------------------
+
+__global__ void zero_velocities_forces_IBM3D(
+	float3* v,
+	float3* f,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		v[i] = make_float3(0.0f,0.0f,0.0f);
+		f[i] = make_float3(0.0f,0.0f,0.0f);
 	}
 }
 
@@ -292,6 +353,126 @@ __global__ void extrapolate_force_IBM3D(
 				}
 			}		
 		}		
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate viscous force due to velocity
+// difference between IBM node and LBM fluid
+// --------------------------------------------------------
+
+__global__ void viscous_force_velocity_difference_IBM3D(
+	float3* r,
+	float3* v,
+	float3* f,
+	float* fxLBM,
+	float* fyLBM,
+	float* fzLBM,
+	float* uLBM,
+	float* vLBM,
+	float* wLBM,
+	float gam,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nNodes) {
+				
+		// --------------------------------------
+		// find nearest LBM voxel (rounded down)
+		// --------------------------------------
+		
+		int i0 = int(floor(r[i].x));
+		int j0 = int(floor(r[i].y));
+		int k0 = int(floor(r[i].z));
+		
+		// --------------------------------------
+		// loop over footprint to get 
+		// interpolated LBM velocity:
+		// --------------------------------------
+		
+		/*
+		float vxLBMi = 0.0;
+		float vyLBMi = 0.0;
+		float vzLBMi = 0.0;		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = r[i].x - float(ii);
+					float ry = r[i].y - float(jj);
+					float rz = r[i].z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					vxLBMi += del*uLBM[ndx];
+					vyLBMi += del*vLBM[ndx];
+					vzLBMi += del*wLBM[ndx];
+				}
+			}
+		}
+		*/
+		
+		float vxLBMi = 0.0;
+		float vyLBMi = 0.0;
+		float vzLBMi = 0.0;		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = r[i].x - float(ii);
+					float ry = r[i].y - float(jj);
+					float rz = r[i].z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					vxLBMi += del*uLBM[ndx];
+					vyLBMi += del*vLBM[ndx];
+					vzLBMi += del*wLBM[ndx];
+					// extrapolate elastic forces to LBM fluid:
+					atomicAdd(&fxLBM[ndx],del*f[i].x);
+					atomicAdd(&fyLBM[ndx],del*f[i].y);
+					atomicAdd(&fzLBM[ndx],del*f[i].z);
+				}
+			}
+		}
+		
+		// --------------------------------------
+		// calculate visous forces & add them
+		// to IBM node:
+		// --------------------------------------
+		
+		float vfx = gam*(vxLBMi - v[i].x);
+		float vfy = gam*(vyLBMi - v[i].y);
+		float vfz = gam*(vzLBMi - v[i].z);
+		f[i].x += vfx;
+		f[i].y += vfy;
+		f[i].z += vfz;
+		
+		// --------------------------------------
+		// loop over footprint to extrapolate
+		// viscous force to LBM lattice:
+		// --------------------------------------
+		
+		/*
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = r[i].x - float(ii);
+					float ry = r[i].y - float(jj);
+					float rz = r[i].z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					// we add the negative of viscous force:
+					atomicAdd(&fxLBM[ndx],del*f[i].x);
+					atomicAdd(&fyLBM[ndx],del*f[i].y);
+					atomicAdd(&fzLBM[ndx],del*f[i].z);
+				}
+			}		
+		}
+		*/		
 	}	
 }
 

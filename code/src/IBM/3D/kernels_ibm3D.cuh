@@ -15,6 +15,23 @@ __global__ void update_node_position_dt_IBM3D(
     float3*,
 	float,
 	int);
+	
+	
+__global__ void update_node_position_verlet_1_IBM3D(
+	float3*,
+	float3*,
+	float3*,
+	float,
+	float,
+	int);
+
+
+__global__ void update_node_position_verlet_2_IBM3D(
+	float3*,
+	float3*,
+	float,
+	float,
+	int);
 
 
 __global__ void update_node_position_vacuum_IBM3D(
@@ -33,6 +50,12 @@ __global__ void update_node_position_IBM3D(
 	int,
     int);
 	
+	
+__global__ void zero_velocities_forces_IBM3D(
+	float3*,
+	float3*,
+	int nNodes);
+			
 	
 __global__ void update_node_ref_position_IBM3D(
 	float3*,
@@ -90,7 +113,24 @@ __global__ void extrapolate_force_IBM3D(
 	int,
 	int);
 	
-	
+
+__global__ void viscous_force_velocity_difference_IBM3D(
+	float3*,
+	float3*,
+	float3*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float,
+	int,
+	int,
+	int,
+	int);
+			
+
 __global__ void compute_node_force_IBM3D(
 	float3*,
     float3*,

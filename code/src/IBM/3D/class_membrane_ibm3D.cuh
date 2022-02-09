@@ -88,6 +88,9 @@ class class_membrane_ibm3D {
 	void write_output_long(std::string,int);
 	void update_node_positions(int,int);
 	void update_node_positions_dt(int,int);
+	void update_node_positions_verlet_1(int,int);
+	void update_node_positions_verlet_2(int,int);
+	void zero_velocities_forces(int,int);
 	void relax_node_positions(int,float,float,int,int);
 	void relax_node_positions_skalak(int,float,float,int,int);
 	void update_node_positions_vacuum(float,int,int);

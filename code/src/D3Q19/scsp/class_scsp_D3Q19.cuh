@@ -128,6 +128,7 @@ public:
 	void extrapolate_velocity_from_IBM(int,int,float3*,float3*,int);
 	void interpolate_velocity_to_IBM(int,int,float3*,float3*,int);
 	void extrapolate_forces_from_IBM(int,int,float3*,float3*,int);
+	void viscous_force_IBM_LBM(int,int,float,float3*,float3*,float3*,int);
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);
 	void read_lattice_geometry(int);
