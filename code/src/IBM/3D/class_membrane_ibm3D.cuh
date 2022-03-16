@@ -28,8 +28,10 @@ class class_membrane_ibm3D {
 	int binMax;
 	int nnbins;
 	int nBins;
+	int totalBucketCnt;
 	int3 N;
 	int3 numBins;
+	int3 numBuckets;
 	float sizeBins;
 	float ks,kb,ka,kag,kv;
 	float C;
@@ -38,8 +40,10 @@ class class_membrane_ibm3D {
 	float repD;
 	float repFmax;
 	float3 Box;
+	float3 sizeBuckets;
 	int3 pbcFlag;
 	bool binsFlag;
+	bool bucketsFlag;
 			
 	// host arrays:
 	float3* rH;	
@@ -47,6 +51,7 @@ class class_membrane_ibm3D {
 	edge* edgesH;
 	cell* cellsH;
 	int* cellIDsH;
+	int* bucketCnt;
 		
 	// device arrays:
 	float3* r;
@@ -109,6 +114,7 @@ class class_membrane_ibm3D {
 	void scale_edge_lengths(float,int,int);
 	void unwrap_node_coordinates();
 	void membrane_geometry_analysis(std::string,int);
+	void print_cell_distributions_yz_plane(std::string,int);
 	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);
 	
 };

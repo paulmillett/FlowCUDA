@@ -248,8 +248,8 @@ void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
 	
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
-		//stepIBM();
-		stepVerlet();
+		stepIBM();
+		//stepVerlet();
 	}
 	
 	cout << cummulativeSteps << endl;	
@@ -288,6 +288,7 @@ void scsp_3D_capsules_channel::stepIBM()
 	ibm.compute_node_forces_skalak(nBlocks,nThreads);
 	ibm.nonbonded_node_interactions(nBlocks,nThreads);
 	ibm.wall_forces_ydir_zdir(nBlocks,nThreads);
+	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
 			
 	// update fluid:
 	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
@@ -296,7 +297,7 @@ void scsp_3D_capsules_channel::stepIBM()
 	lbm.set_channel_wall_velocity(0.0,nBlocks,nThreads);
 	
 	// update membrane:
-	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
+	//lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
 	ibm.update_node_positions(nBlocks,nThreads);
 	
 	// CUDA sync
@@ -348,12 +349,17 @@ void scsp_3D_capsules_channel::stepVerlet()
 void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 {	
 	// analyze the system:
-	ibm.membrane_geometry_analysis("capdata",step);
-	lbm.calculate_flow_rate_xdir("flowdata",step);
+	if (step > 50000) {
+		ibm.membrane_geometry_analysis("capdata",step);
+		//ibm.print_cell_distributions_yz_plane("capdistribution",step);
+		lbm.calculate_flow_rate_xdir("flowdata",step);
+	}	
 	
-	// write output for LBM and IBM:	
-	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
-	ibm.write_output("ibm",step);		
+	// write output for LBM and IBM:
+	if (step == nSteps) {
+		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+		ibm.write_output("ibm",step);
+	}			
 }
 
 

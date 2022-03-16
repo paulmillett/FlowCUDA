@@ -5,6 +5,11 @@
 # include <cuda.h>
 
 
+__global__ void zero_reference_vol_area_IBM3D(
+	cell*, 
+	int);
+		
+		
 __global__ void rest_triangle_skalak_IBM3D(
 	float3*,
 	triangle*,

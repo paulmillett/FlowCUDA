@@ -12,6 +12,24 @@
 
 
 // --------------------------------------------------------
+// IBM3D kernel to zero the cell ref vol. and global area:
+// --------------------------------------------------------
+
+__global__ void zero_reference_vol_area_IBM3D(
+	cell* cells, 
+	int nCells)
+{
+	// define face:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nCells) {
+		cells[i].vol0 = 0.0;
+		cells[i].area0 = 0.0;
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to compute rest triangle properties (Skalak):
 // --------------------------------------------------------
 
@@ -823,7 +841,8 @@ __global__ void scale_cell_areas_volumes_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nCells) {
 		cells[i].area0 *= scale*scale;
-		cells[i].vol0 *= scale*scale*scale;		
+		cells[i].vol0 *= scale*scale*scale;	
+		if (cells[i].vol0 > 5000) printf("%i cell vol0 = %f \n",i,cells[i].vol0); 	
 	}
 }
 

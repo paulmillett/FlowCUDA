@@ -731,7 +731,7 @@ void class_scsp_D3Q19::extrapolate_forces_from_IBM(int nBlocks, int nThreads,
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	extrapolate_force_IBM3D
-	<<<nBlocks,nThreads>>> (rIB,fIB,Fx,Fy,Fz,Nx,Ny,Nz,nNodes);	
+	<<<nBlocks,nThreads>>> (rIB,fIB,Fx,Fy,Fz,Nx,Ny,Nz,nNodes);
 }
 
 
@@ -849,6 +849,13 @@ void class_scsp_D3Q19::calculate_flow_rate_xdir(std::string tagname, int tagnum)
 	string filename = filenamecombine.str();
 	outfile.open(filename.c_str(), ios::out | ios::app);
 	
+	// define the file location and name (flowrate thru time):
+	ofstream outfile2;
+	std::stringstream filenamecombine2;
+	filenamecombine2 << "vtkoutput/" << "flowrate_data_thru_time.dat";
+	string filename2 = filenamecombine2.str();
+	outfile2.open(filename2.c_str(), ios::out | ios::app);
+	
 	// create variables for this calculation:
 	float* velx = (float*)malloc(Ny*Nz*sizeof(float));
 	for (int i=0; i<Ny*Nz; i++) velx[i] = 0.0;
@@ -871,10 +878,12 @@ void class_scsp_D3Q19::calculate_flow_rate_xdir(std::string tagname, int tagnum)
 	
 	// print results:
 	outfile << Ny << " " << Nz << endl;
-	//outfile << fixed << setprecision(4) << Qx << endl;
 	for (int i=0; i<Ny*Nz; i++) {
 		outfile << fixed << setprecision(4) << velx[i] << endl;
 	}
+		
+	// print results for flowrate:
+	outfile2 << fixed << setprecision(4) << tagnum << "  " << Qx << endl;
 	
 }
 

@@ -73,7 +73,23 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	    numBins.z = int(floor(N.z/sizeBins));
 		nBins = numBins.x*numBins.y*numBins.z;
 		nnbins = 26;
+	}
+	
+	// set up buckets for cell distributions in y-z plane:
+	int buckets = inputParams("IBM/buckets",0);
+	if (buckets == 0) bucketsFlag = false;
+	if (buckets == 1) bucketsFlag = true;
+	if (bucketsFlag) {
+		numBuckets.y = inputParams("IBM/numBucketsY",1);
+		numBuckets.z = inputParams("IBM/numBucketsZ",1);
+		numBuckets.x = 1;
+		sizeBuckets.y = float(N.y-1)/float(numBuckets.y);
+		sizeBuckets.z = float(N.z-1)/float(numBuckets.z);
+		sizeBuckets.x = 0.0;
+		totalBucketCnt = 0;
 	}	
+	
+	
 }
 
 
@@ -101,6 +117,10 @@ void class_membrane_ibm3D::allocate()
 	edgesH = (edge*)malloc(nEdges*sizeof(edge));
 	cellsH = (cell*)malloc(nCells*sizeof(cell));
 	cellIDsH = (int*)malloc(nNodes*sizeof(int));
+	if (bucketsFlag) {
+		bucketCnt = (int*)malloc(numBuckets.y*numBuckets.z*sizeof(int));
+		for (int i=0; i<numBuckets.y*numBuckets.z; i++) bucketCnt[i] = 0;
+	}
 					
 	// allocate array memory (device):
 	cudaMalloc((void **) &r, nNodes*sizeof(float3));	
@@ -130,7 +150,10 @@ void class_membrane_ibm3D::deallocate()
 	free(facesH);
 	free(edgesH);
 	free(cellsH);
-	free(cellIDsH);	
+	free(cellIDsH);
+	if (bucketsFlag) {
+		free(bucketCnt);
+	}
 				
 	// free array memory (device):
 	cudaFree(r);	
@@ -457,6 +480,10 @@ void class_membrane_ibm3D::write_output_long(std::string tagname, int tagnum)
 
 void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 {
+	// zero the cell reference volume & global area:
+	zero_reference_vol_area_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
 	// rest edge lengths:
 	rest_edge_lengths_IBM3D
 	<<<nBlocks,nThreads>>> (r,edges,nEdges);
@@ -478,6 +505,10 @@ void class_membrane_ibm3D::rest_geometries(int nBlocks, int nThreads)
 
 void class_membrane_ibm3D::rest_geometries_skalak(int nBlocks, int nThreads)
 {
+	// zero the cell reference volume & global area:
+	zero_reference_vol_area_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
 	// rest triangle properties:
 	rest_triangle_skalak_IBM3D
 	<<<nBlocks,nThreads>>> (r,faces,cells,nFaces);
@@ -544,7 +575,7 @@ void class_membrane_ibm3D::relax_node_positions_skalak(int nIts, float scale, fl
 	// iterate to relax node positions while scaling equilibirum
 	// cell size:
 	for (int i=0; i<nIts; i++) {
-		if (i%10000 == 0) cout << "relax step " << i << endl;		
+		if (i%10000 == 0) cout << "relax step " << i << endl;
 		scale_equilibrium_cell_size(scalePerIter,nBlocks,nThreads);		
 		reset_bin_lists(nBlocks,nThreads);		
 		build_bin_lists(nBlocks,nThreads);		
@@ -944,25 +975,43 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 {
 	
 	// Define the file location and name:
+	/*
 	ofstream outfile;
 	std::stringstream filenamecombine;
 	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".dat";
 	string filename = filenamecombine.str();
 	outfile.open(filename.c_str(), ios::out | ios::app);
 	outfile << nCells << endl;
-		
-	float yCFL = float(N.y);
-	float zCFL = float(N.z);
+	*/
+	
+	// Define the file location and name:
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "capsule_data.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	ofstream outfile2;
+	std::stringstream filenamecombine2;
+	filenamecombine2 << "vtkoutput/" << "cell_free_thickness.dat";
+	string filename2 = filenamecombine2.str();
+	outfile2.open(filename2.c_str(), ios::out | ios::app);
+	
 	// Loop over the capsules, calculate center-of-mass
 	// and Taylor deformation parameter.  Here, I'm using
 	// the method described in: Eberly D, Polyhedral Mass
 	// Properties (Revisited), Geometric Tools, Redmond WA	
+	
+	float yCFL = float(N.y);
+	float zCFL = float(N.z);
+		
 	for (int c=0; c<nCells; c++) {
 		
 		float D = 0.0;
 		float3 com = make_float3(0.0,0.0,0.0);
 		float mult[10] = {1.0/6.0,1.0/24.0,1.0/24.0,1.0/24.0,1.0/60.0,1.0/60.0,1.0/60.0,1.0/120.0,1.0/120.0,1.0/120.0};
 		float intg[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+		float maxT1 = -100.0;  // maximum principle tension of capsule
 				
 		for (int f=0; f<nFacesPerCell; f++) {
 			// get vertices of triangle i:
@@ -1014,6 +1063,8 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 			float zwallsep = std::fmin(zpos-0.0,float(N.z-1)-zpos);
 			if (ywallsep < yCFL) yCFL = ywallsep;
 			if (zwallsep < zCFL) zCFL = zwallsep;
+			// update maximum tension:
+			if (facesH[fID].T1 > maxT1) maxT1 = facesH[fID].T1;
 		}
 		
 		for (int i=0; i<10; i++) intg[i] *= mult[i];
@@ -1051,25 +1102,30 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 		float Lmax = std::max({L1,L2,L3});
 		float Lmin = std::min({L1,L2,L3});
 		D = (Lmax-Lmin)/(Lmax+Lmin);
-		//D12 = (L1-L2)/(L1+L2);
-		//D13 = (L1-L3)/(L1+L3);
-		//D23 = (L2-L3)/(L2+L3);
-		
+				
 		// calculate the inclination angle:
 		//phi = 0.5*atan(2*Ixy/(Ixx-Iyy));
 		//phi = phi/pi;
 		
+		// add cell to the y-z bucket:
+		if (bucketsFlag) {
+			int bucketID = int(floor(com.z/sizeBuckets.z))*numBuckets.y + 
+			               int(floor(com.y/sizeBuckets.y));
+			bucketCnt[bucketID]++;
+			totalBucketCnt++;
+		}	
+		
 		// print data:
 		outfile << fixed << setprecision(4) << vol << "  " << com.x << "  " << com.y << "  " << com.z << "  "
-		        << D << "  " << endl;
-						
+		        << D << "  " << maxT1 << endl;						
 	}
 	
 	// print the cell-free layer thickness in the y-dir and z-dir:
-	outfile << fixed << setprecision(4) << yCFL << "  " << zCFL << endl;
+	outfile2 << fixed << setprecision(4) << tagnum << "  " << yCFL << "  " << zCFL << endl;
 		
 	// close file
 	outfile.close();
+	outfile2.close();
 	
 }
 
@@ -1096,5 +1152,34 @@ void class_membrane_ibm3D::subexpressions(
     g1 = f2 + w1*(f1 + w1);
     g2 = f2 + w2*(f1 + w2);	
 }
+
+
+
+// --------------------------------------------------------
+// Print the cell distributions in the y-z plane:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::print_cell_distributions_yz_plane(std::string tagname, int tagnum)
+{
+	if (bucketsFlag) {
+		// Define the file location and name:
+		ofstream outfile;
+		std::stringstream filenamecombine;
+		filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".dat";
+		string filename = filenamecombine.str();
+		outfile.open(filename.c_str(), ios::out | ios::app);
+		// print number of buckets in y-dir and z-dir:
+		outfile << numBuckets.y << " " << numBuckets.z << endl;
+		// print distributions:
+		int numBucketsTot = numBuckets.y*numBuckets.z;
+		for (int i=0; i<numBucketsTot; i++) {
+			outfile << float(bucketCnt[i])/float(totalBucketCnt) << endl;
+		}	
+		// close file
+		outfile.close();
+	}	
+}
+
+
 
 

@@ -326,7 +326,7 @@ __global__ void extrapolate_force_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nNodes) {
-				
+		
 		// --------------------------------------
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
