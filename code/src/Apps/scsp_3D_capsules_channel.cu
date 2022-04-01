@@ -42,6 +42,7 @@ scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
 	// ----------------------------------------------
 	
 	nSteps = inputParams("Time/nSteps",0);
+	nStepsEquilibrate = inputParams("Time/nStepsEquilibrate",0);
 	
 	// ----------------------------------------------
 	// Lattice Boltzmann parameters:
@@ -95,10 +96,12 @@ scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
 	
 	// ----------------------------------------------
 	// determine membrane parameters (see function
-	// below):
+	// below), then calculate reference flux for no
+	// capsules:
 	// ----------------------------------------------
 	
 	calcMembraneParams(Re,Ca,umax,ksmax);
+	calcRefFlux();
 	
 }
 
@@ -204,11 +207,19 @@ void scsp_3D_capsules_channel::initSystem()
 	// ----------------------------------------------
 	// relax node positions: 
 	// ----------------------------------------------
-			
+	
+	cout << " " << endl;
+	cout << "-----------------------------------------------" << endl;
+	cout << "Relaxing capsules..." << endl;
+		
 	scale = 1.0/0.7;
 	ibm.relax_node_positions_skalak(90000,scale,0.02,nBlocks,nThreads);	
 	ibm.relax_node_positions_skalak(90000,1.0,0.02,nBlocks,nThreads);
-					
+		
+	cout << "... done relaxing" << endl;
+	cout << "-----------------------------------------------" << endl;
+	cout << " " << endl;
+				
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
@@ -240,7 +251,26 @@ void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
 	// beginning of this cycle:
 	// ----------------------------------------------
 	
-	int cummulativeSteps = stepsPerCycle*currentCycle;	
+	int cummulativeSteps = stepsPerCycle*currentCycle;
+	
+	// ----------------------------------------------
+	// if simulation just started, perform 
+	// equilibration:
+	// ----------------------------------------------
+	
+	if (cummulativeSteps == 0) {
+		cout << " " << endl;
+		cout << "-----------------------------------------------" << endl;
+		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
+		for (int i=0; i<nStepsEquilibrate; i++) {
+			if (i%10000 == 0) cout << "equilibration step " << i << endl;
+			stepIBM();
+		}
+		cout << " " << endl;
+		cout << "... done equilibrating!" << endl;
+		cout << "-----------------------------------------------" << endl;
+		cout << " " << endl;
+	}
 	
 	// ----------------------------------------------
 	// loop through this cycle:
@@ -347,19 +377,21 @@ void scsp_3D_capsules_channel::stepVerlet()
 // --------------------------------------------------------
 
 void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
-{	
-	// analyze the system:
-	if (step > 50000) {
+{				
+	if (step > 0) { 
+		// analyze membrane geometry:
 		ibm.membrane_geometry_analysis("capdata",step);
-		//ibm.print_cell_distributions_yz_plane("capdistribution",step);
-		lbm.calculate_flow_rate_xdir("flowdata",step);
-	}	
 	
-	// write output for LBM and IBM:
-	if (step == nSteps) {
-		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
-		ibm.write_output("ibm",step);
-	}			
+		// calculate relative viscosity:
+		lbm.calculate_relative_viscosity("relative_viscosity_thru_time",Q0,step);
+	
+		// write output for LBM and IBM:
+		if (step == nSteps) {
+			lbm.print_flow_rate_xdir("flow_data",step);
+			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+			ibm.write_output("ibm",step);
+		}		
+	}	
 }
 
 
@@ -444,7 +476,41 @@ float scsp_3D_capsules_channel::calcInfSum(float w, float h)
 
 
 
+// --------------------------------------------------------
+// Calculate reference flux for the chosen values of w, h,
+// bodyForx, and nu:
+// --------------------------------------------------------
 
+void scsp_3D_capsules_channel::calcRefFlux()
+{
+	// parameters:
+	float w = float(Ny-1)/2.0;
+	float h = float(Nz-1)/2.0;
+	Q0 = 0.0;
+	
+	// calculate solution for velocity at every
+	// site in the y-z plane:
+	for (int j=0; j<Ny; j++) {
+		for (int k=0; k<Nz; k++) {
+			float y = float(j) - w;
+			float z = float(k) - h;
+			float sumval = 0.0;
+			// take first 40 terms of infinite sum
+			for (int n = 1; n<80; n=n+2) {
+				float nf = float(n);
+				float pref = pow(-1.0,(nf-1.0)/2)/(nf*nf*nf);
+				float term = pref*(1 - cosh(nf*M_PI*z/2/w) / cosh(nf*M_PI*h/2/w)) * cos(nf*M_PI*y/2/w);
+				sumval += term;
+			}
+			float u0 = (16*bodyForx*w*w/nu/pow(M_PI,3))*sumval;
+			Q0 += u0;
+		}
+	}
+	
+	// output the results:
+	cout << "reference flux = " << Q0 << endl;
+	cout << "  " << endl;		
+}
 
 
 

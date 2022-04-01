@@ -23,8 +23,10 @@ private:
 	int nVoxels;	
 	int Nx,Ny,Nz;
 	int numIolets;
+	int xvelAveCnt;
 	float nu;
 	float dt;
+	float relViscAve;
 	bool forceFlag;
 	bool velIBFlag;
 	bool inoutFlag;
@@ -45,6 +47,7 @@ private:
 	int* solidH;
 	int* inoutH;
 	iolet* ioletsH;
+	float* xvelAve;
 	
 	// device arrays:
 	float* u;
@@ -131,6 +134,8 @@ public:
 	void viscous_force_IBM_LBM(int,int,float,float3*,float3*,float3*,int);
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);
+	void calculate_relative_viscosity(std::string,float,int);
+	void print_flow_rate_xdir(std::string,int);
 	void read_lattice_geometry(int);
 	void vtk_structured_output_ruvw(std::string,int,int,int,int);
 	void vtk_structured_output_iuvw_inout(std::string,int,int,int,int);

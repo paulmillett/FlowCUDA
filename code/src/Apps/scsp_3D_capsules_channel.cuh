@@ -24,12 +24,14 @@ private:
 	int nFaces;
 	int nEdges;
 	int nSteps;
+	int nStepsEquilibrate;
 	int iskip,jskip,kskip;
 	float tau;
 	float nu;
 	float bodyForx;
 	float a;
 	float gam;
+	float Q0;
 	std::string vtkFormat;
 	
 	// objects:
@@ -47,6 +49,7 @@ public:
 	void writeOutput(std::string,int);
 	void calcMembraneParams(float,float,float,float);
 	float calcInfSum(float,float);
+	void calcRefFlux();
 	
 };
 

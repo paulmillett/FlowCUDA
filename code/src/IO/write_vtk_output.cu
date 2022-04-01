@@ -426,6 +426,18 @@ void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
 	outfile.open(filename.c_str(), ios::out | ios::app);
 	
 	// -----------------------------------------------
+	//	find output dimensions considering
+	//  iskip, jskip, kskip:
+	// -----------------------------------------------
+	
+	int Nxs = NX/iskip;
+	int Nys = NY/jskip;
+	int Nzs = NZ/kskip;
+	if (NX%2 && iskip>1) Nxs++;  // if odd, then add 1
+	if (NY%2 && jskip>1) Nys++;
+	if (NZ%2 && kskip>1) Nzs++;	
+	
+	// -----------------------------------------------
 	//	Write the 'vtk' file header:
 	// -----------------------------------------------
 	
@@ -435,11 +447,11 @@ void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
 	outfile << "ASCII" << endl;
 	outfile << " " << endl;
 	outfile << "DATASET STRUCTURED_POINTS" << endl;
-	outfile << "DIMENSIONS" << d << NX/iskip << d << NY/jskip << d << NZ/kskip << endl;	
+	outfile << "DIMENSIONS" << d << Nxs << d << Nys << d << Nzs << endl;	
 	outfile << "ORIGIN " << d << 0 << d << 0 << d << 0 << endl;
 	outfile << "SPACING" << d << 1.0*iskip << d << 1.0*jskip << d << 1.0*kskip << endl;	
     outfile << " " << endl;
-    outfile << "POINT_DATA " << (NX/iskip)*(NY/jskip)*(NZ/kskip) << endl;
+    outfile << "POINT_DATA " << Nxs*Nys*Nzs << endl;
     outfile << "SCALARS " << tagname << " float" << endl;
     outfile << "LOOKUP_TABLE default" << endl;
 		

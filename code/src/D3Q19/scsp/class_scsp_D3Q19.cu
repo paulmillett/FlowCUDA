@@ -49,7 +49,9 @@ class_scsp_D3Q19::class_scsp_D3Q19()
 	velIBFlag = false;
 	inoutFlag = false;
 	solidFlag = false;
-	xyzFlag = false;	
+	xyzFlag = false;
+	xvelAveCnt = 0;
+	relViscAve = 0.0;
 }
 
 
@@ -80,6 +82,7 @@ void class_scsp_D3Q19::allocate()
 	voxelTypeH = (int*)malloc(nVoxels*sizeof(int));
 	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));	
 	ioletsH = (iolet*)malloc(numIolets*sizeof(iolet));
+	xvelAve = (float*)malloc(Ny*Nz*sizeof(float));
 			
 	// allocate array memory (device):
 	cudaMalloc((void **) &u, nVoxels*sizeof(float));
@@ -187,7 +190,7 @@ void class_scsp_D3Q19::deallocate()
 	free(nListH);
 	free(voxelTypeH);
 	free(streamIndexH);	
-	free(ioletsH);	
+	free(ioletsH);
 	if (xyzFlag) {
 		free(xH);
 		free(yH);
@@ -837,11 +840,108 @@ void class_scsp_D3Q19::inside_hemisphere(int nBlocks, int nThreads)
 
 
 
+// --------------------------------------------------------
+// Calculate the time-averaged x-vel profile.  Also,
+// calculate the instantaneous relative viscosity and
+// print to file
+// --------------------------------------------------------
 
+void class_scsp_D3Q19::calculate_relative_viscosity(std::string tagname, float Q0, int tagnum)
+{
+		
+	// define the file location and name (flowrate thru time):
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << ".dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// create array for the current x-vel average along channel:
+	float* xvel = (float*)malloc(Ny*Nz*sizeof(float));
+	for (int i=0; i<Ny*Nz; i++) xvel[i] = 0.0;
+	
+	// loop over grid and calculate average x-vel for each voxel
+	// on the yz-plane (for current time):
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			float vxsum = 0.0;
+			for (int i=0; i<Nx; i++) {		
+				vxsum += uH[k*Nx*Ny + j*Nx + i];
+			}
+			xvel[k*Ny + j] = vxsum/float(Nx);
+		}
+	}
+	
+	// update the cumulative moving average for x-vel profile:
+	xvelAveCnt++;
+	for (int i=0; i<Ny*Nz; i++) {
+		xvelAve[i] = (xvel[i] + (xvelAveCnt-1)*xvelAve[i])/xvelAveCnt;
+	}
+	
+	// calculate relative viscosity defined as ratio of reference
+	// flux (without capsules) divided by instantaneous flux:
+	float Q = 0.0;
+	for (int i=0; i<Ny*Nz; i++) Q += xvel[i];
+	float relVisc = Q0/Q;
+	relViscAve = (relVisc + (xvelAveCnt-1)*relViscAve)/xvelAveCnt;
+	outfile << fixed << setprecision(4) << tagnum << "  " << relVisc << "  " << relViscAve << endl;
+			
+}
+
+
+
+// --------------------------------------------------------
+// Calculate the time-averaged x-vel profile.  Also,
+// calculate the x-dir flux and print to file
+// --------------------------------------------------------
 
 void class_scsp_D3Q19::calculate_flow_rate_xdir(std::string tagname, int tagnum)
 {
+		
+	// define the file location and name (flowrate thru time):
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << ".dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
 	
+	// create array for the current x-vel average along channel:
+	float* xvel = (float*)malloc(Ny*Nz*sizeof(float));
+	for (int i=0; i<Ny*Nz; i++) xvel[i] = 0.0;
+	
+	// loop over grid and calculate average x-vel for each voxel
+	// on the yz-plane (for current time):
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			float vxsum = 0.0;
+			for (int i=0; i<Nx; i++) {		
+				vxsum += uH[k*Nx*Ny + j*Nx + i];
+			}
+			xvel[k*Ny + j] = vxsum/float(Nx);
+		}
+	}
+	
+	// calculate x-dir flux defined as sum of xvel[]:
+	float Q = 0.0;
+	for (int i=0; i<Ny*Nz; i++) Q += xvel[i];
+	outfile << fixed << setprecision(4) << tagnum << "  " << Q << endl;
+	
+	// update the cumulative moving average for x-vel profile:
+	xvelAveCnt++;
+	for (int i=0; i<Ny*Nz; i++) {
+		xvelAve[i] = (xvel[i] + (xvelAveCnt-1)*xvelAve[i])/xvelAveCnt;
+	}
+		
+}
+
+
+
+// --------------------------------------------------------
+// Print the time-averaged x-vel profile:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::print_flow_rate_xdir(std::string tagname, int tagnum)
+{
 	// define the file location and name:
 	ofstream outfile;
 	std::stringstream filenamecombine;
@@ -849,44 +949,13 @@ void class_scsp_D3Q19::calculate_flow_rate_xdir(std::string tagname, int tagnum)
 	string filename = filenamecombine.str();
 	outfile.open(filename.c_str(), ios::out | ios::app);
 	
-	// define the file location and name (flowrate thru time):
-	ofstream outfile2;
-	std::stringstream filenamecombine2;
-	filenamecombine2 << "vtkoutput/" << "flowrate_data_thru_time.dat";
-	string filename2 = filenamecombine2.str();
-	outfile2.open(filename2.c_str(), ios::out | ios::app);
-	
-	// create variables for this calculation:
-	float* velx = (float*)malloc(Ny*Nz*sizeof(float));
-	for (int i=0; i<Ny*Nz; i++) velx[i] = 0.0;
-	
-	// loop over grid and calculate average x-vel for each voxel
-	// on the yz-plane:
-	for (int k=0; k<Nz; k++) {
-		for (int j=0; j<Ny; j++) {
-			float vxsum = 0.0;
-			for (int i=0; i<Nx; i++) {		
-				vxsum += uH[k*Nx*Ny + j*Nx + i];
-			}
-			velx[k*Ny + j] = vxsum/float(Nx);
-		}
-	}
-	
-	// calculate overall x-dir. volumetric flow rate:
-	float Qx = 0.0;
-	for (int i=0; i<Ny*Nz; i++) Qx += velx[i];  // assume dx=dy=dz=1
-	
 	// print results:
 	outfile << Ny << " " << Nz << endl;
 	for (int i=0; i<Ny*Nz; i++) {
-		outfile << fixed << setprecision(4) << velx[i] << endl;
+		outfile << fixed << setprecision(4) << xvelAve[i] << endl;
 	}
-		
-	// print results for flowrate:
-	outfile2 << fixed << setprecision(4) << tagnum << "  " << Qx << endl;
-	
 }
-
+	
 
 
 
