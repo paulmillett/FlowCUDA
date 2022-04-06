@@ -108,6 +108,7 @@ class class_membrane_ibm3D {
 	void compute_node_forces(int,int);
 	void compute_node_forces_skalak(int,int);
 	void wall_forces_ydir(int,int);
+	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
 	void change_cell_volume(float,int,int);
 	void scale_equilibrium_cell_size(float,int,int); 

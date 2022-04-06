@@ -363,6 +363,18 @@ void class_scsp_D3Q19::create_lattice_box_shear()
 
 
 // --------------------------------------------------------
+// Initialize lattice as a "box" set up for slit flow
+// in the x-direction (plane poiseuille):
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::create_lattice_box_slit()
+{
+	build_box_lattice_slit_D3Q19(nVoxels,Nx,Ny,Nz,voxelTypeH,nListH);
+}
+
+
+
+// --------------------------------------------------------
 // Initialize lattice as a "box" set up for channel flow
 // in the x-direction:
 // --------------------------------------------------------
@@ -673,6 +685,21 @@ void class_scsp_D3Q19::set_boundary_shear_velocity(float uBot, float uTop, int n
 {
 	scsp_set_boundary_shear_velocity_D3Q19 
 	<<<nBlocks,nThreads>>> (uBot,uTop,f1,u,v,w,r,Nx,Ny,Nz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "set_boundary_slit_velocity_D3Q19" kernel:
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::set_boundary_slit_velocity(float uWall, int nBlocks, int nThreads)
+{
+	scsp_set_boundary_slit_velocity_D3Q19 
+	<<<nBlocks,nThreads>>> (uWall,f1,u,v,w,r,Nx,Ny,Nz,nVoxels);
 }
 
 

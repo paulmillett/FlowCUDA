@@ -61,6 +61,15 @@ __global__ void wall_forces_ydir_IBM3D(
 	int);
 
 
+__global__ void wall_forces_zdir_IBM3D(
+	float3*,
+	float3*,
+	float3,
+	float,
+	float,
+	int);
+		
+		
 __global__ void wall_forces_ydir_zdir_IBM3D(
 	float3*,
 	float3*,

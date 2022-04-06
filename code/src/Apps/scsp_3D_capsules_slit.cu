@@ -1,5 +1,5 @@
 
-# include "scsp_3D_capsules_channel.cuh"
+# include "scsp_3D_capsules_slit.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
+scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -111,7 +111,7 @@ scsp_3D_capsules_channel::scsp_3D_capsules_channel() : lbm(),ibm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_channel::~scsp_3D_capsules_channel()
+scsp_3D_capsules_slit::~scsp_3D_capsules_slit()
 {
 	lbm.deallocate();
 	ibm.deallocate();	
@@ -123,7 +123,7 @@ scsp_3D_capsules_channel::~scsp_3D_capsules_channel()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_channel::initSystem()
+void scsp_3D_capsules_slit::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -134,10 +134,10 @@ void scsp_3D_capsules_channel::initSystem()
 	string latticeSource = inputParams("Lattice/source","box");	
 		
 	// ----------------------------------------------
-	// create the lattice for channel flow:
+	// create the lattice for shear flow (same as slit):
 	// ----------------------------------------------	
 	
-	lbm.create_lattice_box_channel();
+	lbm.create_lattice_box_slit();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -243,7 +243,7 @@ void scsp_3D_capsules_channel::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_capsules_slit::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -305,7 +305,7 @@ void scsp_3D_capsules_channel::cycleForward(int stepsPerCycle, int currentCycle)
 // Take a time-step with the traditional IBM approach:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_channel::stepIBM()
+void scsp_3D_capsules_slit::stepIBM()
 {
 	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
@@ -317,14 +317,14 @@ void scsp_3D_capsules_channel::stepIBM()
 	// compute IBM node forces:
 	ibm.compute_node_forces_skalak(nBlocks,nThreads);
 	ibm.nonbonded_node_interactions(nBlocks,nThreads);
-	ibm.wall_forces_ydir_zdir(nBlocks,nThreads);
+	ibm.wall_forces_zdir(nBlocks,nThreads);
 	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
 			
 	// update fluid:
 	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
 	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 	lbm.stream_collide_save_forcing(nBlocks,nThreads);
-	lbm.set_channel_wall_velocity(0.0,nBlocks,nThreads);
+	lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
 	
 	// update membrane:
 	//lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
@@ -340,7 +340,7 @@ void scsp_3D_capsules_channel::stepIBM()
 // Take a time-step with the velocity-Verlet approach for IBM:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_channel::stepVerlet()
+void scsp_3D_capsules_slit::stepVerlet()
 {
 	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
@@ -355,13 +355,13 @@ void scsp_3D_capsules_channel::stepVerlet()
 	// compute IBM node forces:
 	ibm.compute_node_forces_skalak(nBlocks,nThreads);
 	ibm.nonbonded_node_interactions(nBlocks,nThreads);
-	ibm.wall_forces_ydir_zdir(nBlocks,nThreads);
+	ibm.wall_forces_zdir(nBlocks,nThreads);
 			
 	// update fluid:
 	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.r,ibm.v,ibm.f,nNodes);
 	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 	lbm.stream_collide_save_forcing(nBlocks,nThreads);
-	lbm.set_channel_wall_velocity(0.0,nBlocks,nThreads);
+	lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
 	
 	// second step of IBM velocity verlet:
 	ibm.update_node_positions_verlet_2(nBlocks,nThreads);
@@ -376,7 +376,7 @@ void scsp_3D_capsules_channel::stepVerlet()
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
+void scsp_3D_capsules_slit::writeOutput(std::string tagname, int step)
 {				
 	if (step > 0) { 
 		// analyze membrane geometry:
@@ -387,10 +387,12 @@ void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 	
 		// write output for LBM and IBM:
 		if (step == nSteps) {
-			lbm.print_flow_rate_xdir("flow_data",step);
-			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
-			ibm.write_output("ibm",step);
-		}		
+			lbm.print_flow_rate_xdir("flow_data",step);			
+		}
+		
+		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+		ibm.write_output("ibm",step);
+		
 	}	
 }
 
@@ -403,30 +405,27 @@ void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 // conditions that maximum u < umax and ks < ksmax:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_channel::calcMembraneParams(float Re, float Ca, float umax, float Ksmax)
+void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, float Ksmax)
 {
 	// assumed parameters:
 	float rho = 1.0;
-	float w = float(Ny-1)/2.0;
 	float h = float(Nz-1)/2.0;
-	float Dh = 4.0*(4.0*w*h)/(4.0*(w+h));
-	float infsum = calcInfSum(w,h);
-
+	
 	// set Ks to some large number:
 	float Ks = 1000.0;
 
 	// loop until parameters are acceptable:
 	while (Ks > Ksmax) {		
 		// step 1: calculate nu:
-		nu = umax*Dh/Re;
+		nu = umax*h/Re;
 		while (nu > 1.0/6.0) {
 		    umax *= 0.9999;
-		    nu = umax*Dh/Re;
+		    nu = umax*h/Re;
 		}	    
 		// step 2: calculate fx:
-		bodyForx = umax*nu*pow(M_PI,3)/(16.0*w*w*infsum);
+		bodyForx = 2.0*umax*rho*nu/h/h;
 		// step 3: calculate Es:
-		Ks = rho*nu*umax*a/(h*Ca);
+		Ks = bodyForx*h*a/2.0/Ca;
 		// step 4: if Es > Esmax, reduce umax
 		if (Ks > Ksmax) umax *= 0.9999;
 	}
@@ -442,36 +441,16 @@ void scsp_3D_capsules_channel::calcMembraneParams(float Re, float Ca, float umax
 	
 	// output the results:
 	cout << "  " << endl;
-	cout << "hydraulic diameter = " << Dh << endl;
+	cout << "H = " << h << endl;
 	cout << "umax = " << umax << endl;
 	cout << "ks = " << Ks << endl;
 	cout << "nu = " << nu << endl;
 	cout << "fx = " << bodyForx << endl;
 	cout << "  " << endl;
-	cout << "Re = " << umax*Dh/nu << endl;
-	cout << "Ca = " << rho*nu*umax*a/h/Ks << endl;
+	cout << "Re = " << umax*h/nu << endl;
+	cout << "Ca = " << bodyForx*h*a/2.0/Ks << endl;
 	cout << "  " << endl;
 		
-}
-
-
-
-// --------------------------------------------------------
-// Calculate infinite sum associated with solution
-// to velocity profile in rectanglular channel:
-// --------------------------------------------------------
-
-float scsp_3D_capsules_channel::calcInfSum(float w, float h)
-{
-	float outval = 0.0;
-	// take first 40 terms of infinite sum
-	for (int n = 1; n<80; n=n+2) {
-		float nf = float(n);
-		float pref = pow(-1.0,(nf-1.0)/2)/(nf*nf*nf);
-		float term = pref*(1 - 1/cosh(nf*M_PI*h/2.0/w));
-		outval += term;
-	}
-	return outval;
 }
 
 
@@ -481,32 +460,13 @@ float scsp_3D_capsules_channel::calcInfSum(float w, float h)
 // bodyForx, and nu:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_channel::calcRefFlux()
+void scsp_3D_capsules_slit::calcRefFlux()
 {
 	// parameters:
-	float w = float(Ny-1)/2.0;
+	float w = float(Ny-1);
 	float h = float(Nz-1)/2.0;
-	Q0 = 0.0;
-	
-	// calculate solution for velocity at every
-	// site in the y-z plane:
-	for (int j=0; j<Ny; j++) {
-		for (int k=0; k<Nz; k++) {
-			float y = float(j) - w;
-			float z = float(k) - h;
-			float sumval = 0.0;
-			// take first 40 terms of infinite sum
-			for (int n = 1; n<80; n=n+2) {
-				float nf = float(n);
-				float pref = pow(-1.0,(nf-1.0)/2)/(nf*nf*nf);
-				float term = pref*(1 - cosh(nf*M_PI*z/2/w) / cosh(nf*M_PI*h/2/w)) * cos(nf*M_PI*y/2/w);
-				sumval += term;
-			}
-			float u0 = (16*bodyForx*w*w/nu/pow(M_PI,3))*sumval;
-			Q0 += u0;
-		}
-	}
-	
+	Q0 = 2.0*bodyForx*h*h*h*w/3.0/nu;
+		
 	// output the results:
 	cout << "reference flux = " << Q0 << endl;
 	cout << "  " << endl;		

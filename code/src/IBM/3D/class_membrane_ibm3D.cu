@@ -872,6 +872,18 @@ void class_membrane_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to kernel that calculates wall forces in z-dir:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::wall_forces_zdir(int nBlocks, int nThreads)
+{
+	wall_forces_zdir_IBM3D
+	<<<nBlocks,nThreads>>> (r,f,Box,repA,repD,nNodes);
+}
+
+
+
+// --------------------------------------------------------
 // Call to kernel that calculates wall forces in y-dir
 // and z-dir:
 // --------------------------------------------------------

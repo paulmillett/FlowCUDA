@@ -233,6 +233,40 @@ __global__ void wall_forces_ydir_IBM3D(
 // IBM3D kernel to calculate wall forces:
 // --------------------------------------------------------
 
+__global__ void wall_forces_zdir_IBM3D(
+	float3* R,
+	float3* F,
+	float3 Box,
+	float repA,
+	float repD,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		const float d = repD;
+		const float A = repA;
+		const float zi = R[i].z;
+		// bottom wall
+		if (zi < d) {
+			const float force = A/pow(zi,2) - A/pow(d,2);
+			F[i].z += force;
+		}
+		// top wall
+		else if (zi > Box.z-d) {
+			const float bmzi = Box.z - zi;
+			const float force = A/pow(bmzi,2) - A/pow(d,2);
+			F[i].z -= force;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
 __global__ void wall_forces_ydir_zdir_IBM3D(
 	float3* R,
 	float3* F,

@@ -91,6 +91,7 @@ public:
 	void create_lattice_box();
 	void create_lattice_box_periodic();
 	void create_lattice_box_shear();
+	void create_lattice_box_slit();
 	void create_lattice_box_channel();
 	void create_lattice_box_periodic_solid_walls();
 	void bounding_box_nList_construct();
@@ -123,6 +124,7 @@ public:
 	void stream_collide_save_forcing_solid(int,int);
 	void stream_collide_save_IBforcing(int,int);
 	void set_boundary_shear_velocity(float,float,int,int);
+	void set_boundary_slit_velocity(float,int,int);
 	void set_channel_wall_velocity(float,int,int);
 	void zero_forces(int,int);
 	void zero_forces_with_IBM(int,int);	
