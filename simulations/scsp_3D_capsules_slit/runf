@@ -1,0 +1,8 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=32
+#SBATCH --cpus-per-task=1
+#SBATCH --partition gpu06
+#SBATCH --time=04:00:00
+
+../../code/bin/FlowCUDA

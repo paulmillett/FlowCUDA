@@ -4,11 +4,12 @@
 
 
 [LBM]
-	App = scsp_3D_capsules_channel
+	App = scsp_3D_capsules_slit
 	nu = 0.1666666667
 	bodyForx = 0.00001
-	Re = 100.0  #200.0
-	umax = 0.05
+	Re = 100.0
+	umax = 0.03
+	Q0 = 135.3338
 []
 
 
@@ -16,9 +17,9 @@
 	nNodesPerCell = 642
 	nFacesPerCell = 1280
 	nEdgesPerCell = 1920	
-	nCells = 81  #162 #81  #41
-	a = 10.0
-	Ca = 2.0
+	nCells = 95  #162 #81  #41
+	a = 6.0
+	Ca = 0.3
 	ksmax = 0.002
 	kv = 0.05
 	gamma = 0.5
@@ -38,22 +39,23 @@
 	D = 3
 	Q = 19
 	source = box
-	nVoxels = 3513840
-	Nx = 240
-	Ny = 121
-	Nz = 121
+	nVoxels = 878400
+	Nx = 120
+	Ny = 120
+	Nz = 61
 	numIolets = 0
 []
 
 
 [Time]
-	nSteps = 200000
-	nStepsEquilibrate = 100000
+	nSteps = 300000
+	nStepsEquilibrate = 500000
 []
 
 
 [Output]
 	nOutputs = 200
+	nVTKOutputs = 20
 	format = structured
 	fName = macros
 	iskip = 2

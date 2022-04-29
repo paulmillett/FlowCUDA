@@ -1,0 +1,38 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_slit_channel
+	Re = 70
+	umax = 0.03
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 219600
+	Nx = 30
+	Ny = 120
+	Nz = 61
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 1000000
+[]
+
+
+[Output]
+	nOutputs = 20
+	format = structured
+	fName = macros
+	iskip = 1
+	jskip = 1
+	kskip = 1 
+[]
+

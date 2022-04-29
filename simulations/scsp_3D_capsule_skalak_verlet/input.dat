@@ -4,7 +4,7 @@
 
 
 [LBM]
-	App = scsp_3D_capsule_skalak
+	App = scsp_3D_capsule_skalak_verlet
 	nu = 0.166666666
 	shearVel = 0.05
 []
@@ -20,6 +20,7 @@
 	kb = 0.003	
 	kv = 0.9 
 	kag = 0.0
+	gamma = 1.0
 []
 
 
