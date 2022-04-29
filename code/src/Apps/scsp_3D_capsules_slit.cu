@@ -69,7 +69,7 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	ibm.set_pbcFlag(1,0,0);
+	ibm.set_pbcFlag(1,1,0);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -85,6 +85,7 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 	iskip = inputParams("Output/iskip",1);
 	jskip = inputParams("Output/jskip",1);
 	kskip = inputParams("Output/kskip",1);
+	nVTKOutputs = inputParams("Output/nVTKOutputs",0);
 	
 	// ----------------------------------------------
 	// allocate array memory (host & device):
@@ -102,6 +103,7 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 	
 	calcMembraneParams(Re,Ca,umax,ksmax);
 	calcRefFlux();
+	Q0 = inputParams("LBM/Q0",0.0);
 	
 }
 
@@ -148,12 +150,24 @@ void scsp_3D_capsules_slit::initSystem()
 	// ----------------------------------------------			
 	// initialize velocities: 
 	// ----------------------------------------------
+		
+	float h = float(Nz-1)/2.0;
 	
-	for (int i=0; i<nVoxels; i++) {
-		lbm.setU(i,0.0);
-		lbm.setV(i,0.0);
-		lbm.setW(i,0.0);
-		lbm.setR(i,1.0);		
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = k*Nx*Ny + j*Nx + i;
+				// analytical solution for Poiseuille flow
+				// between parallel plates:
+				double xvel0 = bodyForx*h*h/(2.0*nu);  // assume rho=1
+				double z = float(k) - h;
+				double xvel = xvel0*(1.0 - pow(z/h,2));
+				lbm.setU(ndx,xvel);
+				lbm.setV(ndx,0.0);
+				lbm.setW(ndx,0.0);
+				lbm.setR(ndx,1.0);
+			}
+		}
 	}
 	
 	// ----------------------------------------------			
@@ -213,8 +227,8 @@ void scsp_3D_capsules_slit::initSystem()
 	cout << "Relaxing capsules..." << endl;
 		
 	scale = 1.0/0.7;
-	ibm.relax_node_positions_skalak(90000,scale,0.02,nBlocks,nThreads);	
-	ibm.relax_node_positions_skalak(90000,1.0,0.02,nBlocks,nThreads);
+	ibm.relax_node_positions_skalak(90000,scale,0.1,nBlocks,nThreads);	
+	ibm.relax_node_positions_skalak(90000,1.0,0.1,nBlocks,nThreads);
 		
 	cout << "... done relaxing" << endl;
 	cout << "-----------------------------------------------" << endl;
@@ -278,8 +292,8 @@ void scsp_3D_capsules_slit::cycleForward(int stepsPerCycle, int currentCycle)
 	
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
-		stepIBM();
-		//stepVerlet();
+		//stepIBM();
+		stepVerlet();
 	}
 	
 	cout << cummulativeSteps << endl;	
@@ -378,21 +392,31 @@ void scsp_3D_capsules_slit::stepVerlet()
 
 void scsp_3D_capsules_slit::writeOutput(std::string tagname, int step)
 {				
+	if (step == 0) {
+		// only print out vtk files
+		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+		ibm.write_output("ibm",step);
+	}
+	
 	if (step > 0) { 
 		// analyze membrane geometry:
 		ibm.membrane_geometry_analysis("capdata",step);
 	
 		// calculate relative viscosity:
 		lbm.calculate_relative_viscosity("relative_viscosity_thru_time",Q0,step);
-	
-		// write output for LBM and IBM:
+		
+		// write vtk output for LBM and IBM:
+		int intervalVTK = nSteps/nVTKOutputs;
+		if (nVTKOutputs == 0) intervalVTK = nSteps;
+		if (step%intervalVTK == 0) {
+			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+			ibm.write_output("ibm",step);
+		}
+		
+		// print out final averaged flow profile:
 		if (step == nSteps) {
 			lbm.print_flow_rate_xdir("flow_data",step);			
 		}
-		
-		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
-		ibm.write_output("ibm",step);
-		
 	}	
 }
 
@@ -411,6 +435,19 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 	float rho = 1.0;
 	float h = float(Nz-1)/2.0;
 	
+	// Kruger's suggested calculations:
+	/*
+	nu = umax*h/Re;
+	bodyForx = 2.0*rho*umax*umax/(Re*h);
+	float Ks = rho*umax*umax*a/(Ca*Re);
+	*/
+	
+	// My calculations:
+	nu = umax*h/Re;
+	bodyForx = 2.0*rho*umax*umax/(Re*h);   //umax*2.0*rho*nu/(h*h);
+	float Ks = rho*umax*umax*a/(Ca*Re);    //rho*nu*umax*a/(h*Ca);
+		
+	/*
 	// set Ks to some large number:
 	float Ks = 1000.0;
 
@@ -429,10 +466,11 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 		// step 4: if Es > Esmax, reduce umax
 		if (Ks > Ksmax) umax *= 0.9999;
 	}
-
+	*/
+	
 	// assign values for ks and nu:
 	ibm.set_ks(Ks); 
-	ibm.set_kb(Ks*a*a*0.00287*sqrt(3));
+	ibm.set_kb(Ks*a*a*0.00287);  //*sqrt(3));
 	//ibm.set_kv(0.5);
 	ibm.set_ka(0.0007);
 	ibm.set_kag(0.0);
@@ -463,7 +501,7 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 void scsp_3D_capsules_slit::calcRefFlux()
 {
 	// parameters:
-	float w = float(Ny-1);
+	float w = float(Ny);   // PBC's in y-dir
 	float h = float(Nz-1)/2.0;
 	Q0 = 2.0*bodyForx*h*h*h*w/3.0/nu;
 		

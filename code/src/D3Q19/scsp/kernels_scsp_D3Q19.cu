@@ -271,6 +271,7 @@ __global__ void scsp_set_boundary_slit_velocity_D3Q19(float uWall,
 			u[i] = uWall;
 			v[i] = 0.0;
 			w[i] = 0.0;
+			r[i] = 1.0;
 			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
 		} 
 		if (zi == Nz-1) {
@@ -278,6 +279,7 @@ __global__ void scsp_set_boundary_slit_velocity_D3Q19(float uWall,
 			u[i] = uWall;
 			v[i] = 0.0;
 			w[i] = 0.0;
+			r[i] = 1.0;
 			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
 		}		
 	}		

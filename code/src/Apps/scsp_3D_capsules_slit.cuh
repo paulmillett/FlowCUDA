@@ -25,6 +25,7 @@ private:
 	int nEdges;
 	int nSteps;
 	int nStepsEquilibrate;
+	int nVTKOutputs;
 	int iskip,jskip,kskip;
 	float tau;
 	float nu;

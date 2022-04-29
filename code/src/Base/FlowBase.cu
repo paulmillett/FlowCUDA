@@ -39,6 +39,7 @@
 # include "../Apps/scsp_3D_capsules_channel.cuh"
 # include "../Apps/scsp_3D_capsules_slit.cuh"
 # include "../Apps/scsp_3D_duct_channel.cuh"
+# include "../Apps/scsp_3D_slit_channel.cuh"
 # include "../Apps/scsp_3D_rbcs_susp_shear.cuh"
 # include "../Apps/scsp_3D_swell_ibm.cuh"
 # include "../Apps/scsp_3D_leftvent_ibm.cuh"
@@ -96,6 +97,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_capsules_channel") return new scsp_3D_capsules_channel();
 	if (specifier == "scsp_3D_capsules_slit") return new scsp_3D_capsules_slit();
 	if (specifier == "scsp_3D_duct_channel") return new scsp_3D_duct_channel();
+	if (specifier == "scsp_3D_slit_channel") return new scsp_3D_slit_channel();
 	if (specifier == "scsp_3D_rbcs_susp_shear") return new scsp_3D_rbcs_susp_shear();
 	if (specifier == "scsp_3D_swell_ibm") return new scsp_3D_swell_ibm();
 	if (specifier == "scsp_3D_leftvent_ibm") return new scsp_3D_leftvent_ibm();
