@@ -1,0 +1,21 @@
+scsp_3D_capsules_slit
+  
+H = 45.5
+umax = 0.03
+ks = 0.0045
+nu = 0.034125
+fx = 9.89011e-07
+  
+Re = 40
+Ca = 0.03
+  
+reference flux = 218.4
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000

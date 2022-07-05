@@ -349,6 +349,115 @@ __global__ void scsp_set_channel_wall_velocity_D3Q19(float uWall,
 
 
 // --------------------------------------------------------
+// D3Q19 kernel to set wall densities at the z=0 and
+// z=Nz-1 boundaries.  The flow direction is the x-dir.
+// --------------------------------------------------------
+
+__global__ void scsp_set_boundary_slit_density_D3Q19(float* f1,													   
+												     int Nx,
+													 int Ny,
+													 int Nz,
+													 int nVoxels)
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {		
+		// 3D indices assuming data is ordered first x, then y, then z
+		int zi = i/(Nx*Ny); 
+		const float w0 = 1.0/3.0;
+		const float ws = 1.0/18.0;
+		const float wd = 1.0/36.0;
+		// only top and bottom boundaries
+		if (zi == 0 || zi == Nz-1) {
+			int offst = 19*i;			
+			float rho = f1[offst+0]+f1[offst+1]+f1[offst+2]+f1[offst+3]+f1[offst+4]+
+			            f1[offst+5]+f1[offst+6]+f1[offst+7]+f1[offst+8]+f1[offst+9]+
+			            f1[offst+10]+f1[offst+11]+f1[offst+12]+f1[offst+13]+f1[offst+14]+
+			            f1[offst+15]+f1[offst+16]+f1[offst+17]+f1[offst+18];
+			float rAdd = 1.0 - rho;
+			f1[offst+0] += w0*rAdd;
+			f1[offst+1] += ws*rAdd;
+			f1[offst+2] += ws*rAdd;
+			f1[offst+3] += ws*rAdd;
+			f1[offst+4] += ws*rAdd;
+			f1[offst+5] += ws*rAdd;
+			f1[offst+6] += ws*rAdd;
+			f1[offst+7] += wd*rAdd;
+			f1[offst+8] += wd*rAdd;
+			f1[offst+9] += wd*rAdd;
+			f1[offst+10] += wd*rAdd;
+			f1[offst+11] += wd*rAdd;
+			f1[offst+12] += wd*rAdd;
+			f1[offst+13] += wd*rAdd;
+			f1[offst+14] += wd*rAdd;
+			f1[offst+15] += wd*rAdd;
+			f1[offst+16] += wd*rAdd;
+			f1[offst+17] += wd*rAdd;
+			f1[offst+18] += wd*rAdd;
+		} 
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to set wall densities at the z=0, 
+// z=Nz-1, y=0, and y=Ny-1 boundaries.
+// The flow direction is the x-dir.
+// --------------------------------------------------------
+
+__global__ void scsp_set_boundary_duct_density_D3Q19(float* f1,													   
+												     int Nx,
+													 int Ny,
+													 int Nz,
+													 int nVoxels)
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {		
+		// 3D indices assuming data is ordered first x, then y, then z
+		//int xi = i%Nx;
+		int yi = (i/Nx)%Ny;
+		int zi = i/(Nx*Ny); 
+		const float w0 = 1.0/3.0;
+		const float ws = 1.0/18.0;
+		const float wd = 1.0/36.0;
+		// only duct boundaries in y- and z-dir's
+		if (zi == 0 || zi == Nz-1 || yi == 0 || yi == Ny-1) {
+			int offst = 19*i;			
+			float rho = f1[offst+0]+f1[offst+1]+f1[offst+2]+f1[offst+3]+f1[offst+4]+
+			            f1[offst+5]+f1[offst+6]+f1[offst+7]+f1[offst+8]+f1[offst+9]+
+			            f1[offst+10]+f1[offst+11]+f1[offst+12]+f1[offst+13]+f1[offst+14]+
+			            f1[offst+15]+f1[offst+16]+f1[offst+17]+f1[offst+18];
+			float rAdd = 1.0 - rho;
+			f1[offst+0] += w0*rAdd;
+			f1[offst+1] += ws*rAdd;
+			f1[offst+2] += ws*rAdd;
+			f1[offst+3] += ws*rAdd;
+			f1[offst+4] += ws*rAdd;
+			f1[offst+5] += ws*rAdd;
+			f1[offst+6] += ws*rAdd;
+			f1[offst+7] += wd*rAdd;
+			f1[offst+8] += wd*rAdd;
+			f1[offst+9] += wd*rAdd;
+			f1[offst+10] += wd*rAdd;
+			f1[offst+11] += wd*rAdd;
+			f1[offst+12] += wd*rAdd;
+			f1[offst+13] += wd*rAdd;
+			f1[offst+14] += wd*rAdd;
+			f1[offst+15] += wd*rAdd;
+			f1[offst+16] += wd*rAdd;
+			f1[offst+17] += wd*rAdd;
+			f1[offst+18] += wd*rAdd;
+		} 
+	}		
+}
+
+
+
+// --------------------------------------------------------
 // D3Q19 update kernel.
 // This algorithm is based on the optimized "stream-collide-
 // save" algorithm recommended by T. Kruger in the 

@@ -5,7 +5,7 @@
 
 [LBM]
 	App = scsp_3D_slit_channel
-	Re = 70
+	Re = 400.0
 	umax = 0.03
 []
 
@@ -14,10 +14,10 @@
 	D = 3
 	Q = 19
 	source = box
-	nVoxels = 219600
+	nVoxels = 75600
 	Nx = 30
 	Ny = 120
-	Nz = 61
+	Nz = 21
 	numIolets = 0
 []
 

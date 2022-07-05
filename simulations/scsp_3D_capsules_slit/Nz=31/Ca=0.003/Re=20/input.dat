@@ -1,0 +1,66 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsules_slit
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 20
+	umax = 0.03
+	Q0 = 74.346
+[]
+
+
+[IBM]
+	nNodesPerCell = 642
+	nFacesPerCell = 1280
+	nEdgesPerCell = 1920	
+	nCells = 49
+	a = 6.0
+	Ca = 0.003
+	ksmax = 0.002
+	kv = 0.0001
+	gamma = 0.5
+	ibmUpdate = ibm
+	
+	sizeBins = 4.0
+	binMax = 35
+	repA = 0.1
+	repD = 1.0  #1.732  #sqrt(3)
+	repFmax = 0.1
+	buckets = 1
+	numBucketsY = 20
+	numBucketsZ = 20
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 446400
+	Nx = 120
+	Ny = 120
+	Nz = 31
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 300000
+	nStepsEquilibrate = 300000
+[]
+
+
+[Output]
+	nOutputs = 200
+	nVTKOutputs = 20
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+

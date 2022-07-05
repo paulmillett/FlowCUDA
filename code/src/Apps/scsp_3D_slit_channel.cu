@@ -54,7 +54,7 @@ scsp_3D_slit_channel::scsp_3D_slit_channel() : lbm()
 	umax = inputParams("LBM/umax",0.1);
 	
 	float rho = 1.0;
-	float h = float(Nz-1)/2.0;
+	float h = float(Nz)/2.0;  // float(Nz-1)/2.0;
 	nu = umax*h/Re;
 	bodyForx = 2.0*rho*umax*umax/(Re*h);
 	
@@ -130,7 +130,7 @@ void scsp_3D_slit_channel::initSystem()
 	// initialize velocities: 
 	// ----------------------------------------------
 		
-	float h = float(Nz-1)/2.0;
+	float h = float(Nz)/2.0;  //float(Nz-1)/2.0;
 	
 	for (int k=0; k<Nz; k++) {
 		for (int j=0; j<Ny; j++) {
@@ -200,7 +200,8 @@ void scsp_3D_slit_channel::cycleForward(int stepsPerCycle, int currentCycle)
 		// update fluid:
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
-		lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
+		//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
+		lbm.set_boundary_slit_density(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 
 	}

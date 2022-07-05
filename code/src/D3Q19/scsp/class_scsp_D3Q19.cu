@@ -720,6 +720,36 @@ void class_scsp_D3Q19::set_channel_wall_velocity(float uWall, int nBlocks, int n
 
 
 // --------------------------------------------------------
+// Call to "scsp_set_boundary_slit_density_D3Q19" kernel:
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::set_boundary_slit_density(int nBlocks, int nThreads)
+{
+	scsp_set_boundary_slit_density_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,Nx,Ny,Nz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_set_boundary_duct_density_D3Q19" kernel:
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::set_boundary_duct_density(int nBlocks, int nThreads)
+{
+	scsp_set_boundary_duct_density_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,Nx,Ny,Nz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "extrapolate_velocity_IBM3D" kernel.  
 // Note: this kernel is in the IBM/3D folder, and one
 //       should use nBlocks as if calling an IBM kernel.
@@ -911,7 +941,7 @@ void class_scsp_D3Q19::calculate_relative_viscosity(std::string tagname, float Q
 	for (int i=0; i<Ny*Nz; i++) Q += xvel[i];
 	float relVisc = Q0/Q;
 	relViscAve = (relVisc + (xvelAveCnt-1)*relViscAve)/xvelAveCnt;
-	outfile << fixed << setprecision(4) << tagnum << "  " << relVisc << "  " << relViscAve << endl;
+	outfile << fixed << setprecision(4) << tagnum << "  " << relVisc << "  " << relViscAve << "  " << Q << endl;
 			
 }
 

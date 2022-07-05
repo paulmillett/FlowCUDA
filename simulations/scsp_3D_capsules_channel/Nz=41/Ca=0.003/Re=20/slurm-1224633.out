@@ -1,0 +1,25 @@
+scsp_3D_capsules_channel
+  
+hydraulic diameter = 61
+umax = 0.03
+ks = 0.009
+nu = 0.04575
+fx = 5.00674e-06
+  
+Re = 20
+Ca = 0.03
+  
+reference flux = 53.2182
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+slurmstepd: error: *** JOB 1224633 ON c1713 CANCELLED AT 2022-06-28T11:39:48 ***

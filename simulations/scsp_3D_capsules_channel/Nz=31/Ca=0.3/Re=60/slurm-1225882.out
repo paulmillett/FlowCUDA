@@ -1,0 +1,15 @@
+scsp_3D_capsules_channel
+  
+hydraulic diameter = 49.0392
+umax = 0.03
+ks = 0.000358823
+nu = 0.0122598
+fx = 2.18116e-06
+  
+Re = 60
+Ca = 0.3
+  
+reference flux = 36.3761
+  
+nnbins = 26
+slurmstepd: error: *** JOB 1225882 ON c1706 CANCELLED AT 2022-06-30T10:28:00 ***

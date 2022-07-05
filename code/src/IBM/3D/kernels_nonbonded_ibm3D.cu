@@ -174,6 +174,7 @@ __device__ inline void pairwise_interaction_forces(
 	const float r = length(rij);
 	if (r < repD) {
 		// if separation is too small, we must adjust positions:
+		/*
 		if (r < 1.732) {
 			float dr = 1.732 - r;
 			// avoid adjusting positions twice:
@@ -190,8 +191,14 @@ __device__ inline void pairwise_interaction_forces(
 			if (force > repFmax) force = repFmax;
 			F[i] += force*(rij/r);
 		}
+		*/
 		
-		if (r < 1.0) printf("separation = %f \n",r);
+		
+		float force = repA/pow(r,2) - repA/pow(repD,2);
+		if (force > repFmax) force = repFmax;
+		F[i] += force*(rij/r);
+		
+		if (r < 0.5) printf("separation = %f \n",r);
 	} 	
 }
 

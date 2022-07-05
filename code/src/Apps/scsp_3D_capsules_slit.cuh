@@ -34,6 +34,7 @@ private:
 	float gam;
 	float Q0;
 	std::string vtkFormat;
+	std::string ibmUpdate;
 	
 	// objects:
 	class_scsp_D3Q19 lbm;

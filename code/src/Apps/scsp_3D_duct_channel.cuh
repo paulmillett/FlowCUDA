@@ -24,6 +24,9 @@ private:
 	float tau;
 	float nu;
 	float bodyForx;
+	float Re;
+	float umax;
+	float Q0;
 	std::string vtkFormat;
 	
 	// objects:
@@ -36,6 +39,8 @@ public:
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
+	float calcInfSum(float,float);
+	float calcRefFlux(float,float);
 	
 };
 

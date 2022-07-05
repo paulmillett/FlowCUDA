@@ -1,0 +1,457 @@
+scsp_3D_capsules_channel
+  
+hydraulic diameter = 61
+umax = 0.03
+ks = 0.00027
+nu = 0.004575
+fx = 5.00674e-07
+  
+Re = 200
+Ca = 0.1
+  
+reference flux = 53.2182
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+... done relaxing
+-----------------------------------------------
+ 
+ 
+-----------------------------------------------
+Equilibrating for 300000 steps...
+equilibration step 0
+equilibration step 10000
+separation = 0.495485 
+separation = 0.495485 
+separation = 0.495485 
+separation = 0.499022 
+separation = 0.499022 
+separation = 0.497668 
+separation = 0.497668 
+separation = 0.497668 
+separation = 0.492417 
+separation = 0.492417 
+separation = 0.490276 
+separation = 0.490276 
+separation = 0.478510 
+separation = 0.482876 
+separation = 0.457134 
+separation = 0.470529 
+separation = 0.470529 
+separation = 0.466267 
+separation = 0.466267 
+separation = 0.490543 
+separation = 0.493240 
+separation = 0.483242 
+separation = 0.483242 
+separation = 0.412563 
+separation = 0.374244 
+separation = 0.374244 
+separation = 0.337066 
+separation = 0.322781 
+separation = 0.322781 
+separation = 0.307136 
+separation = 0.266249 
+separation = 0.269843 
+separation = 0.486240 
+separation = 0.268359 
+separation = 0.457449 
+separation = 0.434407 
+separation = 0.272725 
+separation = 0.277953 
+separation = 0.291297 
+separation = 0.291297 
+separation = 0.404895 
+separation = 0.384836 
+separation = 0.304502 
+separation = 0.392396 
+separation = 0.498953 
+separation = 0.323089 
+separation = 0.323089 
+separation = 0.387678 
+separation = 0.465294 
+separation = 0.338681 
+separation = 0.338681 
+separation = 0.460018 
+separation = 0.406502 
+separation = 0.359275 
+separation = 0.359275 
+separation = 0.409542 
+separation = 0.374787 
+separation = 0.374787 
+separation = 0.436948 
+separation = 0.395390 
+separation = 0.395390 
+separation = 0.446534 
+separation = 0.410612 
+separation = 0.410612 
+separation = 0.398137 
+separation = 0.471057 
+separation = 0.431228 
+separation = 0.431228 
+separation = 0.482726 
+separation = 0.447804 
+separation = 0.447804 
+separation = 0.374810 
+separation = 0.499528 
+separation = 0.465770 
+separation = 0.465770 
+separation = 0.481409 
+separation = 0.481409 
+separation = 0.494666 
+separation = 0.494666 
+separation = 0.349958 
+separation = 0.362410 
+separation = 0.356094 
+separation = 0.384995 
+separation = 0.386495 
+separation = 0.428788 
+separation = 0.448175 
+separation = 0.485163 
+separation = 0.489707 
+separation = 0.436458 
+separation = 0.435888 
+separation = 0.422769 
+separation = 0.424948 
+separation = 0.424538 
+separation = 0.452165 
+separation = 0.468809 
+separation = 0.492141 
+separation = 0.474627 
+separation = 0.465514 
+separation = 0.463616 
+separation = 0.468961 
+separation = 0.475317 
+separation = 0.484760 
+separation = 0.493981 
+separation = 0.495674 
+separation = 0.498535 
+separation = 0.493755 
+separation = 0.498477 
+separation = 0.496639 
+separation = 0.497552 
+separation = 0.451592 
+separation = 0.406094 
+separation = 0.375081 
+separation = 0.347151 
+separation = 0.330712 
+separation = 0.318211 
+separation = 0.310412 
+separation = 0.303318 
+separation = 0.292475 
+separation = 0.492050 
+separation = 0.282815 
+separation = 0.446510 
+separation = 0.269863 
+separation = 0.413165 
+separation = 0.258563 
+separation = 0.378535 
+separation = 0.246017 
+separation = 0.352933 
+separation = 0.236090 
+separation = 0.333828 
+separation = 0.226863 
+separation = 0.327117 
+separation = 0.221245 
+separation = 0.327433 
+separation = 0.216671 
+separation = 0.332681 
+separation = 0.215578 
+separation = 0.340674 
+separation = 0.215788 
+separation = 0.349929 
+separation = 0.218654 
+separation = 0.360437 
+separation = 0.370829 
+separation = 0.224903 
+separation = 0.383517 
+separation = 0.228272 
+separation = 0.224172 
+separation = 0.397361 
+separation = 0.224172 
+separation = 0.214401 
+separation = 0.413132 
+separation = 0.214401 
+separation = 0.208364 
+separation = 0.431771 
+separation = 0.208364 
+separation = 0.204694 
+separation = 0.452122 
+separation = 0.204694 
+separation = 0.205008 
+separation = 0.475034 
+separation = 0.205008 
+separation = 0.206342 
+separation = 0.206342 
+separation = 0.209133 
+separation = 0.209133 
+separation = 0.211198 
+separation = 0.211198 
+separation = 0.213776 
+separation = 0.213776 
+separation = 0.216715 
+separation = 0.216715 
+separation = 0.216858 
+separation = 0.216858 
+separation = 0.216639 
+separation = 0.216639 
+separation = 0.215011 
+separation = 0.215011 
+separation = 0.213879 
+separation = 0.213879 
+separation = 0.212054 
+separation = 0.212054 
+separation = 0.209284 
+separation = 0.209284 
+separation = 0.205851 
+separation = 0.205851 
+separation = 0.201770 
+separation = 0.201770 
+separation = 0.198379 
+separation = 0.198379 
+separation = 0.196244 
+separation = 0.196244 
+separation = 0.197000 
+separation = 0.197000 
+separation = 0.199183 
+separation = 0.199183 
+separation = 0.204672 
+separation = 0.204672 
+separation = 0.211586 
+separation = 0.211586 
+separation = 0.222223 
+separation = 0.222223 
+separation = 0.233507 
+separation = 0.233507 
+separation = 0.245002 
+separation = 0.245002 
+separation = 0.255926 
+separation = 0.255926 
+separation = 0.269608 
+separation = 0.269608 
+separation = 0.278828 
+separation = 0.278828 
+separation = 0.282054 
+separation = 0.282054 
+separation = 0.281063 
+separation = 0.281063 
+separation = 0.278160 
+separation = 0.278160 
+separation = 0.280570 
+separation = 0.280570 
+separation = 0.283471 
+separation = 0.283471 
+separation = 0.291374 
+separation = 0.488205 
+separation = 0.291374 
+separation = 0.300015 
+separation = 0.477300 
+separation = 0.300015 
+separation = 0.313528 
+separation = 0.464205 
+separation = 0.313528 
+separation = 0.329044 
+separation = 0.452394 
+separation = 0.329044 
+separation = 0.350166 
+separation = 0.440147 
+separation = 0.350166 
+separation = 0.373951 
+separation = 0.373951 
+separation = 0.406330 
+separation = 0.423689 
+separation = 0.406330 
+separation = 0.434997 
+separation = 0.434997 
+separation = 0.459975 
+separation = 0.416450 
+separation = 0.459975 
+separation = 0.481074 
+separation = 0.481074 
+separation = 0.498031 
+separation = 0.417088 
+separation = 0.498031 
+separation = 0.418768 
+separation = 0.418768 
+separation = 0.422519 
+separation = 0.432431 
+separation = 0.432431 
+separation = 0.434531 
+separation = 0.434531 
+separation = 0.450391 
+separation = 0.450391 
+separation = 0.458235 
+separation = 0.458235 
+separation = 0.458235 
+separation = 0.476222 
+separation = 0.476222 
+separation = 0.492814 
+separation = 0.492814 
+separation = 0.494138 
+separation = 0.494138 
+separation = 0.486279 
+separation = 0.486279 
+separation = 0.483836 
+separation = 0.483836 
+separation = 0.484760 
+separation = 0.484760 
+separation = 0.489764 
+separation = 0.489764 
+separation = 0.497940 
+separation = 0.497940 
+separation = 0.471827 
+separation = 0.464301 
+separation = 0.464301 
+separation = 0.443514 
+separation = 0.443514 
+separation = 0.408498 
+separation = 0.408498 
+separation = 0.393616 
+separation = 0.393616 
+separation = 0.393616 
+separation = 0.372958 
+separation = 0.372958 
+separation = 0.372958 
+separation = 0.370906 
+separation = 0.370906 
+separation = 0.370906 
+separation = 0.362493 
+separation = 0.362493 
+separation = 0.373238 
+separation = 0.373238 
+separation = 0.375847 
+separation = 0.375847 
+separation = 0.385400 
+separation = 0.385400 
+separation = 0.383503 
+separation = 0.375871 
+separation = 0.367061 
+separation = 0.369887 
+separation = 0.362918 
+separation = 0.368200 
+separation = 0.365684 
+separation = 0.372200 
+separation = 0.374712 
+separation = 0.387246 
+separation = 0.399808 
+separation = 0.424273 
+separation = 0.451336 
+separation = 0.488906 
+equilibration step 20000
+equilibration step 30000
+equilibration step 40000
+equilibration step 50000
+equilibration step 60000
+equilibration step 70000
+equilibration step 80000
+equilibration step 90000
+equilibration step 100000
+equilibration step 110000
+equilibration step 120000
+equilibration step 130000
+equilibration step 140000
+equilibration step 150000
+equilibration step 160000
+equilibration step 170000
+equilibration step 180000
+equilibration step 190000
+equilibration step 200000
+equilibration step 210000
+equilibration step 220000
+equilibration step 230000
+equilibration step 240000
+equilibration step 250000
+equilibration step 260000
+equilibration step 270000
+equilibration step 280000
+equilibration step 290000
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+1500
+3000
+4500
+6000
+7500
+9000
+10500
+12000
+13500
+15000
+16500
+18000
+19500
+21000
+22500
+24000
+25500
+27000
+28500
+30000
+31500
+33000
+34500
+36000
+37500
+39000
+40500
+42000
+43500
+45000
+46500
+48000
+49500
+51000
+52500
+54000
+55500
+57000
+58500
+60000
+61500
+63000
+64500
+66000
+67500
+69000
+70500
+72000
+73500
+75000
+76500
+78000
+79500
+81000
+82500
+84000
+85500
+87000
+88500
+90000
+91500
+93000
+94500
+96000
+97500
+99000

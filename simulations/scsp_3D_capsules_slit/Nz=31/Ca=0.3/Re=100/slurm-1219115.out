@@ -1,0 +1,15 @@
+scsp_3D_capsules_slit
+  
+H = 15.5
+umax = 0.03
+ks = 0.00018
+nu = 0.00465
+fx = 1.16129e-06
+  
+Re = 100
+Ca = 0.3
+  
+reference flux = 74.4
+  
+nnbins = 26
+slurmstepd: error: *** JOB 1219115 ON c1705 CANCELLED AT 2022-06-22T10:16:53 ***

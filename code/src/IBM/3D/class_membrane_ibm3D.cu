@@ -996,7 +996,10 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 	outfile << nCells << endl;
 	*/
 	
+	// -----------------------------------------
 	// Define the file location and name:
+	// -----------------------------------------
+	
 	ofstream outfile;
 	std::stringstream filenamecombine;
 	filenamecombine << "vtkoutput/" << "capsule_data.dat";
@@ -1009,10 +1012,12 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 	string filename2 = filenamecombine2.str();
 	outfile2.open(filename2.c_str(), ios::out | ios::app);
 	
+	// -----------------------------------------
 	// Loop over the capsules, calculate center-of-mass
 	// and Taylor deformation parameter.  Here, I'm using
 	// the method described in: Eberly D, Polyhedral Mass
 	// Properties (Revisited), Geometric Tools, Redmond WA	
+	// -----------------------------------------
 	
 	float yCFL = float(N.y);
 	float zCFL = float(N.z);
@@ -1026,7 +1031,11 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 		float maxT1 = -100.0;  // maximum principle tension of capsule
 				
 		for (int f=0; f<nFacesPerCell; f++) {
+			
+			// -----------------------------------------
 			// get vertices of triangle i:
+			// -----------------------------------------
+			
 			int fID = f + c*nFacesPerCell;
 			int v0 = facesH[fID].v0;
 			int v1 = facesH[fID].v1;
@@ -1040,7 +1049,11 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 			float x2 = rH[v2].x;
 			float y2 = rH[v2].y;
 			float z2 = rH[v2].z;
+			
+			// -----------------------------------------
 			// get edges and cross product of edges:
+			// -----------------------------------------
+			
 			float a1 = x1-x0;
 			float b1 = y1-y0;
 			float c1 = z1-z0;
@@ -1050,14 +1063,22 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 			float d0 = b1*c2-b2*c1;
 			float d1 = a2*c1-a1*c2;
 			float d2 = a1*b2-a2*b1;
+			
+			// -----------------------------------------
 			// compute integral terms:
+			// -----------------------------------------
+			
 			float f1x,f2x,f3x,g0x,g1x,g2x;
 			float f1y,f2y,f3y,g0y,g1y,g2y;
 			float f1z,f2z,f3z,g0z,g1z,g2z;
 			subexpressions(x0,x1,x2,f1x,f2x,f3x,g0x,g1x,g2x);
 			subexpressions(y0,y1,y2,f1y,f2y,f3y,g0y,g1y,g2y);
 			subexpressions(z0,z1,z2,f1z,f2z,f3z,g0z,g1z,g2z);
+			
+			// -----------------------------------------
 			// update integrals:
+			// -----------------------------------------
+			
 			intg[0] += d0*f1x;
 			intg[1] += d0*f2x;
 			intg[2] += d1*f2y;
@@ -1068,27 +1089,43 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 			intg[7] += d0*(y0*g0x + y1*g1x + y2*g2x);
 			intg[8] += d1*(z0*g0y + z1*g1y + z2*g2y);
 			intg[9] += d2*(x0*g0z + x1*g1z + x2*g2z);
-			// check cell-free layer value:
+			
+			// -----------------------------------------
+			// check cell-free layer value.  Here, we
+			// assume half-way bounceback conditions, so
+			// wall is 0.5dx away from outer grid pos:
+			// -----------------------------------------
+			
 			float ypos = (y0+y1+y2)/3.0;
 			float zpos = (z0+z1+z2)/3.0;
-			float ywallsep = std::fmin(ypos-0.0,float(N.y-1)-ypos);
-			float zwallsep = std::fmin(zpos-0.0,float(N.z-1)-zpos);
+			float ywallsep = std::fmin(ypos-(0.0-0.5),float(N.y-1+0.5)-ypos);
+			float zwallsep = std::fmin(zpos-(0.0-0.5),float(N.z-1+0.5)-zpos);
 			if (ywallsep < yCFL) yCFL = ywallsep;
 			if (zwallsep < zCFL) zCFL = zwallsep;
+			
+			// -----------------------------------------
 			// update maximum tension:
+			// -----------------------------------------
+			
 			if (facesH[fID].T1 > maxT1) maxT1 = facesH[fID].T1;
 		}
 		
 		for (int i=0; i<10; i++) intg[i] *= mult[i];
 		
+		// -----------------------------------------
 		// center of mass:
+		// -----------------------------------------
+		
 		float mass = intg[0];
 		float vol = mass;   // assume density = 1
 		com.x = intg[1]/mass;
 		com.y = intg[2]/mass;
 		com.z = intg[3]/mass;
 		
+		// -----------------------------------------
 		// inertia tensor relative to center of mass:
+		// -----------------------------------------
+		
 		float Ixx = intg[5] + intg[6] - mass*(com.y*com.y + com.z*com.z);
 		float Iyy = intg[4] + intg[6] - mass*(com.z*com.z + com.x*com.x);
 		float Izz = intg[4] + intg[5] - mass*(com.x*com.x + com.y*com.y);
@@ -1101,25 +1138,37 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 		// S = sqrt((5/2/vol)*(Ixx + Iyy - sqrt((Ixx-Iyy)^2 + 4*Ixy^2))/2);
 		// L = sqrt((5/2/vol)*(Ixx + Iyy + sqrt((Ixx-Iyy)^2 + 4*Ixy^2))/2);
 		// Dsl = (L-S)/(L+S)
-
+		
+		// -----------------------------------------
 		// calculate eigenvalues of inertia tensor:
+		// -----------------------------------------
+		
 		float eigvals[3] = {0.0,0.0,0.0}; 
 		float eigvecs[3][3] = {{0.0,0.0,0.0}, {0.0,0.0,0.0}, {0.0,0.0,0.0}};
 		eigen_decomposition(I,eigvecs,eigvals);
 		float L1 = sqrt(5/2/vol*(eigvals[1] + eigvals[2] - eigvals[0]));
 		float L2 = sqrt(5/2/vol*(eigvals[0] + eigvals[2] - eigvals[1]));
 		float L3 = sqrt(5/2/vol*(eigvals[0] + eigvals[1] - eigvals[2]));
-
+		
+		// -----------------------------------------
 		// calculate Taylor deformation parameters:
+		// -----------------------------------------
+		
 		float Lmax = std::max({L1,L2,L3});
 		float Lmin = std::min({L1,L2,L3});
 		D = (Lmax-Lmin)/(Lmax+Lmin);
-				
+		
+		// -----------------------------------------		
 		// calculate the inclination angle:
+		// -----------------------------------------
+		
 		//phi = 0.5*atan(2*Ixy/(Ixx-Iyy));
 		//phi = phi/pi;
 		
+		// -----------------------------------------
 		// add cell to the y-z bucket:
+		// -----------------------------------------
+		
 		if (bucketsFlag) {
 			int bucketID = int(floor(com.z/sizeBuckets.z))*numBuckets.y + 
 			               int(floor(com.y/sizeBuckets.y));
@@ -1127,15 +1176,24 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 			totalBucketCnt++;
 		}	
 		
+		// -----------------------------------------
 		// print data:
+		// -----------------------------------------
+		
 		outfile << fixed << setprecision(4) << vol << "  " << com.x << "  " << com.y << "  " << com.z << "  "
 		        << D << "  " << maxT1 << endl;						
 	}
 	
+	// -----------------------------------------
 	// print the cell-free layer thickness in the y-dir and z-dir:
+	// -----------------------------------------
+	
 	outfile2 << fixed << setprecision(4) << tagnum << "  " << yCFL << "  " << zCFL << endl;
-		
+	
+	// -----------------------------------------	
 	// close file
+	// -----------------------------------------
+	
 	outfile.close();
 	outfile2.close();
 	

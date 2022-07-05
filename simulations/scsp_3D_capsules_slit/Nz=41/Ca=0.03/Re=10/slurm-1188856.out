@@ -1,0 +1,686 @@
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+scsp_3D_capsules_slit
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+  
+reference flux = 146.4
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+  
+  
+H = 30.5
+umax = 0.03
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+reference flux = 146.4
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+  
+  
+Ca = 0.003
+  
+reference flux = 146.4
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+reference flux = 146.4
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+  
+  
+H = 30.5
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+H = 30.5
+umax = 0.03
+ks = 0.18
+nu = 0.0915
+fx = 5.90164e-06
+  
+Re = 10
+Ca = 0.003
+  
+reference flux = 146.4
+  
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+nnbins = 26
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+ 
+relax step 0
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 10000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 20000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+relax step 30000
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+srun: got SIGCONT
+slurmstepd: error: *** JOB 1188856 ON c1701 CANCELLED AT 2022-05-18T12:30:46 ***
+srun: forcing job termination
+slurmstepd: error: *** STEP 1188856.0 ON c1701 CANCELLED AT 2022-05-18T12:30:46 ***
+srun: error: c1701: tasks 19-20,26,28: Terminated
+srun: error: c1701: tasks 11,13,27: Terminated
+srun: error: c1701: tasks 18,21-23: Terminated
+srun: error: c1701: tasks 24,29-31: Terminated
+srun: error: c1701: tasks 7,16-17,25: Terminated
+srun: error: c1701: tasks 5,8,12,14: Terminated
+srun: error: c1701: tasks 0,2,9,15: Terminated
+srun: error: c1701: tasks 3-4,6,10: Terminated
+srun: error: c1701: task 1: Terminated

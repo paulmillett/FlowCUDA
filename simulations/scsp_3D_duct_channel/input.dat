@@ -5,8 +5,10 @@
 
 [LBM]
 	App = scsp_3D_duct_channel
-	nu = 0.0595  #0.166666666
-	bodyForx = 5.70329E-06 #0.00001
+	nu = 0.166666666
+	bodyForx = 0.00001
+	Re = 2
+	umax = 0.03
 []
 
 
@@ -14,16 +16,16 @@
 	D = 3
 	Q = 19
 	source = box
-	nVoxels = 432000
-	Nx = 30
-	Ny = 120
-	Nz = 120
+	nVoxels = 12810
+	Nx = 10
+	Ny = 61
+	Nz = 21
 	numIolets = 0
 []
 
 
 [Time]
-	nSteps = 300000
+	nSteps = 1000000
 []
 
 

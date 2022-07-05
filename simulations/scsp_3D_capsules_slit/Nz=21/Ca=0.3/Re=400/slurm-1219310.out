@@ -1,0 +1,26 @@
+scsp_3D_capsules_slit
+  
+H = 10.5
+umax = 0.03
+ks = 4.5e-05
+nu = 0.0007875
+fx = 4.28571e-07
+  
+Re = 400
+Ca = 0.3
+  
+reference flux = 50.4
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+slurmstepd: error: *** JOB 1219310 ON c1705 CANCELLED AT 2022-06-22T14:07:33 ***

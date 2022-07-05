@@ -64,6 +64,7 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 	float Ca = inputParams("IBM/Ca",1.0);
 	float ksmax = inputParams("IBM/ksmax",0.002);
 	gam = inputParams("IBM/gamma",0.1);
+	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -151,7 +152,8 @@ void scsp_3D_capsules_slit::initSystem()
 	// initialize velocities: 
 	// ----------------------------------------------
 		
-	float h = float(Nz-1)/2.0;
+	//float h = float(Nz-1)/2.0;
+	float h = float(Nz)/2.0;
 	
 	for (int k=0; k<Nz; k++) {
 		for (int j=0; j<Ny; j++) {
@@ -215,7 +217,7 @@ void scsp_3D_capsules_slit::initSystem()
 	// ----------------------------------------------
 			
 	float scale = 0.7;
-	ibm.shrink_and_randomize_cells(scale,16.0,11.0);
+	ibm.shrink_and_randomize_cells(scale,16.0,a+2.0);
 	ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 		
 	// ----------------------------------------------
@@ -278,7 +280,12 @@ void scsp_3D_capsules_slit::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			stepIBM();
+			// decide on update type:
+			if (ibmUpdate == "ibm") {
+				stepIBM();
+			} else if (ibmUpdate == "verlet") {
+				stepVerlet();
+			}			
 		}
 		cout << " " << endl;
 		cout << "... done equilibrating!" << endl;
@@ -289,11 +296,15 @@ void scsp_3D_capsules_slit::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 	// loop through this cycle:
 	// ----------------------------------------------
-	
+		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
-		//stepIBM();
-		stepVerlet();
+		// decide on update type:
+		if (ibmUpdate == "ibm") {
+			stepIBM();
+		} else if (ibmUpdate == "verlet") {
+			stepVerlet();
+		}		
 	}
 	
 	cout << cummulativeSteps << endl;	
@@ -338,11 +349,12 @@ void scsp_3D_capsules_slit::stepIBM()
 	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
 	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 	lbm.stream_collide_save_forcing(nBlocks,nThreads);
-	lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
+	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
+	lbm.set_boundary_slit_density(nBlocks,nThreads);
 	
 	// update membrane:
-	//lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
-	ibm.update_node_positions(nBlocks,nThreads);
+	//ibm.update_node_positions(nBlocks,nThreads);
+	ibm.update_node_positions_verlet_1(nBlocks,nThreads);
 	
 	// CUDA sync
 	cudaDeviceSynchronize();
@@ -375,7 +387,8 @@ void scsp_3D_capsules_slit::stepVerlet()
 	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.r,ibm.v,ibm.f,nNodes);
 	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 	lbm.stream_collide_save_forcing(nBlocks,nThreads);
-	lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
+	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
+	lbm.set_boundary_slit_density(nBlocks,nThreads);
 	
 	// second step of IBM velocity verlet:
 	ibm.update_node_positions_verlet_2(nBlocks,nThreads);
@@ -433,7 +446,8 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 {
 	// assumed parameters:
 	float rho = 1.0;
-	float h = float(Nz-1)/2.0;
+	//float h = float(Nz-1)/2.0;
+	float h = float(Nz)/2.0;
 	
 	// Kruger's suggested calculations:
 	/*
@@ -470,7 +484,7 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 	
 	// assign values for ks and nu:
 	ibm.set_ks(Ks); 
-	ibm.set_kb(Ks*a*a*0.00287);  //*sqrt(3));
+	ibm.set_kb(Ks*a*a*0.00287*sqrt(3));
 	//ibm.set_kv(0.5);
 	ibm.set_ka(0.0007);
 	ibm.set_kag(0.0);
@@ -502,7 +516,8 @@ void scsp_3D_capsules_slit::calcRefFlux()
 {
 	// parameters:
 	float w = float(Ny);   // PBC's in y-dir
-	float h = float(Nz-1)/2.0;
+	//float h = float(Nz-1)/2.0;
+	float h = float(Nz)/2.0;
 	Q0 = 2.0*bodyForx*h*h*h*w/3.0/nu;
 		
 	// output the results:

@@ -434,13 +434,13 @@ __global__ void viscous_force_velocity_difference_IBM3D(
 					// extrapolate elastic forces to LBM fluid:
 					atomicAdd(&fxLBM[ndx],del*f[i].x);
 					atomicAdd(&fyLBM[ndx],del*f[i].y);
-					atomicAdd(&fzLBM[ndx],del*f[i].z);
+					atomicAdd(&fzLBM[ndx],del*f[i].z);					
 				}
 			}
 		}
 		
 		// --------------------------------------
-		// calculate visous forces & add them
+		// calculate friction forces & add them
 		// to IBM node:
 		// --------------------------------------
 		
@@ -466,13 +466,14 @@ __global__ void viscous_force_velocity_difference_IBM3D(
 					float rz = r[i].z - float(kk);
 					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
 					// we add the negative of viscous force:
-					atomicAdd(&fxLBM[ndx],del*f[i].x);
-					atomicAdd(&fyLBM[ndx],del*f[i].y);
-					atomicAdd(&fzLBM[ndx],del*f[i].z);
+					atomicAdd(&fxLBM[ndx],-del*vfx);
+					atomicAdd(&fyLBM[ndx],-del*vfy);
+					atomicAdd(&fzLBM[ndx],-del*vfz);
 				}
 			}		
 		}
-		*/		
+		*/
+				
 	}	
 }
 
