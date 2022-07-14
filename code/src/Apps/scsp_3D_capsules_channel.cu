@@ -174,7 +174,8 @@ void scsp_3D_capsules_channel::initSystem()
 				float xvel = (16*bodyForx*w*w/nu/pow(M_PI,3))*sumval;
 				
 				// set values:
-				lbm.setU(ndx,xvel);
+				//lbm.setU(ndx,xvel);
+				lbm.setU(ndx,0.0);
 				lbm.setV(ndx,0.0);
 				lbm.setW(ndx,0.0);
 				lbm.setR(ndx,1.0);
@@ -226,26 +227,26 @@ void scsp_3D_capsules_channel::initSystem()
 	// shrink and randomly disperse cells: 
 	// ----------------------------------------------
 			
-	float scale = 0.7;
+	float scale = 1.0;  //0.7;  
 	ibm.shrink_and_randomize_cells(scale,2.0*a+1.0,a+2.0);
 	ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 		
 	// ----------------------------------------------
 	// relax node positions: 
 	// ----------------------------------------------
-	
+		
 	cout << " " << endl;
 	cout << "-----------------------------------------------" << endl;
 	cout << "Relaxing capsules..." << endl;
 		
-	scale = 1.0/0.7;
+	scale = 1.0/scale;
 	ibm.relax_node_positions_skalak(90000,scale,0.02,nBlocks,nThreads);	
 	ibm.relax_node_positions_skalak(90000,1.0,0.02,nBlocks,nThreads);
 		
 	cout << "... done relaxing" << endl;
 	cout << "-----------------------------------------------" << endl;
 	cout << " " << endl;
-				
+					
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
@@ -363,8 +364,8 @@ void scsp_3D_capsules_channel::stepIBM()
 	lbm.set_boundary_duct_density(nBlocks,nThreads);
 	
 	// update membrane:
-	//lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
-	ibm.update_node_positions(nBlocks,nThreads);
+	//ibm.update_node_positions(nBlocks,nThreads);
+	ibm.update_node_positions_verlet_1(nBlocks,nThreads);
 	
 	// CUDA sync
 	cudaDeviceSynchronize();
