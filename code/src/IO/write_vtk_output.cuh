@@ -21,13 +21,19 @@ void write_vtk_immersed_boundary_3D(std::string,int,int,int,float3*,int*,int*,in
 
 void write_vtk_immersed_boundary_3D(std::string,int,int,int,float3*,triangle*);
 
+void write_vtk_immersed_boundary_3D_cellID(std::string,int,int,int,float3*,triangle*,cell*);
+
 void write_vtk_immersed_boundary_normals_3D(std::string,int,int,int,int,float3*,triangle*,edge*);
 
 void write_vtk_structured_grid(std::string,int,int,int,int,float*,
                                float*,float*,float*);
 							   														  							   
 void write_vtk_structured_grid(std::string,int,int,int,int,float*,
-                               float*,float*,float*,int,int,int);
+                               float*,float*,float*,int,int,int,int);
+							   
+void write_vtk_structured_grid_slit_scaled(std::string,int,int,int,int,float*,
+                                           float*,float*,float*,int,int,int,int,
+										   float,float,float);
 							   
 void write_vtk_structured_grid(std::string,int,int,int,int,float*,
                                float*,float*,float*,float*,int,int,int);

@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_CAPSULES_SLIT_H
-# define SCSP_3D_CAPSULES_SLIT_H
+# ifndef SCSP_3D_CAPSULES_SLIT_TRAINS_H
+# define SCSP_3D_CAPSULES_SLIT_TRAINS_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_capsules_slit : public FlowBase {
+class scsp_3D_capsules_slit_trains : public FlowBase {
 	
 private:
 
@@ -27,12 +27,16 @@ private:
 	int nStepsEquilibrate;
 	int nVTKOutputs;
 	int iskip,jskip,kskip;
+	int precision;
 	float tau;
 	float nu;
 	float bodyForx;
+	float umax;
 	float a;
 	float gam;
 	float Q0;
+	float trainRij;
+	float trainAng;
 	bool initRandom;
 	std::string vtkFormat;
 	std::string ibmUpdate;
@@ -43,16 +47,16 @@ private:
 		
 public:
 
-	scsp_3D_capsules_slit();
-	~scsp_3D_capsules_slit();
+	scsp_3D_capsules_slit_trains();
+	~scsp_3D_capsules_slit_trains();
 	void initSystem();
 	void cycleForward(int,int);
 	void stepIBM();
 	void stepVerlet();
 	void writeOutput(std::string,int);
-	void calcMembraneParams(float,float,float,float);
+	void calcMembraneParams(float,float,float);
 	void calcRefFlux();
 	
 };
 
-# endif  // SCSP_3D_CAPSULES_SLIT_H
+# endif  // SCSP_3D_CAPSULES_SLIT_TRAINS_H

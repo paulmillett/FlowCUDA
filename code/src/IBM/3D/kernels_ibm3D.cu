@@ -119,6 +119,24 @@ __global__ void zero_velocities_forces_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D add force in the x-direction:
+// --------------------------------------------------------
+
+__global__ void add_xdir_force_IBM3D(
+	float3* f,
+	float fx,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		f[i].x += fx;
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D node update kernel:
 // --------------------------------------------------------
 

@@ -241,7 +241,8 @@ void scsp_3D_capsule_skalak::writeOutput(std::string tagname, int step)
 	lbm.calculate_flow_rate_xdir("flowdata",step);
 	
 	// write output for LBM and IBM:	
-	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+	int precision = 3;
+	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 	ibm.write_output("ibm",step);		
 }
 

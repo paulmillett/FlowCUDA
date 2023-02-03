@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_CAPSULES_SLIT_H
-# define SCSP_3D_CAPSULES_SLIT_H
+# ifndef SCSP_3D_CAPSULE_SEDIMENTATION_H
+# define SCSP_3D_CAPSULE_SEDIMENTATION_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_capsules_slit : public FlowBase {
+class scsp_3D_capsule_sedimentation : public FlowBase {
 	
 private:
 
@@ -29,11 +29,9 @@ private:
 	int iskip,jskip,kskip;
 	float tau;
 	float nu;
-	float bodyForx;
 	float a;
 	float gam;
-	float Q0;
-	bool initRandom;
+	float fx;
 	std::string vtkFormat;
 	std::string ibmUpdate;
 	
@@ -43,16 +41,15 @@ private:
 		
 public:
 
-	scsp_3D_capsules_slit();
-	~scsp_3D_capsules_slit();
+	scsp_3D_capsule_sedimentation();
+	~scsp_3D_capsule_sedimentation();
 	void initSystem();
 	void cycleForward(int,int);
 	void stepIBM();
 	void stepVerlet();
 	void writeOutput(std::string,int);
 	void calcMembraneParams(float,float,float,float);
-	void calcRefFlux();
 	
 };
 
-# endif  // SCSP_3D_CAPSULES_SLIT_H
+# endif  // SCSP_3D_CAPSULE_SEDIMENTATION_H

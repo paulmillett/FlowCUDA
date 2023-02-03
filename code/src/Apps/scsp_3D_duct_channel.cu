@@ -251,7 +251,8 @@ void scsp_3D_duct_channel::writeOutput(std::string tagname, int step)
 	lbm.calculate_flow_rate_xdir("flowdata",step);
 	
 	// write output for LBM and IBM:	
-	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+	int precision = 3;
+	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 }
 
 

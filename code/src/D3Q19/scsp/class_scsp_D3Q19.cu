@@ -1062,9 +1062,23 @@ void class_scsp_D3Q19::read_lattice_geometry(int type)
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::vtk_structured_output_ruvw(std::string tagname, int tagnum,
-                                            int iskip, int jskip, int kskip)
+                                            int iskip, int jskip, int kskip, int precision)
 {
-	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,rH,uH,vH,wH,iskip,jskip,kskip);
+	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,rH,uH,vH,wH,iskip,jskip,kskip,precision);
+}
+
+
+
+// --------------------------------------------------------
+// Write VTK output: structured with u[], v[], w[], r[]:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::vtk_structured_output_ruvw_slit_scaled(std::string tagname, int tagnum,
+                                            int iskip, int jskip, int kskip, int precision,
+											float umax, float h, float scale)
+{
+	write_vtk_structured_grid_slit_scaled(tagname,tagnum,Nx,Ny,Nz,rH,uH,vH,wH,iskip,jskip,kskip,
+	                                      precision,umax,h,scale);
 }
 
 

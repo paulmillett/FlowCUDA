@@ -54,8 +54,14 @@ __global__ void update_node_position_IBM3D(
 __global__ void zero_velocities_forces_IBM3D(
 	float3*,
 	float3*,
-	int nNodes);
-			
+	int);
+
+
+__global__ void add_xdir_force_IBM3D(
+	float3*,
+	float,
+	int);
+		
 	
 __global__ void update_node_ref_position_IBM3D(
 	float3*,

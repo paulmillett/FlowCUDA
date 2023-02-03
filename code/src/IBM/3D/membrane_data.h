@@ -38,11 +38,13 @@ struct edge {
 // --------------------------------------------------------
 
 struct cell {
+	int refNode;
+	bool intrain;
 	float vol;
 	float vol0;
 	float area;
 	float area0;
-	int refNode;
+	float3 com;
 };
 
 # endif  // MEMBRANE_DATA_H

@@ -83,6 +83,7 @@ class class_membrane_ibm3D {
 	void assign_refNode_to_cells();
 	void assign_cellIDs_to_nodes();
 	void duplicate_cells();	
+	void single_file_cells(int,int,int,float,float);
 	void shift_node_positions(int,float,float,float);
 	void rotate_and_shift_node_positions(int,float,float,float);
 	void rest_geometries(int,int);
@@ -96,6 +97,7 @@ class class_membrane_ibm3D {
 	void update_node_positions_verlet_1(int,int);
 	void update_node_positions_verlet_2(int,int);
 	void zero_velocities_forces(int,int);
+	void add_xdir_force_to_nodes(int,int,float);
 	void relax_node_positions(int,float,float,int,int);
 	void relax_node_positions_skalak(int,float,float,int,int);
 	void update_node_positions_vacuum(float,int,int);
@@ -117,6 +119,7 @@ class class_membrane_ibm3D {
 	void membrane_geometry_analysis(std::string,int);
 	void print_cell_distributions_yz_plane(std::string,int);
 	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);
+	void capsule_train_fraction(float,float,int);
 	
 };
 

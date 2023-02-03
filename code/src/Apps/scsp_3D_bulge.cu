@@ -221,7 +221,8 @@ void scsp_3D_bulge::writeOutput(std::string tagname, int step)
 	// ----------------------------------------------
 	
 	if (vtkFormat == "structured") {
-		lbm.vtk_structured_output_ruvw(tagname,step,1,1,1);
+		int precision = 3;
+		lbm.vtk_structured_output_ruvw(tagname,step,1,1,1,precision);
 	}
 	
 	else if (vtkFormat == "polydata") {

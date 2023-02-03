@@ -24,6 +24,7 @@ __global__ void zero_reference_vol_area_IBM3D(
 	if (i < nCells) {
 		cells[i].vol0 = 0.0;
 		cells[i].area0 = 0.0;
+		cells[i].intrain = false;
 	}
 }
 
@@ -55,7 +56,8 @@ __global__ void rest_triangle_skalak_IBM3D(
 		faces[i].l0 = length(vec2);
 		faces[i].lp0 = length(vec1);
 		faces[i].cosphi0 = dot(vec1,vec2)/(faces[i].lp0*faces[i].l0);
-		faces[i].sinphi0 = length(cross(vec1,vec2))/(faces[i].lp0*faces[i].l0);			
+		faces[i].sinphi0 = length(cross(vec1,vec2))/(faces[i].lp0*faces[i].l0);
+		faces[i].T1 = 0.0;		
 		// calculate global cell geometries:
 		int cID = faces[i].cellID;
 		float volFace = triangle_signed_volume(r0,r1,r2);
@@ -266,7 +268,11 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 		const float J = lamb1*lamb2;
 		faces[i].T1 = (gs/J)*(lamb1*lamb1*(lamb1*lamb1-1.0) + C*J*J*(J*J-1.0));
 		faces[i].T1 /= gs;
-
+		
+		// Elastic strain energy:
+		//faces[i].T1 = (gs*(i1*i1 + 2.0*i1 - 2.0*i2) + gs*C*i2*i2)/12.0;
+		//faces[i].T1 *= area/gs;
+		
 	    // Derivatives of Skalak energy density E used in chain rule below: eq. (C.14)
 	    float dEdI1 = 2.0*gs*(i1 + 1.0);
 	    float dEdI2 = 2.0*gs*(C*i2 - 1.0);

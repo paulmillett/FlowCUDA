@@ -1,5 +1,5 @@
 
-# include "scsp_3D_capsules_slit.cuh"
+# include "scsp_3D_capsules_slit_trains.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
+scsp_3D_capsules_slit_trains::scsp_3D_capsules_slit_trains() : lbm(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -51,7 +51,7 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 	nu = inputParams("LBM/nu",0.1666666);
 	bodyForx = inputParams("LBM/bodyForx",0.0);
 	float Re = inputParams("LBM/Re",2.0);
-	float umax = inputParams("LBM/umax",0.1);
+	umax = inputParams("LBM/umax",0.1);
 	
 	// ----------------------------------------------
 	// Immersed-Boundary parameters:
@@ -66,6 +66,8 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 	gam = inputParams("IBM/gamma",0.1);
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	initRandom = inputParams("IBM/initRandom",1);
+	trainRij = inputParams("IBM/trainRij",2.8*a);
+	trainAng = inputParams("IBM/trainAng",15.0);
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -88,6 +90,7 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 	jskip = inputParams("Output/jskip",1);
 	kskip = inputParams("Output/kskip",1);
 	nVTKOutputs = inputParams("Output/nVTKOutputs",0);
+	precision = inputParams("Output/precision",3);
 	
 	// ----------------------------------------------
 	// allocate array memory (host & device):
@@ -103,7 +106,7 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 	// capsules:
 	// ----------------------------------------------
 	
-	calcMembraneParams(Re,Ca,umax,ksmax);
+	calcMembraneParams(Re,Ca,ksmax);
 	calcRefFlux();
 	Q0 = inputParams("LBM/Q0",0.0);
 	
@@ -115,7 +118,7 @@ scsp_3D_capsules_slit::scsp_3D_capsules_slit() : lbm(),ibm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_slit::~scsp_3D_capsules_slit()
+scsp_3D_capsules_slit_trains::~scsp_3D_capsules_slit_trains()
 {
 	lbm.deallocate();
 	ibm.deallocate();	
@@ -127,7 +130,7 @@ scsp_3D_capsules_slit::~scsp_3D_capsules_slit()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_slit::initSystem()
+void scsp_3D_capsules_slit_trains::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -153,7 +156,6 @@ void scsp_3D_capsules_slit::initSystem()
 	// initialize velocities: 
 	// ----------------------------------------------
 		
-	//float h = float(Nz-1)/2.0;
 	float h = float(Nz)/2.0;
 	
 	for (int k=0; k<Nz; k++) {
@@ -163,7 +165,7 @@ void scsp_3D_capsules_slit::initSystem()
 				// analytical solution for Poiseuille flow
 				// between parallel plates:
 				double xvel0 = bodyForx*h*h/(2.0*nu);  // assume rho=1
-				double z = float(k) - h;
+				double z = float(k) + 0.5 - h;
 				double xvel = xvel0*(1.0 - pow(z/h,2));
 				lbm.setU(ndx,xvel);
 				lbm.setV(ndx,0.0);
@@ -181,7 +183,7 @@ void scsp_3D_capsules_slit::initSystem()
 	ibm.duplicate_cells();
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();	
-			
+				
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
@@ -216,12 +218,12 @@ void scsp_3D_capsules_slit::initSystem()
 	// ----------------------------------------------
 	// shrink and randomly disperse cells: 
 	// ----------------------------------------------
-				
+	
 	if (initRandom) {
 		float scale = 1.0;  //0.7
 		ibm.shrink_and_randomize_cells(scale,16.0,a+2.0);
 		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
-		
+	
 		/*
 		cout << " " << endl;
 		cout << "-----------------------------------------------" << endl;
@@ -237,10 +239,11 @@ void scsp_3D_capsules_slit::initSystem()
 		*/
 	}
 	
+	
 	// ----------------------------------------------
 	// line up cells in a single-file line: 
 	// ----------------------------------------------
-		
+	
 	if (!initRandom) {
 		float cellSpacingX = inputParams("IBM/cellSpacingX",float(Nx));
 		float offsetY = inputParams("IBM/offsetY",0.0);
@@ -270,7 +273,7 @@ void scsp_3D_capsules_slit::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_capsules_slit::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_capsules_slit_trains::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -341,7 +344,7 @@ void scsp_3D_capsules_slit::cycleForward(int stepsPerCycle, int currentCycle)
 // Take a time-step with the traditional IBM approach:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_slit::stepIBM()
+void scsp_3D_capsules_slit_trains::stepIBM()
 {
 	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
@@ -377,7 +380,7 @@ void scsp_3D_capsules_slit::stepIBM()
 // Take a time-step with the velocity-Verlet approach for IBM:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_slit::stepVerlet()
+void scsp_3D_capsules_slit_trains::stepVerlet()
 {
 	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
@@ -414,20 +417,23 @@ void scsp_3D_capsules_slit::stepVerlet()
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_capsules_slit::writeOutput(std::string tagname, int step)
+void scsp_3D_capsules_slit_trains::writeOutput(std::string tagname, int step)
 {				
 	
-	int precision = 3;
+	float h = float(Nz)/2.0;
+	float scale = 1.0/umax;
 	
 	if (step == 0) {
 		// only print out vtk files
-		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
+		//lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
+		lbm.vtk_structured_output_ruvw_slit_scaled(tagname,step,iskip,jskip,kskip,precision,umax,h,scale);
 		ibm.write_output("ibm",step);
 	}
 	
 	if (step > 0) { 
 		// analyze membrane geometry:
 		ibm.membrane_geometry_analysis("capdata",step);
+		ibm.capsule_train_fraction(trainRij*a,trainAng,step);
 	
 		// calculate relative viscosity:
 		lbm.calculate_relative_viscosity("relative_viscosity_thru_time",Q0,step);
@@ -436,7 +442,8 @@ void scsp_3D_capsules_slit::writeOutput(std::string tagname, int step)
 		int intervalVTK = nSteps/nVTKOutputs;
 		if (nVTKOutputs == 0) intervalVTK = nSteps;
 		if (step%intervalVTK == 0) {
-			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
+			//lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
+			lbm.vtk_structured_output_ruvw_slit_scaled(tagname,step,iskip,jskip,kskip,precision,umax,h,scale);
 			ibm.write_output("ibm",step);
 		}
 		
@@ -456,7 +463,7 @@ void scsp_3D_capsules_slit::writeOutput(std::string tagname, int step)
 // conditions that maximum u < umax and ks < ksmax:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, float Ksmax)
+void scsp_3D_capsules_slit_trains::calcMembraneParams(float Re, float Ca, float Ksmax)
 {
 	// assumed parameters:
 	float rho = 1.0;
@@ -471,9 +478,10 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 	*/
 	
 	// My calculations:
-	nu = umax*h/Re;
+	umax = Re*nu/h;     //nu = umax*h/Re;
 	bodyForx = 2.0*rho*umax*umax/(Re*h);   //umax*2.0*rho*nu/(h*h);
 	float Ks = rho*umax*umax*a/(Ca*Re);    //rho*nu*umax*a/(h*Ca);
+	float Kb = Ks*a*a*0.00287*sqrt(3);  
 		
 	/*
 	// set Ks to some large number:
@@ -498,7 +506,7 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 	
 	// assign values for ks and nu:
 	ibm.set_ks(Ks); 
-	ibm.set_kb(Ks*a*a*0.00287*sqrt(3));
+	ibm.set_kb(Kb);
 	//ibm.set_kv(0.5);
 	ibm.set_ka(0.0007);
 	ibm.set_kag(0.0);
@@ -510,6 +518,7 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 	cout << "H = " << h << endl;
 	cout << "umax = " << umax << endl;
 	cout << "ks = " << Ks << endl;
+	cout << "kb = " << Kb << endl;
 	cout << "nu = " << nu << endl;
 	cout << "fx = " << bodyForx << endl;
 	cout << "  " << endl;
@@ -526,7 +535,7 @@ void scsp_3D_capsules_slit::calcMembraneParams(float Re, float Ca, float umax, f
 // bodyForx, and nu:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_slit::calcRefFlux()
+void scsp_3D_capsules_slit_trains::calcRefFlux()
 {
 	// parameters:
 	float w = float(Ny);   // PBC's in y-dir

@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 	}
 		
 	for (int cycle=0; cycle < nCycles; cycle++) {
-			fc->cycleForward(stepsPerCycle,cycle);
+		fc->cycleForward(stepsPerCycle,cycle);
 	}	
 	
 	// ----------------------------------------------------

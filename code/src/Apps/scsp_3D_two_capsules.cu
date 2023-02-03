@@ -252,7 +252,8 @@ void scsp_3D_two_capsules::writeOutput(std::string tagname, int step)
 	// decide which VTK file format to use for output
 	// ----------------------------------------------
 	
-	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+	int precision = 3;
+	lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 	ibm.write_output("ibm",step);		
 }
 

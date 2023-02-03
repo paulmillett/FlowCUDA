@@ -412,7 +412,7 @@ void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
 
 void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
 	                           int NZ, float* r, float* u, float* v, float* w,
-							   int iskip, int jskip, int kskip)
+							   int iskip, int jskip, int kskip, int prec)
 {		
 	
 	// -----------------------------------------------
@@ -465,7 +465,7 @@ void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
 		for (int j=0; j<NY; j+=jskip) {
 			for (int i=0; i<NX; i+=iskip) {
 				int ndx = k*NX*NY + j*NX + i;
-				outfile << fixed << setprecision(3) << r[ndx] << endl;
+				outfile << fixed << setprecision(prec) << r[ndx] << endl;
 			}
 		}
 	}	
@@ -482,9 +482,105 @@ void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
 		for (int j=0; j<NY; j+=jskip) {
 			for (int i=0; i<NX; i+=iskip) {
 				int ndx = k*NX*NY + j*NX + i;
-				outfile << fixed << setprecision(3) << u[ndx] << " "
-					                                << v[ndx] << " " 
-													<< w[ndx] << endl;
+				outfile << fixed << setprecision(prec) << u[ndx] << " "
+					                                   << v[ndx] << " " 
+													   << w[ndx] << endl;
+			}
+		}
+	}
+	
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+	
+	outfile.close();
+	
+}
+
+
+
+// -----------------------------------------------------------------------------------------
+// Write output in a VTK Structured Grid format (note: this is for 3D simulations):
+// -----------------------------------------------------------------------------------------
+
+void write_vtk_structured_grid_slit_scaled(std::string tagname, int tagnum, int NX, int NY,
+	                                       int NZ, float* r, float* u, float* v, float* w,
+							               int iskip, int jskip, int kskip, int prec,
+										   float umax, float h, float scale)
+{		
+	
+	// -----------------------------------------------
+	//	Define the file location and name:
+	// -----------------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------------
+	//	find output dimensions considering
+	//  iskip, jskip, kskip:
+	// -----------------------------------------------
+	
+	int Nxs = NX/iskip;
+	int Nys = NY/jskip;
+	int Nzs = NZ/kskip;
+	if (NX%2 && iskip>1) Nxs++;  // if odd, then add 1
+	if (NY%2 && jskip>1) Nys++;
+	if (NZ%2 && kskip>1) Nzs++;	
+	
+	// -----------------------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------------------
+	
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing grid data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET STRUCTURED_POINTS" << endl;
+	outfile << "DIMENSIONS" << d << Nxs << d << Nys << d << Nzs << endl;	
+	outfile << "ORIGIN " << d << 0 << d << 0 << d << 0 << endl;
+	outfile << "SPACING" << d << 1.0*iskip << d << 1.0*jskip << d << 1.0*kskip << endl;	
+    outfile << " " << endl;
+    outfile << "POINT_DATA " << Nxs*Nys*Nzs << endl;
+    outfile << "SCALARS " << tagname << " float" << endl;
+    outfile << "LOOKUP_TABLE default" << endl;
+		
+	// -----------------------------------------------
+	// Write the 'rho' data:
+	// NOTE: x-data increases fastest,
+	//       then y-data
+	// -----------------------------------------------
+	
+	for (int k=0; k<NZ; k+=kskip) {
+		for (int j=0; j<NY; j+=jskip) {
+			for (int i=0; i<NX; i+=iskip) {
+				int ndx = k*NX*NY + j*NX + i;
+				outfile << fixed << setprecision(prec) << r[ndx] << endl;
+			}
+		}
+	}	
+	
+	// -----------------------------------------------				
+	// Write the 'velocity' data:
+	// NOTE: x-data increases fastest,
+	//       then y-data	
+	// -----------------------------------------------
+	
+	outfile << "   " << endl;
+	outfile << "VECTORS Velocity float" << endl;		
+	for (int k=0; k<NZ; k+=kskip) {
+		float z = float(k) + 0.5 - h;
+		float u0 = umax*(1.0 - pow(z/h,2));
+		for (int j=0; j<NY; j+=jskip) {
+			for (int i=0; i<NX; i+=iskip) {
+				int ndx = k*NX*NY + j*NX + i;				
+				outfile << fixed << setprecision(prec) << scale*(u[ndx] - u0) << " "
+					                                   << scale*(v[ndx]) << " " 
+													   << scale*(w[ndx]) << endl;
 			}
 		}
 	}
@@ -856,6 +952,94 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 		float tension = faces[i].T1;
 		if (tension != tension) tension = 0.0;  // this is true if NaN
 		outfile << tension << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+		
+	outfile.close();
+		
+}
+
+
+
+// -------------------------------------------------------------------------
+// Write IBM mesh to 'vtk' file:
+// -------------------------------------------------------------------------
+
+void write_vtk_immersed_boundary_3D_cellID(std::string tagname, int tagnum, int nNodes, int nFaces,
+                                           float3* r, triangle* faces, cell* cells)
+{
+		
+	// -----------------------------------
+	//	Define the file location and name:
+	// -----------------------------------
+
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+
+	// -----------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------
+
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing IBM data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET POLYDATA" << endl;			
+	
+	// -----------------------------------
+	//	Write the node positions:
+	// -----------------------------------
+
+	outfile << " " << endl;	
+	outfile << "POINTS " << nNodes << " float" << endl;
+	for (int n=0; n<nNodes; n++) {
+		outfile << fixed << setprecision(3) << r[n].x << "  " << r[n].y << "  " << r[n].z << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the polygon information:
+	// -----------------------------------------------
+	
+	outfile << " " << endl;
+	outfile << "POLYGONS " << nFaces << " " << 4*nFaces << endl;
+	for (int i=0; i<nFaces; i++) {
+		outfile << 3 << " " << faces[i].v0 << " " << faces[i].v1 << " " << faces[i].v2 << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the principal tension for each face:
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	outfile << "CELL_DATA " << nFaces << endl;
+	outfile << "SCALARS " << "tension " << "float" << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nFaces; i++) {
+		float tension = faces[i].T1;
+		if (tension != tension) tension = 0.0;  // this is true if NaN
+		outfile << tension << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the cellID (bool 'intrain') for each face:
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	//outfile << "CELL_DATA " << nFaces << endl;
+	outfile << "SCALARS " << "cellID " << "int" << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nFaces; i++) {
+		int cellID = faces[i].cellID;
+		bool value = cells[cellID].intrain;
+		if (tagnum==0) value = false;   // initial value
+		outfile << value << endl;
 	}
 	
 	// -----------------------------------------------

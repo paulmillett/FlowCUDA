@@ -416,15 +416,19 @@ void scsp_3D_capsules_channel::stepVerlet()
 
 void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 {				
+	
+	int precision = 3;
+	
 	if (step == 0) {
 		// only print out vtk files
-		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 		ibm.write_output("ibm",step);
 	}
 	
 	if (step > 0) { 
 		// analyze membrane geometry:
 		ibm.membrane_geometry_analysis("capdata",step);
+		ibm.capsule_train_fraction(4*a,30.0,step);
 	
 		// calculate relative viscosity:
 		lbm.calculate_relative_viscosity("relative_viscosity_thru_time",Q0,step);
@@ -433,7 +437,7 @@ void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 		int intervalVTK = nSteps/nVTKOutputs;
 		if (nVTKOutputs == 0) intervalVTK = nSteps;
 		if (step%intervalVTK == 0) {
-			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip); 
+			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 			ibm.write_output("ibm",step);
 		}
 		

@@ -141,9 +141,10 @@ public:
 	void calculate_relative_viscosity(std::string,float,int);
 	void print_flow_rate_xdir(std::string,int);
 	void read_lattice_geometry(int);
-	void vtk_structured_output_ruvw(std::string,int,int,int,int);
+	void vtk_structured_output_ruvw(std::string,int,int,int,int,int);
 	void vtk_structured_output_iuvw_inout(std::string,int,int,int,int);
 	void vtk_structured_output_iuvw_vtype(std::string,int,int,int,int);
+	void vtk_structured_output_ruvw_slit_scaled(std::string,int,int,int,int,int,float,float,float);
 	void vtk_polydata_output_ruvw(std::string,int);
 
 };

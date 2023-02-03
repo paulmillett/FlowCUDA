@@ -32,12 +32,14 @@
 # include "../Apps/scsp_3D_capsule.cuh"
 # include "../Apps/scsp_3D_capsule_skalak.cuh"
 # include "../Apps/scsp_3D_capsule_skalak_verlet.cuh"
+# include "../Apps/scsp_3D_capsule_sedimentation.cuh"
 # include "../Apps/scsp_3D_two_capsules.cuh"
 # include "../Apps/scsp_3D_capsules_lots.cuh"
 # include "../Apps/scsp_3D_capsules_susp_shear.cuh"
 # include "../Apps/scsp_3D_capsules_constriction.cuh"
 # include "../Apps/scsp_3D_capsules_channel.cuh"
 # include "../Apps/scsp_3D_capsules_slit.cuh"
+# include "../Apps/scsp_3D_capsules_slit_trains.cuh"
 # include "../Apps/scsp_3D_duct_channel.cuh"
 # include "../Apps/scsp_3D_slit_channel.cuh"
 # include "../Apps/scsp_3D_rbcs_susp_shear.cuh"
@@ -90,12 +92,14 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_capsule") return new scsp_3D_capsule();
 	if (specifier == "scsp_3D_capsule_skalak") return new scsp_3D_capsule_skalak();
 	if (specifier == "scsp_3D_capsule_skalak_verlet") return new scsp_3D_capsule_skalak_verlet();
+	if (specifier == "scsp_3D_capsule_sedimentation") return new scsp_3D_capsule_sedimentation();
 	if (specifier == "scsp_3D_two_capsules") return new scsp_3D_two_capsules();
 	if (specifier == "scsp_3D_capsules_lots") return new scsp_3D_capsules_lots();
 	if (specifier == "scsp_3D_capsules_susp_shear") return new scsp_3D_capsules_susp_shear();
 	if (specifier == "scsp_3D_capsules_constriction") return new scsp_3D_capsules_constriction();
 	if (specifier == "scsp_3D_capsules_channel") return new scsp_3D_capsules_channel();
 	if (specifier == "scsp_3D_capsules_slit") return new scsp_3D_capsules_slit();
+	if (specifier == "scsp_3D_capsules_slit_trains") return new scsp_3D_capsules_slit_trains();
 	if (specifier == "scsp_3D_duct_channel") return new scsp_3D_duct_channel();
 	if (specifier == "scsp_3D_slit_channel") return new scsp_3D_slit_channel();
 	if (specifier == "scsp_3D_rbcs_susp_shear") return new scsp_3D_rbcs_susp_shear();

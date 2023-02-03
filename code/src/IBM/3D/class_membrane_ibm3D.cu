@@ -345,6 +345,38 @@ void class_membrane_ibm3D::duplicate_cells()
 
 
 // --------------------------------------------------------
+// Line up cells in a single-file line in the middle of
+// the channel:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::single_file_cells(int Nx, int Ny, int Nz, float cellSpacingX, float offsetY)
+{
+	// copy node positions from device to host:
+	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	
+	// determine cell spacing:
+	float evenSpacingX = float(Nx)/nCells;
+	if (cellSpacingX > evenSpacingX) cellSpacingX = evenSpacingX;
+	cout << "Initial cell spacing = " << cellSpacingX << endl;
+	
+	// line up cells in the x-direction:
+	int cnt = 1;
+	for (int c=0; c<nCells; c++) {
+		float3 shift = make_float3(0.0);
+		shift.x = cellSpacingX/2.0 + c*cellSpacingX;
+		shift.y = float(Ny-1)/2.0  + float(cnt)*offsetY;
+		shift.z = float(Nz-1)/2.0;
+		rotate_and_shift_node_positions(c,shift.x,shift.y,shift.z);
+		cnt = -cnt;
+	}
+	
+	// last, copy node positions from host to device:
+	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+}
+
+
+
+// --------------------------------------------------------
 // With the Host, shrink cells and randomly shift them with
 // the box:
 // --------------------------------------------------------
@@ -455,8 +487,10 @@ void class_membrane_ibm3D::rotate_and_shift_node_positions(int cellID, float xsh
 
 void class_membrane_ibm3D::write_output(std::string tagname, int tagnum)
 {
-	write_vtk_immersed_boundary_3D(tagname,tagnum,
-	nNodes,nFaces,rH,facesH);
+	//write_vtk_immersed_boundary_3D(tagname,tagnum,
+	//nNodes,nFaces,rH,facesH);
+	write_vtk_immersed_boundary_3D_cellID(tagname,tagnum,
+	nNodes,nFaces,rH,facesH,cellsH);
 }
 
 
@@ -695,6 +729,18 @@ void class_membrane_ibm3D::zero_velocities_forces(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "add_xdir_force_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::add_xdir_force_to_nodes(int nBlocks, int nThreads, float fx)
+{
+	add_xdir_force_IBM3D
+	<<<nBlocks,nThreads>>> (f,fx,nNodes);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "interpolate_velocity_IBM3D" kernel:
 // --------------------------------------------------------
 
@@ -726,12 +772,12 @@ void class_membrane_ibm3D::extrapolate_force(float* fxLBM, float* fyLBM,
 
 void class_membrane_ibm3D::build_binMap(int nBlocks, int nThreads)
 {
-	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
-	
-	cout << "nnbins = " << nnbins << endl;
-	
-	build_binMap_IBM3D
-	<<<nBlocks,nThreads>>> (binMap,numBins,nnbins,nBins);
+	if (nCells > 1) {
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;	
+		cout << "nnbins = " << nnbins << endl;	
+		build_binMap_IBM3D
+		<<<nBlocks,nThreads>>> (binMap,numBins,nnbins,nBins);
+	}	
 }
 
 
@@ -742,9 +788,11 @@ void class_membrane_ibm3D::build_binMap(int nBlocks, int nThreads)
 
 void class_membrane_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 {
-	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
-	reset_bin_lists_IBM3D
-	<<<nBlocks,nThreads>>> (binOccupancy,binMembers,binMax,nBins);
+	if (nCells > 1) {
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+		reset_bin_lists_IBM3D
+		<<<nBlocks,nThreads>>> (binOccupancy,binMembers,binMax,nBins);
+	}	
 }
 
 
@@ -755,9 +803,11 @@ void class_membrane_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 
 void class_membrane_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 {
-	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
-	build_bin_lists_IBM3D
-	<<<nBlocks,nThreads>>> (r,binOccupancy,binMembers,numBins,sizeBins,nNodes,binMax);
+	if (nCells > 1) {
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+		build_bin_lists_IBM3D
+		<<<nBlocks,nThreads>>> (r,binOccupancy,binMembers,numBins,sizeBins,nNodes,binMax);
+	}	
 }
 
 
@@ -768,10 +818,12 @@ void class_membrane_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 
 void class_membrane_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads)
 {
-	if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
-	nonbonded_node_interactions_IBM3D
-	<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,numBins,sizeBins,
-	                        repA,repD,repFmax,nNodes,binMax,nnbins,Box,pbcFlag);
+	if (nCells > 1) {
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+		nonbonded_node_interactions_IBM3D
+		<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,numBins,sizeBins,
+		                        repA,repD,repFmax,nNodes,binMax,nnbins,Box,pbcFlag);
+	}	
 }
 
 
@@ -1012,6 +1064,12 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 	string filename2 = filenamecombine2.str();
 	outfile2.open(filename2.c_str(), ios::out | ios::app);
 	
+	ofstream outfile3;
+	std::stringstream filenamecombine3;
+	filenamecombine3 << "vtkoutput/" << "averaged_max_T1.dat";
+	string filename3 = filenamecombine3.str();
+	outfile3.open(filename3.c_str(), ios::out | ios::app);
+	
 	// -----------------------------------------
 	// Loop over the capsules, calculate center-of-mass
 	// and Taylor deformation parameter.  Here, I'm using
@@ -1021,6 +1079,7 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 	
 	float yCFL = float(N.y);
 	float zCFL = float(N.z);
+	float maxT1Aver = 0.0; // average maximum tension
 		
 	for (int c=0; c<nCells; c++) {
 		
@@ -1029,7 +1088,7 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 		float mult[10] = {1.0/6.0,1.0/24.0,1.0/24.0,1.0/24.0,1.0/60.0,1.0/60.0,1.0/60.0,1.0/120.0,1.0/120.0,1.0/120.0};
 		float intg[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 		float maxT1 = -100.0;  // maximum principle tension of capsule
-				
+						
 		for (int f=0; f<nFacesPerCell; f++) {
 			
 			// -----------------------------------------
@@ -1121,6 +1180,15 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 		com.x = intg[1]/mass;
 		com.y = intg[2]/mass;
 		com.z = intg[3]/mass;
+		cellsH[c].com.x = com.x;
+		cellsH[c].com.y = com.y;
+		cellsH[c].com.z = com.z;		
+		
+		// -----------------------------------------
+		// sum maxT1 for average calculation:
+		// -----------------------------------------
+		
+		maxT1Aver += maxT1;
 		
 		// -----------------------------------------
 		// inertia tensor relative to center of mass:
@@ -1190,12 +1258,19 @@ void class_membrane_ibm3D::membrane_geometry_analysis(std::string tagname, int t
 	
 	outfile2 << fixed << setprecision(4) << tagnum << "  " << yCFL << "  " << zCFL << endl;
 	
+	// -----------------------------------------
+	// print the average maximum T1:
+	// -----------------------------------------
+	
+	outfile3 << fixed << setprecision(5) << tagnum << "  " << maxT1Aver/float(nCells) << endl;
+	
 	// -----------------------------------------	
 	// close file
 	// -----------------------------------------
 	
 	outfile.close();
 	outfile2.close();
+	outfile3.close();
 	
 }
 
@@ -1250,6 +1325,157 @@ void class_membrane_ibm3D::print_cell_distributions_yz_plane(std::string tagname
 	}	
 }
 
+
+
+// --------------------------------------------------------
+// Calculate an order parameter for the fraction of 
+// cells in a train-like structure (oriented in the x-dir)
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::capsule_train_fraction(float rcut, float thetacut, int step)
+{
+		
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "capsule_allignment.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+		
+	// -----------------------------------------
+	// Initialize variables:
+	// -----------------------------------------
+	
+	float rcut2 = rcut*rcut;
+	
+	int numNabors[nCells];
+	for (int c=0; c<nCells; c++) {
+		numNabors[c] = 0;
+	}
+			
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].intrain = false;
+	}
+	
+	// -----------------------------------------
+	// Loop over the capsule pairs to determine
+	// how many nabors a capsule has in the 
+	// specified alignment (x-dir) zone.  
+	// -----------------------------------------
+	
+	for (int c=0; c<nCells; c++) {
+		
+		float ix = cellsH[c].com.x;
+		float iy = cellsH[c].com.y;
+		float iz = cellsH[c].com.z;
+		
+		for (int d=0; d<nCells; d++) {
+			
+			if (d==c) continue;
+			
+			float jx = cellsH[d].com.x;
+			float jy = cellsH[d].com.y;
+			float jz = cellsH[d].com.z;
+			
+			float dx = ix - jx;
+			float dy = iy - jy;
+			float dz = iz - jz;
+			dx -= roundf(dx/Box.x)*Box.x;
+			dy -= roundf(dy/Box.y)*Box.y;
+			float r2 = dx*dx + dy*dy + dz*dz;
+			
+			if (r2 < rcut2) {
+				float theta = atan2(dy,dx)*180.0/M_PI; 
+				// check if 'c' is in front of 'd':
+				if (theta < thetacut and theta > -thetacut) {
+					numNabors[c]++;
+					//cellsH[c].intrain = true;
+					//cellsH[d].intrain = true;
+				}
+				// check if 'd' is in front of 'c':
+				if (theta > (180.0-thetacut) or theta < (-180+thetacut)) { 
+					numNabors[c]++;
+					//cellsH[c].intrain = true;
+					//cellsH[d].intrain = true;
+				}					
+			}			
+		}		
+	}
+	
+	// -----------------------------------------
+	// Loop over the capsules to see which are 
+	// in trains.  
+	// -----------------------------------------
+	
+	for (int c=0; c<nCells; c++) {
+		
+		// if a capsule has 2 nabors (front & back),
+		// it is in a train:
+		if (numNabors[c] == 2) {
+			cellsH[c].intrain = true;
+			continue;
+		}
+		
+		// if a capsule has 1 nabor, check if that
+		// nabor has 2 nabors, if so then include
+		// it in the train:
+		if (numNabors[c] == 1) {
+			
+			float ix = cellsH[c].com.x;
+			float iy = cellsH[c].com.y;
+			float iz = cellsH[c].com.z;
+		
+			for (int d=0; d<nCells; d++) {
+			
+				if (d==c) continue;
+			
+				float jx = cellsH[d].com.x;
+				float jy = cellsH[d].com.y;
+				float jz = cellsH[d].com.z;
+			
+				float dx = ix - jx;
+				float dy = iy - jy;
+				float dz = iz - jz;
+				dx -= roundf(dx/Box.x)*Box.x;
+				dy -= roundf(dy/Box.y)*Box.y;
+				float r2 = dx*dx + dy*dy + dz*dz;
+			
+				if (r2 < rcut2) {
+					float theta = atan2(dy,dx)*180.0/M_PI; 
+					// check if 'c' is in front of 'd':
+					if (theta < thetacut and theta > -thetacut) {
+						if (numNabors[d] == 2) cellsH[c].intrain = true;
+					}
+					// check if 'd' is in front of 'c':
+					if (theta > (180.0-thetacut) or theta < (-180+thetacut)) { 
+						if (numNabors[d] == 2) cellsH[c].intrain = true;
+					}					
+				}			
+			}				
+		}		
+	}
+	
+	// -----------------------------------------
+	// Find fraction of cells in trains:
+	// -----------------------------------------
+	
+	int nCellsTrain = 0;
+	for (int c=0; c<nCells; c++) {
+		if (cellsH[c].intrain == true) nCellsTrain++;
+	}
+	float fracTrain = float(nCellsTrain)/float(nCells);
+	
+	// -----------------------------------------
+	// Print results:
+	// -----------------------------------------
+	
+	outfile << fixed << setprecision(4) << step << "  " << fracTrain << endl;
+	outfile.close();
+	
+}
 
 
 
