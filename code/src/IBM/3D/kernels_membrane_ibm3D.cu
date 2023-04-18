@@ -206,8 +206,6 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	float3* vertR,
 	float3* vertF,
 	cell* cells,	
-	float gs,
-	float C,
 	int nFaces)
 {
 	// define face:
@@ -215,6 +213,11 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	
 	if (i < nFaces) {
 				
+		// get cell properties:
+		int cID = faces[i].cellID;
+		float gs = cells[cID].ks;
+		float C  = cells[cID].C;
+		
 		// calculate current shape of triangle:
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
@@ -360,8 +363,7 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 		add_force_to_vertex(V1,vertF,force1);
 		add_force_to_vertex(V2,vertF,force2);
 						
-		// add to global cell geometries:
-		int cID = faces[i].cellID;
+		// add to global cell geometries:		
 		float volFace = triangle_signed_volume(r0,r1,r2);
 		atomicAdd(&cells[cID].vol,volFace); 
 		atomicAdd(&cells[cID].area,area);
@@ -463,7 +465,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		float edgeL = length(r01);
 		float length0 = edges[i].length0;
 		// calculate edge stretching force:
-		float lengthRatio = (edgeL-length0)/length0;
+		//float lengthRatio = (edgeL-length0)/length0;
 		float lengthForceMag = ks*(edgeL-length0); //ks*(lengthRatio + lengthRatio/abs(9.0-lengthRatio*lengthRatio));
 		r01 /= edgeL;  // normalize vector
 		add_force_to_vertex(V0,vertF, lengthForceMag*r01);
@@ -483,8 +485,8 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 	triangle* faces,
 	float3* vertR,
 	float3* vertF,
-	edge* edges,	
-	float kb,
+	edge* edges,
+	cell* cells,
 	int nEdges)
 {		
 	// define edge:
@@ -498,6 +500,8 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 		// calculate bending force magnitude:
 		int F0 = edges[i].f0;
 		int F1 = edges[i].f1;
+		int cID = faces[F0].cellID;
+		float kb = cells[cID].kb;
 		float3 n0 = faces[F0].norm;  // normals were calculated above in
 		float3 n1 = faces[F1].norm;  // "compute_node_force_membrane_area_IBM3D()"
 		float dtheta = angle_between_faces(n0,n1,n01) - edges[i].theta0;
@@ -537,7 +541,6 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 	triangle* faces,
 	float3* vertF,
 	cell* cells,	
-	float kv,
 	int nFaces)
 {
 	// define face:
@@ -549,6 +552,7 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
+		float kv = cells[cID].kv;
 		float area = faces[i].area;
 		float3 unitnorm = normalize(faces[i].norm);
 		float volRatio = (cells[cID].vol - cells[cID].vol0)/cells[cID].vol0;

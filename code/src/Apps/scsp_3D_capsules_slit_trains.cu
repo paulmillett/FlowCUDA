@@ -58,12 +58,13 @@ scsp_3D_capsules_slit_trains::scsp_3D_capsules_slit_trains() : lbm(),ibm()
 	// ----------------------------------------------
 	
 	int nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
-	int nCells = inputParams("IBM/nCells",1);
+	nCells = inputParams("IBM/nCells",1);
 	nNodes = nNodesPerCell*nCells;
 	a = inputParams("IBM/a",10.0);
 	float Ca = inputParams("IBM/Ca",1.0);
 	float ksmax = inputParams("IBM/ksmax",0.002);
 	gam = inputParams("IBM/gamma",0.1);
+	ibmFile = inputParams("IBM/ibmFile","sphere.dat");
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	initRandom = inputParams("IBM/initRandom",1);
 	trainRij = inputParams("IBM/trainRij",2.8*a);
@@ -179,11 +180,19 @@ void scsp_3D_capsules_slit_trains::initSystem()
 	// initialize immersed boundary info: 
 	// ----------------------------------------------
 		
-	ibm.read_ibm_information("sphere.dat");
+	ibm.read_ibm_information(ibmFile);
 	ibm.duplicate_cells();
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();	
-				
+	
+	// ----------------------------------------------			
+	// rescale capsule sizes for normal distribution: 
+	// ----------------------------------------------
+	
+	cellSizes = inputParams("IBM/cellSizes","uniform");
+	float stddevA = inputParams("IBM/stddevA",0.0);
+	ibm.rescale_cell_radii(a,stddevA,cellSizes);	
+					
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
@@ -220,11 +229,11 @@ void scsp_3D_capsules_slit_trains::initSystem()
 	// ----------------------------------------------
 	
 	if (initRandom) {
-		float scale = 1.0;  //0.7
+		float scale = 1.0;   // 0.7;
 		ibm.shrink_and_randomize_cells(scale,16.0,a+2.0);
 		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 	
-		/*
+		
 		cout << " " << endl;
 		cout << "-----------------------------------------------" << endl;
 		cout << "Relaxing capsules..." << endl;
@@ -236,7 +245,7 @@ void scsp_3D_capsules_slit_trains::initSystem()
 		cout << "... done relaxing" << endl;
 		cout << "-----------------------------------------------" << endl;
 		cout << " " << endl;	
-		*/
+		
 	}
 	
 	
@@ -465,67 +474,19 @@ void scsp_3D_capsules_slit_trains::writeOutput(std::string tagname, int step)
 
 void scsp_3D_capsules_slit_trains::calcMembraneParams(float Re, float Ca, float Ksmax)
 {
-	// assumed parameters:
+	// 'GetPot' object containing input parameters:
+	GetPot inputParams("input.dat");
+	cellProps = inputParams("IBM/cellProps","uniform");
+	float stddevCa = inputParams("IBM/stddevCa",0.0);
+	float Kv = inputParams("IBM/kv",0.0);
+	float C = inputParams("IBM/C",2.0);
 	float rho = 1.0;
-	//float h = float(Nz-1)/2.0;
 	float h = float(Nz)/2.0;
-	
-	// Kruger's suggested calculations:
-	/*
-	nu = umax*h/Re;
-	bodyForx = 2.0*rho*umax*umax/(Re*h);
-	float Ks = rho*umax*umax*a/(Ca*Re);
-	*/
-	
-	// My calculations:
 	umax = Re*nu/h;     //nu = umax*h/Re;
 	bodyForx = 2.0*rho*umax*umax/(Re*h);   //umax*2.0*rho*nu/(h*h);
-	float Ks = rho*umax*umax*a/(Ca*Re);    //rho*nu*umax*a/(h*Ca);
-	float Kb = Ks*a*a*0.00287*sqrt(3);  
-		
-	/*
-	// set Ks to some large number:
-	float Ks = 1000.0;
-
-	// loop until parameters are acceptable:
-	while (Ks > Ksmax) {		
-		// step 1: calculate nu:
-		nu = umax*h/Re;
-		while (nu > 1.0/6.0) {
-		    umax *= 0.9999;
-		    nu = umax*h/Re;
-		}	    
-		// step 2: calculate fx:
-		bodyForx = 2.0*umax*rho*nu/h/h;
-		// step 3: calculate Es:
-		Ks = bodyForx*h*a/2.0/Ca;
-		// step 4: if Es > Esmax, reduce umax
-		if (Ks > Ksmax) umax *= 0.9999;
-	}
-	*/
 	
-	// assign values for ks and nu:
-	ibm.set_ks(Ks); 
-	ibm.set_kb(Kb);
-	//ibm.set_kv(0.5);
-	ibm.set_ka(0.0007);
-	ibm.set_kag(0.0);
-	ibm.set_C(2.0);
-	lbm.setNu(nu);   
-	
-	// output the results:
-	cout << "  " << endl;
-	cout << "H = " << h << endl;
-	cout << "umax = " << umax << endl;
-	cout << "ks = " << Ks << endl;
-	cout << "kb = " << Kb << endl;
-	cout << "nu = " << nu << endl;
-	cout << "fx = " << bodyForx << endl;
-	cout << "  " << endl;
-	cout << "Re = " << umax*h/nu << endl;
-	cout << "Ca = " << bodyForx*h*a/2.0/Ks << endl;
-	cout << "  " << endl;
-		
+	// set the mechanical properties:
+	ibm.calculate_cell_membrane_props(Re,Ca,stddevCa,a,h,rho,umax,Kv,C,cellProps);
 }
 
 

@@ -46,7 +46,8 @@ class class_membrane_ibm3D {
 	bool bucketsFlag;
 			
 	// host arrays:
-	float3* rH;	
+	float3* rH;
+	float3* vH;
 	triangle* facesH;
 	edge* edgesH;
 	cell* cellsH;
@@ -80,6 +81,14 @@ class class_membrane_ibm3D {
 	void set_kv(float);
 	void set_kag(float);
 	void set_C(float);
+	void set_cells_mechanical_props(float,float,float,float,float);
+	void set_cell_mechanical_props(int,float,float,float,float,float);
+	void set_cells_radii(float);
+	void set_cell_radius(int,float);
+	void calculate_cell_membrane_props(float,float,float,float,float,float,
+		                               float,float,float,std::string); 
+	void rescale_cell_radii(float,float,std::string);
+	void resize_cell_radius(int,float);
 	void assign_refNode_to_cells();
 	void assign_cellIDs_to_nodes();
 	void duplicate_cells();	

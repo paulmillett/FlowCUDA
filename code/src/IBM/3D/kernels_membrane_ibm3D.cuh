@@ -49,8 +49,6 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	float3*,
 	float3*,
 	cell*,	
-	float,
-	float,
 	int);
 
 
@@ -77,7 +75,7 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 	float3*,
 	float3*,
 	edge*,
-    float,
+	cell*,
     int);
 		
 
@@ -85,7 +83,6 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 	triangle*,
 	float3*,
 	cell*,
-    float,
     int);
 
 

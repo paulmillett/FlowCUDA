@@ -44,6 +44,12 @@ struct cell {
 	float vol0;
 	float area;
 	float area0;
+	float rad;
+	float ks;
+	float kb;
+	float kv;
+	float C;
+	float Ca;
 	float3 com;
 };
 

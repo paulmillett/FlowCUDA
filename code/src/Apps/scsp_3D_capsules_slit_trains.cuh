@@ -24,6 +24,7 @@ private:
 	int nFaces;
 	int nEdges;
 	int nSteps;
+	int nCells;
 	int nStepsEquilibrate;
 	int nVTKOutputs;
 	int iskip,jskip,kskip;
@@ -40,6 +41,9 @@ private:
 	bool initRandom;
 	std::string vtkFormat;
 	std::string ibmUpdate;
+	std::string ibmFile;
+	std::string cellProps;
+	std::string cellSizes;
 	
 	// objects:
 	class_scsp_D3Q19 lbm;

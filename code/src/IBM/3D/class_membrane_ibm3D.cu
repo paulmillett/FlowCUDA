@@ -9,6 +9,7 @@
 # include <string>
 # include <sstream>
 # include <stdlib.h>
+# include <time.h>
 using namespace std;  
 
 
@@ -60,8 +61,8 @@ class_membrane_ibm3D::class_membrane_ibm3D()
 	Box.x = float(N.x);   // assume dx=1
 	Box.y = float(N.y);
 	Box.z = float(N.z);
-	pbcFlag = make_int3(1,1,1);  
-		
+	pbcFlag = make_int3(1,1,1);
+			
 	// if we need bins, do some calculations:
 	binsFlag = false;
 	if (nCells > 1) binsFlag = true;
@@ -112,7 +113,8 @@ class_membrane_ibm3D::~class_membrane_ibm3D()
 void class_membrane_ibm3D::allocate()
 {
 	// allocate array memory (host):
-	rH = (float3*)malloc(nNodes*sizeof(float3));		
+	rH = (float3*)malloc(nNodes*sizeof(float3));
+	vH = (float3*)malloc(nNodes*sizeof(float3));		
 	facesH = (triangle*)malloc(nFaces*sizeof(triangle));
 	edgesH = (edge*)malloc(nEdges*sizeof(edge));
 	cellsH = (cell*)malloc(nCells*sizeof(cell));
@@ -121,6 +123,11 @@ void class_membrane_ibm3D::allocate()
 		bucketCnt = (int*)malloc(numBuckets.y*numBuckets.z*sizeof(int));
 		for (int i=0; i<numBuckets.y*numBuckets.z; i++) bucketCnt[i] = 0;
 	}
+	
+	// assign membrane properties to all cells:
+	GetPot inputParams("input.dat");
+	float Ca = inputParams("IBM/Ca",1.0); 
+	set_cells_mechanical_props(ks,kb,kv,C,Ca);
 					
 	// allocate array memory (device):
 	cudaMalloc((void **) &r, nNodes*sizeof(float3));	
@@ -146,7 +153,8 @@ void class_membrane_ibm3D::allocate()
 void class_membrane_ibm3D::deallocate()
 {
 	// free array memory (host):
-	free(rH);	
+	free(rH);
+	free(vH);
 	free(facesH);
 	free(edgesH);
 	free(cellsH);
@@ -193,7 +201,8 @@ void class_membrane_ibm3D::memcopy_host_to_device()
 
 void class_membrane_ibm3D::memcopy_device_to_host()
 {
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);	
+	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(vH, v, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
 	cudaMemcpy(facesH, faces, sizeof(triangle)*nFaces, cudaMemcpyDeviceToHost);
 	//cudaMemcpy(edgesH, edges, sizeof(edge)*nEdges, cudaMemcpyDeviceToHost);
 	
@@ -248,6 +257,7 @@ void class_membrane_ibm3D::set_pbcFlag(int x, int y, int z)
 void class_membrane_ibm3D::set_ks(float val)
 {
 	ks = val;
+	for (int c=0; c<nCells; c++) cellsH[c].ks = ks;
 }
 
 void class_membrane_ibm3D::set_ka(float val)
@@ -258,11 +268,13 @@ void class_membrane_ibm3D::set_ka(float val)
 void class_membrane_ibm3D::set_kb(float val)
 {
 	kb = val;
+	for (int c=0; c<nCells; c++) cellsH[c].kb = kb;
 }
 
 void class_membrane_ibm3D::set_kv(float val)
 {
 	kv = val;
+	for (int c=0; c<nCells; c++) cellsH[c].kv = kv;
 }
 
 void class_membrane_ibm3D::set_kag(float val)
@@ -273,6 +285,184 @@ void class_membrane_ibm3D::set_kag(float val)
 void class_membrane_ibm3D::set_C(float val)
 {
 	C = val;
+	for (int c=0; c<nCells; c++) cellsH[c].C = C;
+}
+
+void class_membrane_ibm3D::set_cells_mechanical_props(float ks, float kb, float kv, float C, float Ca)
+{
+	// set props for ALL cells:
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].ks = ks;
+		cellsH[c].kb = kb;
+		cellsH[c].kv = kv;
+		cellsH[c].C  = C;
+		cellsH[c].Ca = Ca;
+	}
+}
+
+void class_membrane_ibm3D::set_cell_mechanical_props(int cID, float ks, float kb, float kv, float C, float Ca)
+{
+	// set props for ONE cell:
+	cellsH[cID].ks = ks;
+	cellsH[cID].kb = kb;
+	cellsH[cID].kv = kv;
+	cellsH[cID].C  = C;
+	cellsH[cID].Ca = Ca;
+}
+
+void class_membrane_ibm3D::resize_cell_radius(int cID, float scale)
+{
+	for (int i=0; i<nNodesPerCell; i++) {
+		int indx = i + cID*nNodesPerCell;
+		rH[indx] *= scale;
+	}
+}
+
+void class_membrane_ibm3D::set_cells_radii(float rad)
+{
+	// set radius for ALL cells:
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].rad = rad;
+	}
+}
+
+void class_membrane_ibm3D::set_cell_radius(int cID, float rad)
+{
+	// set radius for ONE cell:
+	cellsH[cID].rad = rad;
+}
+
+
+
+// --------------------------------------------------------
+// Calculate cell mechanical properties based 
+// on a given distribution:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::calculate_cell_membrane_props(float Re, float Ca, float stddevCa, float a,
+                                                         float h, float rho, float umax, float Kv, float C,
+														 std::string cellPropsDist)
+{
+	// UNIFORM mechanical properties:
+	if (cellPropsDist == "uniform") {		
+		float Ks = rho*umax*umax*a/(Ca*Re);    //rho*nu*umax*a/(h*Ca);
+		float Kb = Ks*a*a*0.00287*sqrt(3);  
+		for (int i=0; i<nCells; i++) {
+			set_cell_mechanical_props(i,Ks,Kb,Kv,C,Ca);
+		}
+		// output the results:
+		cout << "  " << endl;
+		cout << "H = " << h << endl;
+		cout << "umax = " << umax << endl;
+		cout << "ks = " << Ks << endl;
+		cout << "kb = " << Kb << endl;
+		cout << "  " << endl;
+		cout << "Ca = " << Ca << endl;
+		cout << "  " << endl;
+	}
+	
+	// GAUSSIAN 'normal' mechanical properties:
+	else if (cellPropsDist == "normal") {
+		// output file:
+		ofstream outfile;
+		std::stringstream filenamecombine;
+		filenamecombine << "vtkoutput/" << "distribution_Ca.dat";
+		string filename = filenamecombine.str();
+		outfile.open(filename.c_str(), ios::out | ios::app);
+		// random number generator:
+		std::default_random_engine generator;
+		std::normal_distribution<double> distribution(Ca,stddevCa);
+		// loop over cells:
+		for (int i=0; i<nCells; i++) {
+			float Ca_i = distribution(generator);
+			if (Ca_i < 0.008) Ca_i = 0.008;
+			float Ks = rho*umax*umax*a/(Ca_i*Re);  //rho*nu*umax*a/(h*Ca);
+			float Kb = Ks*a*a*0.00287*sqrt(3);
+			set_cell_mechanical_props(i,Ks,Kb,Kv,C,Ca_i);
+			outfile << fixed << setprecision(5) << Ca_i << endl;
+		}
+		outfile.close();
+		// output the results:
+		cout << "  " << endl;
+		cout << "H = " << h << endl;
+		cout << "umax = " << umax << endl;
+		cout << "  " << endl;
+		cout << "Ca = " << Ca << endl;
+		cout << "Ca std dev = " << stddevCa << endl;
+		cout << "  " << endl;
+	}
+	
+	// BIMODAL mechanical properties:
+	else if (cellPropsDist == "bimodal") {
+		// assign membrane properties to all cells:
+		GetPot inputParams("input.dat");
+		float Ca1 = inputParams("IBM/Ca1",0.1); 
+		float Ca2 = inputParams("IBM/Ca2",0.1);
+		float xCa1 = inputParams("IBM/xCa1",0.5);
+		srand(time(NULL));
+		for (int i=0; i<nCells; i++) {
+			float Ca_i = Ca2;
+			float R = ((float) rand()/(RAND_MAX));			 
+			if (R <= xCa1) Ca_i = Ca1;
+			float Ks = rho*umax*umax*a/(Ca_i*Re);  //rho*nu*umax*a/(h*Ca);
+			float Kb = Ks*a*a*0.00287*sqrt(3);
+			set_cell_mechanical_props(i,Ks,Kb,Kv,C,Ca_i);			
+		}
+	} 
+}
+
+
+
+// --------------------------------------------------------
+// Calculate cell mechanical properties based 
+// on a given distribution:
+// --------------------------------------------------------
+
+void class_membrane_ibm3D::rescale_cell_radii(float a, float stddevA, std::string cellSizeDist)
+{
+	// UNIFORM distribution in cell sizes:
+	if (cellSizeDist == "uniform") {	
+		set_cells_radii(a);
+	}	
+	
+	// NORMAL distribution in cell sizes:
+	else if (cellSizeDist == "normal") {		
+		// output file:
+		ofstream outfile;
+		std::stringstream filenamecombine;
+		filenamecombine << "vtkoutput/" << "distribution_Radii.dat";
+		string filename = filenamecombine.str();
+		outfile.open(filename.c_str(), ios::out | ios::app);
+		// random number generator:
+		std::default_random_engine generator;
+		std::normal_distribution<double> distribution(a,stddevA);
+		// loop over cells:
+		for (int i=0; i<nCells; i++) {
+			float a_i = distribution(generator);
+			float scale = a_i/a;
+			set_cell_radius(i,a_i);
+			resize_cell_radius(i,scale);			
+			outfile << fixed << setprecision(5) << a_i << endl;
+		}
+		outfile.close();
+	}	
+	
+	// BIMODAL distribution in cell sizes:
+	else if (cellSizeDist == "bimodal") {
+		GetPot inputParams("input.dat");
+		float a1 = inputParams("IBM/a1",6.0); 
+		float a2 = inputParams("IBM/a2",6.0);
+		float xa1 = inputParams("IBM/xa1",0.5);
+		srand(time(NULL));
+		for (int i=0; i<nCells; i++) {
+			float a_i = a2;
+			float R = ((float) rand()/(RAND_MAX));
+			if (R <= xa1) a_i = a1;
+			float scale = a_i/a;
+			set_cell_radius(i,a_i);
+			resize_cell_radius(i,scale);
+		}
+	}
 }
 
 
@@ -855,11 +1045,11 @@ void class_membrane_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (faces,r,f,edges,ks,nEdges);
 	
 	compute_node_force_membrane_bending_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,edges,kb,nEdges);
+	<<<nBlocks,nThreads>>> (faces,r,f,edges,cells,nEdges);
 		
 	// Fifth, compute the volume conservation force for each face:
 	compute_node_force_membrane_volume_IBM3D
-	<<<nBlocks,nThreads>>> (faces,f,cells,kv,nFaces);
+	<<<nBlocks,nThreads>>> (faces,f,cells,nFaces);
 	
 	// Sixth, compute the global area conservation force for each face:
 	compute_node_force_membrane_globalarea_IBM3D
@@ -893,15 +1083,15 @@ void class_membrane_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 					
 	// Third, compute the Skalak forces for each face:
 	compute_node_force_membrane_skalak_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,cells,ks,C,nFaces);
+	<<<nBlocks,nThreads>>> (faces,r,f,cells,nFaces);
 	
 	// Fourth, compute the bending force for each edge:		
 	compute_node_force_membrane_bending_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,edges,kb,nEdges);
+	<<<nBlocks,nThreads>>> (faces,r,f,edges,cells,nEdges);
 		
 	// Fifth, compute the volume conservation force for each face:
 	compute_node_force_membrane_volume_IBM3D
-	<<<nBlocks,nThreads>>> (faces,f,cells,kv,nFaces);
+	<<<nBlocks,nThreads>>> (faces,f,cells,nFaces);
 			
 	// Sixth, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
@@ -1414,7 +1604,7 @@ void class_membrane_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 		
 		// if a capsule has 2 nabors (front & back),
 		// it is in a train:
-		if (numNabors[c] == 2) {
+		if (numNabors[c] >= 2) {
 			cellsH[c].intrain = true;
 			continue;
 		}
@@ -1447,11 +1637,11 @@ void class_membrane_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 					float theta = atan2(dy,dx)*180.0/M_PI; 
 					// check if 'c' is in front of 'd':
 					if (theta < thetacut and theta > -thetacut) {
-						if (numNabors[d] == 2) cellsH[c].intrain = true;
+						if (numNabors[d] >= 2) cellsH[c].intrain = true;
 					}
 					// check if 'd' is in front of 'c':
 					if (theta > (180.0-thetacut) or theta < (-180+thetacut)) { 
-						if (numNabors[d] == 2) cellsH[c].intrain = true;
+						if (numNabors[d] >= 2) cellsH[c].intrain = true;
 					}					
 				}			
 			}				
@@ -1474,6 +1664,33 @@ void class_membrane_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 	
 	outfile << fixed << setprecision(4) << step << "  " << fracTrain << endl;
 	outfile.close();
+	
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile2;
+	std::stringstream filenamecombine2;
+	filenamecombine2 << "vtkoutput/" << "capsule_dynamics.dat";
+	string filename2 = filenamecombine2.str();
+	outfile2.open(filename2.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------
+	// calculate capsule velocities & print:
+	// -----------------------------------------
+	
+	for (int i=0; i<nCells; i++) {
+		float3 cellv = make_float3(0.0,0.0,0.0);
+		for (int n=0; n<nNodesPerCell; n++) {
+			int indx = n + i*nNodesPerCell;
+			cellv += vH[indx];
+		}
+		cellv /= nNodesPerCell;
+		outfile2 << fixed << setprecision(6) << cellsH[i].rad << "  " << cellsH[i].Ca << "  "
+			                                 << cellv.x << "  " << cellv.y << "  " << cellv.z << "  " 
+										     << cellsH[i].intrain << endl;
+	}
+	outfile2.close();
 	
 }
 
