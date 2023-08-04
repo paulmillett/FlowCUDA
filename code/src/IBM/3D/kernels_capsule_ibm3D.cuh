@@ -1,5 +1,5 @@
-# ifndef KERNELS_MEMBRANE_IBM3D_H
-# define KERNELS_MEMBRANE_IBM3D_H
+# ifndef KERNELS_CAPSULE_IBM3D_H
+# define KERNELS_CAPSULE_IBM3D_H
 # include "../../Utils/helper_math.h"
 # include "membrane_data.h"
 # include <cuda.h>
@@ -177,4 +177,4 @@ __global__ void scale_cell_areas_volumes_IBM3D(
 	int);
 		
 
-# endif  // KERNELS_MEMBRANE_IBM3D_H
+# endif  // KERNELS_CAPSULE_IBM3D_H

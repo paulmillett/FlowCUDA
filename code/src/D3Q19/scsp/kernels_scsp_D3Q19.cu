@@ -171,6 +171,38 @@ __global__ void scsp_add_body_force_D3Q19(
 
 
 // --------------------------------------------------------
+// D3Q19 add body force to fluid nodes.  Nodes above and
+// below 'zdivide' get different body forces
+// --------------------------------------------------------
+
+__global__ void scsp_add_body_force_divided_D3Q19(
+	float bxL,
+	float bxU,
+	float* fx,
+	float* fy,
+	float* fz,
+	int nVoxels,
+	int Nx,
+	int Ny,
+	int Nz,
+	int zdivide)
+{
+	// define current voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
+	if (i < nVoxels) {	
+		float bx = 0.0;
+		int zi = i/(Nx*Ny);
+		if (zi < zdivide) bx = bxL;  // lower body force
+		if (zi > zdivide) bx = bxU;  // upper body force
+		fx[i] += bx;
+		fy[i] += 0.0;
+		fz[i] += 0.0;
+	}
+}
+
+
+
+// --------------------------------------------------------
 // D3Q19 add body force to fluid nodes:
 // --------------------------------------------------------
 
@@ -221,15 +253,15 @@ __global__ void scsp_set_boundary_shear_velocity_D3Q19(float uBot,
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	
 	if (i < nVoxels) {		
-		int yi = (i/Nx)%Ny;	  // y-index assuming data is ordered first x, then y, then z
-		if (yi == 0) {
+		int zi = i/(Nx*Ny);    // z-index assuming data is ordered first x, then y, then z
+		if (zi == 0) {
 			int offst = 19*i;
 			u[i] = uBot;
 			v[i] = 0.0;
 			w[i] = 0.0;
 			equilibrium_populations_bb_D3Q19(f1,r[i],u[i],v[i],w[i],offst);
 		} 
-		if (yi == Ny-1) {
+		if (zi == Nz-1) {
 			int offst = 19*i;
 			u[i] = uTop;
 			v[i] = 0.0;

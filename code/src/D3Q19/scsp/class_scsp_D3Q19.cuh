@@ -94,6 +94,7 @@ public:
 	void create_lattice_box_slit();
 	void create_lattice_box_channel();
 	void create_lattice_box_periodic_solid_walls();
+	void create_lattice_box_slit_solid_walls();
 	void bounding_box_nList_construct();
 	void stream_index_push();
 	void stream_index_pull();
@@ -131,6 +132,7 @@ public:
 	void zero_forces(int,int);
 	void zero_forces_with_IBM(int,int);	
 	void add_body_force(float,float,float,int,int);
+	void add_body_force_divided(float,float,int,int,int);
 	void add_body_force_with_solid(float,float,float,int,int);	
 	void extrapolate_velocity_from_IBM(int,int,float3*,float3*,int);
 	void interpolate_velocity_to_IBM(int,int,float3*,float3*,int);

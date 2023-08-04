@@ -168,7 +168,8 @@ void scsp_3D_capsules_slit_trains::initSystem()
 				double xvel0 = bodyForx*h*h/(2.0*nu);  // assume rho=1
 				double z = float(k) + 0.5 - h;
 				double xvel = xvel0*(1.0 - pow(z/h,2));
-				lbm.setU(ndx,xvel);
+				//lbm.setU(ndx,xvel);
+				lbm.setU(ndx,0.0);
 				lbm.setV(ndx,0.0);
 				lbm.setW(ndx,0.0);
 				lbm.setR(ndx,1.0);
@@ -222,7 +223,7 @@ void scsp_3D_capsules_slit_trains::initSystem()
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	srand(time(NULL));
+	//srand(time(NULL));
 	
 	// ----------------------------------------------
 	// shrink and randomly disperse cells: 
@@ -230,7 +231,7 @@ void scsp_3D_capsules_slit_trains::initSystem()
 	
 	if (initRandom) {
 		float scale = 1.0;   // 0.7;
-		ibm.shrink_and_randomize_cells(scale,16.0,a+2.0);
+		ibm.shrink_and_randomize_cells(scale,2.0,a+2.0);
 		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 	
 		
@@ -304,11 +305,16 @@ void scsp_3D_capsules_slit_trains::cycleForward(int stepsPerCycle, int currentCy
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
 			// decide on update type:
+			//ibm.stepIBM(lbm,bodyForx,nBlocks,nThreads);
+			
 			if (ibmUpdate == "ibm") {
 				stepIBM();
 			} else if (ibmUpdate == "verlet") {
 				stepVerlet();
-			}			
+			}
+			
+			
+					
 		}
 		cout << " " << endl;
 		cout << "... done equilibrating!" << endl;
@@ -323,11 +329,15 @@ void scsp_3D_capsules_slit_trains::cycleForward(int stepsPerCycle, int currentCy
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
 		// decide on update type:
+		//ibm.stepIBM(lbm,bodyForx,nBlocks,nThreads);
+		
 		if (ibmUpdate == "ibm") {
 			stepIBM();
 		} else if (ibmUpdate == "verlet") {
 			stepVerlet();
-		}		
+		}
+		
+				
 	}
 	
 	cout << cummulativeSteps << endl;	
@@ -373,7 +383,7 @@ void scsp_3D_capsules_slit_trains::stepIBM()
 	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 	lbm.stream_collide_save_forcing(nBlocks,nThreads);
 	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
-	lbm.set_boundary_slit_density(nBlocks,nThreads);
+	//lbm.set_boundary_slit_density(nBlocks,nThreads);
 	
 	// update membrane:
 	//ibm.update_node_positions(nBlocks,nThreads);
@@ -411,7 +421,7 @@ void scsp_3D_capsules_slit_trains::stepVerlet()
 	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 	lbm.stream_collide_save_forcing(nBlocks,nThreads);
 	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
-	lbm.set_boundary_slit_density(nBlocks,nThreads);
+	//lbm.set_boundary_slit_density(nBlocks,nThreads);
 	
 	// second step of IBM velocity verlet:
 	ibm.update_node_positions_verlet_2(nBlocks,nThreads);

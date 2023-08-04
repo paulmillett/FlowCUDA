@@ -1,6 +1,6 @@
 
 
-# include "kernels_membrane_ibm3D.cuh"
+# include "kernels_capsule_ibm3D.cuh"
 # include <stdio.h>
 
 

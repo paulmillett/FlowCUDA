@@ -4,7 +4,7 @@
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
-# include "../IBM/3D/class_membrane_ibm3D.cuh"
+# include "../IBM/3D/class_capsule_ibm3D.cuh"
 # include <cuda.h>
 # include <string>
 
@@ -24,15 +24,26 @@ private:
 	int nFaces;
 	int nEdges;
 	int nSteps;
+	int nCells;
+	int nStepsEquilibrate;
+	int nVTKOutputs;
 	int iskip,jskip,kskip;
+	int precision;
 	float tau;
 	float nu;
+	float gam;
 	float shearVel;
+	float a;
+	bool initRandom;
 	std::string vtkFormat;
+	std::string ibmFile;
+	std::string ibmUpdate;
+	std::string cellProps;
+	std::string cellSizes;
 	
 	// objects:
 	class_scsp_D3Q19 lbm;
-	class_membrane_ibm3D ibm;
+	class_capsule_ibm3D ibm;
 		
 public:
 
@@ -40,7 +51,10 @@ public:
 	~scsp_3D_capsules_susp_shear();
 	void initSystem();
 	void cycleForward(int,int);
+	void stepIBM();
+	void stepVerlet();
 	void writeOutput(std::string,int);
+	void calcMembraneParams(float,float);
 	
 };
 

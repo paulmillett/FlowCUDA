@@ -1,19 +1,20 @@
 
-# ifndef CLASS_MEMBRANE_IBM3D_H
-# define CLASS_MEMBRANE_IBM3D_H
+# ifndef CLASS_CAPSULE_IBM3D_H
+# define CLASS_CAPSULE_IBM3D_H
 
 # include "../../IO/read_ibm_information.cuh"
 # include "../../IO/write_vtk_output.cuh"
 # include "../../Utils/helper_math.h"
+# include "../../D3Q19/scsp/class_scsp_D3Q19.cuh"
 # include "kernels_ibm3D.cuh"
-# include "kernels_membrane_ibm3D.cuh"
+# include "kernels_capsule_ibm3D.cuh"
 # include "kernels_nonbonded_ibm3D.cuh"
 # include "membrane_data.h"
 # include <cuda.h>
 # include <string>
 
 
-class class_membrane_ibm3D {
+class class_capsule_ibm3D {
 	
 	public:  // treat like a struct
 	
@@ -39,11 +40,13 @@ class class_membrane_ibm3D {
 	float repA;
 	float repD;
 	float repFmax;
+	float gam;
 	float3 Box;
 	float3 sizeBuckets;
 	int3 pbcFlag;
 	bool binsFlag;
 	bool bucketsFlag;
+	std::string ibmUpdate;
 			
 	// host arrays:
 	float3* rH;
@@ -67,8 +70,8 @@ class class_membrane_ibm3D {
 	int* cellIDs;
 	
 	// methods:
-	class_membrane_ibm3D();
-	~class_membrane_ibm3D();
+	class_capsule_ibm3D();
+	~class_capsule_ibm3D();
 	void allocate();
 	void deallocate();	
 	void memcopy_host_to_device();
@@ -98,6 +101,7 @@ class class_membrane_ibm3D {
 	void rest_geometries(int,int);
 	void rest_geometries_skalak(int,int);
 	void shrink_and_randomize_cells(float,float,float);
+	void randomize_cells_above_plane(float,float,float,float);
 	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);
 	void write_output_long(std::string,int);
@@ -109,6 +113,7 @@ class class_membrane_ibm3D {
 	void add_xdir_force_to_nodes(int,int,float);
 	void relax_node_positions(int,float,float,int,int);
 	void relax_node_positions_skalak(int,float,float,int,int);
+	void stepIBM(class_scsp_D3Q19&,float,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
 	void extrapolate_force(float*,float*,float*,int,int);	
@@ -132,4 +137,4 @@ class class_membrane_ibm3D {
 	
 };
 
-# endif  // CLASS_MEMBRANE_IBM3D_H
+# endif  // CLASS_CAPSULE_IBM3D_H

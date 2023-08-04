@@ -519,6 +519,83 @@ void build_box_lattice_solid_walls_D3Q19(int nVoxels,
 
 
 // --------------------------------------------------------
+// Build a rectilinear simulation box:
+// NOTE: Here, we assume periodic boundaries in all
+//       directions, with stationary solid nodes!
+// --------------------------------------------------------
+
+void build_box_lattice_slit_solid_walls_D3Q19(int nVoxels,
+                                              int Nx, int Ny, int Nz,
+                                              int* voxelType, int* solid, int* nList)
+{
+	
+	// -----------------------------------------------
+	// make sure dimensions match array sizes:
+	// -----------------------------------------------
+	
+	if (Nx*Ny*Nz != nVoxels) {
+		std::cout << "box size does not match nVoxels" << std::endl;
+		return;
+	}
+	
+	// -----------------------------------------------
+	// build voxelType[] array...
+	// -----------------------------------------------
+	
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = k*Nx*Ny + j*Nx + i;
+				voxelType[ndx] = 0;		
+			}
+		}	
+	}	
+		
+	// -----------------------------------------------
+	// build the nList[] array:
+	// (note: periodic boundaries only along x and z)
+	// -----------------------------------------------
+		
+	int Q = 19;
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = voxel_index(i,j,k,Nx,Ny,Nz); 
+				int offst = Q*ndx;
+				int ip1 = (i+1)%Nx;			
+				int jp1 = (j+1)%Ny;
+				int kp1 = k+1;
+				int im1 = (Nx+i-1)%Nx;
+				int jm1 = (Ny+j-1)%Ny; 
+				int km1 = k-1;
+				nList[offst+0]  = ndx;
+				nList[offst+1]  = voxel_index_solid_boundary(ip1, j,   k,   Nx, Ny, Nz, solid);	
+				nList[offst+2]  = voxel_index_solid_boundary(im1, j,   k,   Nx, Ny, Nz, solid);	
+				nList[offst+3]  = voxel_index_solid_boundary(i,   jp1, k,   Nx, Ny, Nz, solid);	
+				nList[offst+4]  = voxel_index_solid_boundary(i,   jm1, k,   Nx, Ny, Nz, solid);	
+				nList[offst+5]  = voxel_index_solid_boundary(i,   j,   kp1, Nx, Ny, Nz, solid);	
+				nList[offst+6]  = voxel_index_solid_boundary(i,   j,   km1, Nx, Ny, Nz, solid);
+				nList[offst+7]  = voxel_index_solid_boundary(ip1, jp1, k,   Nx, Ny, Nz, solid);	
+				nList[offst+8]  = voxel_index_solid_boundary(im1, jm1, k,   Nx, Ny, Nz, solid);
+				nList[offst+9]  = voxel_index_solid_boundary(ip1, j,   kp1, Nx, Ny, Nz, solid);
+				nList[offst+10] = voxel_index_solid_boundary(im1, j,   km1, Nx, Ny, Nz, solid);
+				nList[offst+11] = voxel_index_solid_boundary(i,   jp1, kp1, Nx, Ny, Nz, solid);
+				nList[offst+12] = voxel_index_solid_boundary(i,   jm1, km1, Nx, Ny, Nz, solid);
+				nList[offst+13] = voxel_index_solid_boundary(ip1, jm1, k,   Nx, Ny, Nz, solid);
+				nList[offst+14] = voxel_index_solid_boundary(im1, jp1, k,   Nx, Ny, Nz, solid);
+				nList[offst+15] = voxel_index_solid_boundary(ip1, j,   km1, Nx, Ny, Nz, solid);
+				nList[offst+16] = voxel_index_solid_boundary(im1, j,   kp1, Nx, Ny, Nz, solid);
+				nList[offst+17] = voxel_index_solid_boundary(i,   jp1, km1, Nx, Ny, Nz, solid);
+				nList[offst+18] = voxel_index_solid_boundary(i,   jm1, kp1, Nx, Ny, Nz, solid);			
+			}
+		}
+	}	
+	
+}
+
+
+
+// --------------------------------------------------------
 // Compute index of voxel given i,j,k indices (if any
 // index lies outside the box, return '-1')
 // --------------------------------------------------------
@@ -550,6 +627,32 @@ int voxel_index_solid(int i, int j, int k, int Nx, int Ny, int Nz, int* solid)
 		return -1;
 	}
 	else {
+		return k*Nx*Ny + j*Nx + i;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Compute index of voxel given i,j,k indices (if solid[]
+// is equal to one, return '-1').  (if any
+// index lies outside the box, return '-1')
+// --------------------------------------------------------
+
+int voxel_index_solid_boundary(int i, int j, int k, int Nx, int Ny, int Nz, int* solid) 
+{
+	if (i < 0 || i > Nx-1 ||
+		j < 0 || j > Ny-1 ||
+		k < 0 || k > Nz-1) 
+	{
+		return -1;
+	} 
+	else if (solid[k*Nx*Ny + j*Nx + i] == 1) 
+	{
+		return -1;
+	}
+	else 
+	{
 		return k*Nx*Ny + j*Nx + i;
 	}
 }

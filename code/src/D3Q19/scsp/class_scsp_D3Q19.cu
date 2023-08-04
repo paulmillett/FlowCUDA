@@ -399,6 +399,19 @@ void class_scsp_D3Q19::create_lattice_box_periodic_solid_walls()
 
 
 // --------------------------------------------------------
+// Initialize lattice as a "box" set up for slit flow
+// in the x-direction (plane poiseuille), with internal
+// solid walls:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::create_lattice_box_slit_solid_walls()
+{
+	build_box_lattice_slit_solid_walls_D3Q19(nVoxels,Nx,Ny,Nz,voxelTypeH,solidH,nListH);
+}
+
+
+
+// --------------------------------------------------------
 // Construct nList[] using bounding box:
 // --------------------------------------------------------
 
@@ -848,6 +861,19 @@ void class_scsp_D3Q19::add_body_force(float bx, float by, float bz, int nBlocks,
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	scsp_add_body_force_D3Q19 
 	<<<nBlocks,nThreads>>> (bx,by,bz,Fx,Fy,Fz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_add_body_forces_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::add_body_force_divided(float bxL, float bxU, int zdivide, int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	scsp_add_body_force_divided_D3Q19 
+	<<<nBlocks,nThreads>>> (bxL,bxU,Fx,Fy,Fz,nVoxels,Nx,Ny,Nz,zdivide);
 }
 
 

@@ -61,7 +61,20 @@ __global__ void scsp_add_body_force_D3Q19(
 	float*,
 	float*,
 	int);
-												 
+
+
+__global__ void scsp_add_body_force_divided_D3Q19(
+	float,
+	float,
+	float*,
+	float*,
+	float*,
+	int,
+	int,
+	int,
+	int,
+	int);
+									 
 
 __global__ void scsp_set_boundary_shear_velocity_D3Q19(
 	float,
