@@ -11,7 +11,7 @@ TARGET_NAME_DBG = dbg$(TARGET_NAME_OPT)
 OBJ_PATH = ./obj
 CFLAGS = -std=c++11
 #CUDAFLAGS = --gpu-architecture=compute_35 --gpu-code=sm_35
-CUDAFLAGS = 
+CUDAFLAGS = -lcufft
 DBG_CFLAGS = $(CFLAGS) -g -DDEBUG
 OPT_CFLAGS = $(CFLAGS) -O3
 CU_DBG_CFLAGS = $(CFLAGS) $(CUDAFLAGS) -g -DDEBUG

@@ -889,11 +889,11 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, float bodyForx, int nBl
 		nonbonded_node_interactions(nBlocks,nThreads);
 		wall_forces_zdir(nBlocks,nThreads);
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,r,v,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,r,f,nNodes);
 		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
 		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
 			
-		// update fluid:
-		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,r,f,nNodes);
+		// update fluid:		
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 		
