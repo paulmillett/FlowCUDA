@@ -1,6 +1,7 @@
 
 # include "class_poisson_ibm3D.cuh"
 # include <math.h>
+# include <iostream>
 using namespace std;
 
 
@@ -41,7 +42,7 @@ void class_poisson_ibm3D::initialize(int Nxin, int Nyin, int Nzin)
 	
 	// define cuFFT plan
 	cufftPlan3d(&plan, Nx, Ny, Nz, CUFFT_C2C);
-	
+		
 	// wave-vector arrays (host)
 	float* kxH = new float[Nx];
 	float* kyH = new float[Ny];
@@ -52,6 +53,9 @@ void class_poisson_ibm3D::initialize(int Nxin, int Nyin, int Nzin)
 	for (int j=Ny/2+1; j<Ny; j++) kyH[j] = (j-Ny)*2*M_PI;	
 	for (int k=0; k<=Nz/2; k++)   kzH[k] = k*2*M_PI;
 	for (int k=Nz/2+1; k<Nz; k++) kzH[k] = (k-Nz)*2*M_PI;
+	
+	// allocate host arrays
+	indicatorH = (float*)malloc(nVoxels*sizeof(float));
 	
 	// allocate device arrays
 	cudaMalloc((void**)&kx, sizeof(float)*Nx);
@@ -102,6 +106,22 @@ void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, int nFaces, 
 
 
 // --------------------------------------------------------
+// write output for the 'indicatorH' array:
+// --------------------------------------------------------
+
+void class_poisson_ibm3D::write_output(std::string tagname, int tagnum,
+                                       int iskip, int jskip, int kskip, int precision)
+{
+	// first, do a memcopy from device to host:
+	cudaMemcpy(indicatorH, indicator, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	for (int i=0; i<nVoxels; i++) cout << i << " " << indicatorH[i] << endl;
+	// second, write the output:
+	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,indicatorH,iskip,jskip,kskip,precision);
+}
+
+
+
+// --------------------------------------------------------
 // Deallocate arrays:
 // --------------------------------------------------------
 
@@ -113,6 +133,7 @@ void class_poisson_ibm3D::deallocate()
 	cudaFree(rhs);
 	cudaFree(G);
 	cudaFree(indicator);
+	free(indicatorH);
 }
 
 

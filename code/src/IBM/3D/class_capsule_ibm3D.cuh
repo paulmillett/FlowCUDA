@@ -113,7 +113,7 @@ class class_capsule_ibm3D {
 	void add_xdir_force_to_nodes(int,int,float);
 	void relax_node_positions(int,float,float,int,int);
 	void relax_node_positions_skalak(int,float,float,int,int);
-	void stepIBM(class_scsp_D3Q19&,float,int,int);
+	void stepIBM(class_scsp_D3Q19&,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
 	void extrapolate_force(float*,float*,float*,int,int);	

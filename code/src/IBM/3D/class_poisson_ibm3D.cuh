@@ -3,6 +3,7 @@
 # define CLASS_POISSON_IBM3D_H
 
 # include "../../Utils/helper_math.h"
+# include "../../IO/write_vtk_output.cuh"
 # include "kernels_poisson_ibm3D.cuh"
 # include "membrane_data.h"
 # include <cuda.h>
@@ -20,6 +21,9 @@ class class_poisson_ibm3D {
 	int Nz;
 	int nVoxels;
 	cufftHandle plan;
+	
+	// host arrays:
+	float* indicatorH;
 			
 	// device arrays:
 	float* indicator;
@@ -34,6 +38,7 @@ class class_poisson_ibm3D {
 	~class_poisson_ibm3D();
 	void initialize(int,int,int);
 	void solve_poisson(triangle*,float3*,int,int,int);
+	void write_output(std::string,int,int,int,int,int);
 	void deallocate();	
 	
 };

@@ -326,6 +326,91 @@ void write_vtk_immersed_boundary_2D(std::string tagname, int tagnum, int nNodes,
 
 
 
+
+
+
+
+
+// -----------------------------------------------------------------------------------------
+// Write output in a VTK Structured Grid format (note: this is for 3D simulations):
+// Here, only one output variable (scalar field) is written
+// -----------------------------------------------------------------------------------------
+
+void write_vtk_structured_grid(std::string tagname, int tagnum, int NX, int NY,
+	                           int NZ, float* r, int iskip, int jskip, int kskip, int prec)
+{		
+	
+	// -----------------------------------------------
+	//	Define the file location and name:
+	// -----------------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------------
+	//	find output dimensions considering
+	//  iskip, jskip, kskip:
+	// -----------------------------------------------
+	
+	int Nxs = NX/iskip;
+	int Nys = NY/jskip;
+	int Nzs = NZ/kskip;
+	if (NX%2 && iskip>1) Nxs++;  // if odd, then add 1
+	if (NY%2 && jskip>1) Nys++;
+	if (NZ%2 && kskip>1) Nzs++;	
+	
+	// -----------------------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------------------
+	
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing grid data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET STRUCTURED_POINTS" << endl;
+	outfile << "DIMENSIONS" << d << Nxs << d << Nys << d << Nzs << endl;	
+	outfile << "ORIGIN " << d << 0 << d << 0 << d << 0 << endl;
+	outfile << "SPACING" << d << 1.0*iskip << d << 1.0*jskip << d << 1.0*kskip << endl;	
+    outfile << " " << endl;
+    outfile << "POINT_DATA " << Nxs*Nys*Nzs << endl;
+    outfile << "SCALARS " << tagname << " float" << endl;
+    outfile << "LOOKUP_TABLE default" << endl;
+		
+	// -----------------------------------------------
+	// Write the 'rho' data:
+	// NOTE: x-data increases fastest,
+	//       then y-data
+	// -----------------------------------------------
+	
+	for (int k=0; k<NZ; k+=kskip) {
+		for (int j=0; j<NY; j+=jskip) {
+			for (int i=0; i<NX; i+=iskip) {
+				int ndx = k*NX*NY + j*NX + i;
+				outfile << fixed << setprecision(prec) << r[ndx] << endl;
+			}
+		}
+	}	
+	
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+	
+	outfile.close();
+	
+}
+
+
+
+
+
+
+
+
+
 // -----------------------------------------------------------------------------------------
 // Write output in a VTK Structured Grid format (note: this is for 3D simulations):
 // -----------------------------------------------------------------------------------------

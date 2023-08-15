@@ -868,7 +868,7 @@ void class_capsule_ibm3D::relax_node_positions_skalak(int nIts, float scale, flo
 // Take step forward with both IBM and LBM:
 // --------------------------------------------------------
 
-void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, float bodyForx, int nBlocks, int nThreads) 
+void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
 {
 	
 	// the traditional IBM update, except here
@@ -892,13 +892,6 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, float bodyForx, int nBl
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,r,f,nNodes);
 		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
 		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
-			
-		// update fluid:		
-		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
-		
-		// CUDA sync
-		cudaDeviceSynchronize();
 		
 	} 
 	
@@ -925,13 +918,6 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, float bodyForx, int nBl
 		wall_forces_zdir(nBlocks,nThreads);
 		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,r,v,f,nNodes);
 		update_node_positions_verlet_2(nBlocks,nThreads);
-			
-		// update fluid:		
-		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);
-			
-		// CUDA sync		
-		cudaDeviceSynchronize();
 		
 	}
 		
