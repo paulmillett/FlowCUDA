@@ -7,6 +7,10 @@
 # include <cufft.h>
 
 
+__global__ void zero_G_poisson_IBM3D(
+	float3*,
+	int);
+		
 
 __global__ void extrapolate_interface_normal_poisson_IBM3D(
 	float3*,
@@ -17,6 +21,14 @@ __global__ void extrapolate_interface_normal_poisson_IBM3D(
 	int,
 	triangle*);
 
+
+__global__ void test_interface_normal_poisson_IBM3D(
+	float3*,
+	int,
+	int,
+	int,
+	int);
+			
 
 __global__ void calculate_rhs_poisson_IBM3D(
 	float3*,

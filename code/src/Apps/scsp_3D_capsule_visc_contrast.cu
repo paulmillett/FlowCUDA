@@ -210,7 +210,7 @@ void scsp_3D_capsule_visc_contrast::initSystem()
 	// ----------------------------------------------
 	// shrink and randomly disperse cells: 
 	// ----------------------------------------------
-	
+		
 	if (initRandom) {
 		float scale = 1.0;   // 0.7;
 		ibm.shrink_and_randomize_cells(scale,2.0,a+2.0);
@@ -230,7 +230,7 @@ void scsp_3D_capsule_visc_contrast::initSystem()
 		cout << " " << endl;	
 		
 	}
-	
+		
 	// ----------------------------------------------
 	// initialize poisson solver:
 	// ----------------------------------------------
@@ -350,6 +350,7 @@ void scsp_3D_capsule_visc_contrast::writeOutput(std::string tagname, int step)
 		if (step%intervalVTK == 0) {
 			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
 			ibm.write_output("ibm",step);
+			poisson.write_output("indicator",step,iskip,jskip,kskip,precision);
 		}
 		
 		// print out final averaged flow profile:

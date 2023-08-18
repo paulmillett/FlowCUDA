@@ -1,6 +1,24 @@
 
 # include "kernels_poisson_ibm3D.cuh"
+# include <stdio.h>
 
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to reset the 'G' vector array
+// --------------------------------------------------------
+
+__global__ void zero_G_poisson_IBM3D(
+	float3* G,
+	int nVoxels)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nVoxels) {
+		G[i] = make_float3(0.0f,0.0f,0.0f);
+	}
+}
 
 
 // --------------------------------------------------------
@@ -23,15 +41,48 @@ __global__ void extrapolate_interface_normal_poisson_IBM3D(
 	if (i < nFaces) {
 		
 		// --------------------------------------
-		// center of mass of face
+		// center of mass of face 
+		// (note: must take into account PBC's!!!
+		// see Wikipedia page on c.o.m.)
 		// --------------------------------------
 		
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		float xf = (r[V0].x + r[V1].x + r[V2].x)/3.0;
-		float yf = (r[V0].y + r[V1].y + r[V2].y)/3.0;
-		float zf = (r[V0].z + r[V1].z + r[V2].z)/3.0;
+		
+		float r0x = r[V0].x, r1x = r[V1].x, r2x = r[V2].x;
+		float r0y = r[V0].y, r1y = r[V1].y, r2y = r[V2].y;
+		float r0z = r[V0].z, r1z = r[V1].z, r2z = r[V2].z;
+		
+		float t0x = r0x/float(Nx)*2*M_PI, t1x = r1x/float(Nx)*2*M_PI, t2x = r2x/float(Nx)*2*M_PI;
+		float t0y = r0y/float(Ny)*2*M_PI, t1y = r1y/float(Ny)*2*M_PI, t2y = r2y/float(Ny)*2*M_PI;
+		float t0z = r0z/float(Nz)*2*M_PI, t1z = r1z/float(Nz)*2*M_PI, t2z = r2z/float(Nz)*2*M_PI;
+		
+		float p0x = cos(t0x), p1x = cos(t1x), p2x = cos(t2x);
+		float q0x = sin(t0x), q1x = sin(t1x), q2x = sin(t2x);		
+		float p0y = cos(t0y), p1y = cos(t1y), p2y = cos(t2y);
+		float q0y = sin(t0y), q1y = sin(t1y), q2y = sin(t2y);		
+		float p0z = cos(t0z), p1z = cos(t1z), p2z = cos(t2z);
+		float q0z = sin(t0z), q1z = sin(t1z), q2z = sin(t2z);
+		
+		float pxave = (p0x + p1x + p2x)/3.0;
+		float qxave = (q0x + q1x + q2x)/3.0;		
+		float pyave = (p0y + p1y + p2y)/3.0;
+		float qyave = (q0y + q1y + q2y)/3.0;		
+		float pzave = (p0z + p1z + p2z)/3.0;
+		float qzave = (q0z + q1z + q2z)/3.0;
+		
+		float txave = atan2(-qxave,-pxave) + M_PI;
+		float tyave = atan2(-qyave,-pyave) + M_PI;
+		float tzave = atan2(-qzave,-pzave) + M_PI;
+		
+		float xf = float(Nx)*txave/(2*M_PI);
+		float yf = float(Ny)*tyave/(2*M_PI);
+		float zf = float(Nz)*tzave/(2*M_PI);
+		
+		//float xf = (r[V0].x + r[V1].x + r[V2].x)/3.0;
+		//float yf = (r[V0].y + r[V1].y + r[V2].y)/3.0;
+		//float zf = (r[V0].z + r[V1].z + r[V2].z)/3.0;
 		
 		// --------------------------------------
 		// find nearest LBM voxel (rounded down)
@@ -59,6 +110,52 @@ __global__ void extrapolate_interface_normal_poisson_IBM3D(
 				}
 			}		
 		}		
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to extrapolate IBM face normal to 
+// LBM lattice
+// --------------------------------------------------------
+
+__global__ void test_interface_normal_poisson_IBM3D(
+	float3* G,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nVoxels)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nVoxels) {
+		
+		// --------------------------------------
+		// get xyz indices
+		// --------------------------------------
+		
+		int xi = i%Nx;
+		int yi = (i/Nx)%Ny;
+		int zi = i/(Nx*Ny);
+		
+		// --------------------------------------
+		// get positions of interface assuming
+		// a sphere capsule with radius = 6
+		// --------------------------------------
+		
+		float distx = float(xi) - float(Nx/2);
+		float disty = float(yi) - float(Ny/2);
+		float distz = float(zi) - float(Nz/2);
+		float r = sqrt(distx*distx + disty*disty + distz*distz);
+		
+		if (r > 5.1 && r < 6.1) {
+			G[i].x = distx/r;
+			G[i].y = disty/r;
+			G[i].z = distz/r;
+		}
+				
 	}	
 }
 
@@ -102,7 +199,8 @@ __global__ void calculate_rhs_poisson_IBM3D(
 		float dGxdx = (G[iup].x - G[idn].x)/2.0;  // dx=1
 		float dGydy = (G[jup].y - G[jdn].y)/2.0;  // dy=1
 		float dGzdz = (G[kup].z - G[kdn].z)/2.0;  // dz=1
-		rhs[i].x = dGxdx + dGydy + dGzdz;	
+		rhs[i].x = dGxdx + dGydy + dGzdz;
+		rhs[i].y = 0.0;
 				
 	}	
 }
