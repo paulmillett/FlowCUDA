@@ -56,10 +56,6 @@ void class_poisson_ibm3D::initialize(int Nxin, int Nyin, int Nzin)
 	
 	// allocate host arrays
 	indicatorH = (float*)malloc(nVoxels*sizeof(float));
-	GH = (float3*)malloc(nVoxels*sizeof(float3));
-	GxH = (float*)malloc(nVoxels*sizeof(float));
-	GyH = (float*)malloc(nVoxels*sizeof(float));
-	GzH = (float*)malloc(nVoxels*sizeof(float));
 	
 	// allocate device arrays
 	cudaMalloc((void**)&kx, sizeof(float)*Nx);
@@ -91,10 +87,7 @@ void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, int nFaces, 
 	// extrapolate IBM interface normal vectors to fluid grid:
 	extrapolate_interface_normal_poisson_IBM3D
 	<<<nBlocks,nThreads>>> (r,G,Nx,Ny,Nz,nFaces,faces);	
-	
-	//test_interface_normal_poisson_IBM3D            // note this is just a test function
-	//<<<nBlocks,nThreads>>> (G,Nx,Ny,Nz,nVoxels);	
-	
+		
 	// calculate RHS of poisson equation (div.G):
 	calculate_rhs_poisson_IBM3D
 	<<<nBlocks,nThreads>>> (G,rhs,nVoxels,Nx,Ny,Nz);
@@ -112,6 +105,13 @@ void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, int nFaces, 
 	// change solution from complex to real:
 	complex2real
 	<<<nBlocks,nThreads>>> (rhs,indicator,nVoxels);
+	
+	// rescale indicator function:
+	float nu_in = 5.0;
+	float nu_out = 1.0/6.0;
+	rescale_indicator_array
+	<<<nBlocks,nThreads>>> (indicator,nu_in,nu_out,nVoxels);
+	
 }
 
 
@@ -125,15 +125,8 @@ void class_poisson_ibm3D::write_output(std::string tagname, int tagnum,
 {
 	// first, do a memcopy from device to host:
 	cudaMemcpy(indicatorH, indicator, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	cudaMemcpy(GH, G, sizeof(float3)*nVoxels, cudaMemcpyDeviceToHost);
-	for (int i=0; i<nVoxels; i++) {
-		GxH[i] = GH[i].x;
-		GyH[i] = GH[i].y;
-		GzH[i] = GH[i].z;
-	}
 	// second, write the output:
-	//write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,indicatorH,iskip,jskip,kskip,precision);
-	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,indicatorH,GxH,GyH,GzH,iskip,jskip,kskip,precision);
+	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,indicatorH,iskip,jskip,kskip,precision);
 }
 
 
@@ -152,10 +145,6 @@ void class_poisson_ibm3D::deallocate()
 	cudaFree(G);
 	cudaFree(indicator);
 	free(indicatorH);
-	free(GH);
-	free(GxH);
-	free(GyH);
-	free(GzH);
 }
 
 

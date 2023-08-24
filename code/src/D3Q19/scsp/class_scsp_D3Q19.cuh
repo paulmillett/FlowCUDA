@@ -122,6 +122,7 @@ public:
 	void initial_equilibrium(int,int);
 	void stream_collide_save(int,int,bool);	
 	void stream_collide_save_forcing(int,int);
+	void stream_collide_save_forcing_varvisc(float*,int,int);
 	void stream_collide_save_forcing_solid(int,int);
 	void stream_collide_save_IBforcing(int,int);
 	void set_boundary_shear_velocity(float,float,int,int);

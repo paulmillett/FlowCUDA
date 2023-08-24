@@ -255,6 +255,29 @@ __global__ void complex2real(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to rescale indicator array
+// --------------------------------------------------------
+
+__global__ void rescale_indicator_array(
+	float* u,
+	float value_in,
+	float value_out,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
+	if (i<nVoxels) {
+		float ui = u[i];
+		ui *= -1.0;
+		if (ui < 0.0) ui = 0.0;
+		if (ui > 1.6) ui = 1.6;
+		ui = value_out + (value_in - value_out)*(ui/1.6);
+		u[i] = ui;
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to determine 1D index from 3D indices:
 // --------------------------------------------------------
 

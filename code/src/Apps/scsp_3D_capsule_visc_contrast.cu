@@ -167,7 +167,7 @@ void scsp_3D_capsule_visc_contrast::initSystem()
 	ibm.duplicate_cells();
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();
-	
+		
 	// ----------------------------------------------			
 	// rescale capsule sizes for normal distribution: 
 	// ----------------------------------------------
@@ -230,6 +230,12 @@ void scsp_3D_capsule_visc_contrast::initSystem()
 		cout << " " << endl;	
 		
 	}
+	
+	if (!initRandom) {
+		ibm.memcopy_device_to_host();
+		ibm.rotate_and_shift_node_positions(0,31.5,31.5,31.5);
+		ibm.memcopy_host_to_device();
+	}
 		
 	// ----------------------------------------------
 	// initialize poisson solver:
@@ -284,8 +290,9 @@ void scsp_3D_capsule_visc_contrast::cycleForward(int stepsPerCycle, int currentC
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
 			poisson.solve_poisson(ibm.faces,ibm.r,ibm.nFaces,nBlocks,nThreads);
-			ibm.stepIBM(lbm,nBlocks,nThreads);			
-			lbm.stream_collide_save_forcing(nBlocks,nThreads);
+			ibm.stepIBM(lbm,nBlocks,nThreads);
+			//lbm.stream_collide_save_forcing(nBlocks,nThreads);	
+			lbm.stream_collide_save_forcing_varvisc(poisson.indicator,nBlocks,nThreads);
 			lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 			cudaDeviceSynchronize();
 		}
@@ -303,7 +310,8 @@ void scsp_3D_capsule_visc_contrast::cycleForward(int stepsPerCycle, int currentC
 		cummulativeSteps++;
 		poisson.solve_poisson(ibm.faces,ibm.r,ibm.nFaces,nBlocks,nThreads);
 		ibm.stepIBM(lbm,nBlocks,nThreads);		
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
+		//lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		lbm.stream_collide_save_forcing_varvisc(poisson.indicator,nBlocks,nThreads);
 		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}

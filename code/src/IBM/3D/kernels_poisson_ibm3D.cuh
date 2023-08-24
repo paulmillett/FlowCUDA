@@ -55,6 +55,13 @@ __global__ void complex2real(
 	int);
 
 
+__global__ void rescale_indicator_array(
+	float*,
+	float,
+	float,
+	int);
+			
+
 __device__ inline int voxel_ndx(
 	int,
 	int,

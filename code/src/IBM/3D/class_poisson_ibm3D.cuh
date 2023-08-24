@@ -24,11 +24,7 @@ class class_poisson_ibm3D {
 	
 	// host arrays:
 	float* indicatorH;
-	float3* GH;
-	float* GxH;
-	float* GyH;
-	float* GzH;
-			
+				
 	// device arrays:
 	float* indicator;
 	float* kx;

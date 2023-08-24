@@ -655,6 +655,22 @@ void class_scsp_D3Q19::stream_collide_save_forcing(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "scsp_stream_collide_save_forcing_varvisc_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::stream_collide_save_forcing_varvisc(float* nuarr, int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	scsp_stream_collide_save_forcing_varvisc_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,Fx,Fy,Fz,nuarr,streamIndex,voxelType,iolets,nVoxels);
+	float* temp = f1;
+	f1 = f2;
+	f2 = temp;
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_stream_collide_save_forcing_dt_D3Q19" kernel:
 // --------------------------------------------------------
 
