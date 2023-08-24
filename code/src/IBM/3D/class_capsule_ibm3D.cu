@@ -597,14 +597,9 @@ void class_capsule_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float s
 			// reset tooClose to false
 			tooClose = false;
 			// get random position
-			
-			shift.x = 31.5;
-			shift.y = 31.5;
-			shift.z = 31.5;
-			
-			//shift.x = (float)rand()/RAND_MAX*Box.x;
-			//shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
-			//shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
+			shift.x = (float)rand()/RAND_MAX*Box.x;
+			shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
+			shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
 			// check with other cells
 			for (int d=0; d<c; d++) {
 				float sep = calc_separation_pbc(shift,cellCOM[d]);
@@ -708,9 +703,9 @@ void class_capsule_ibm3D::shift_node_positions(int cellID, float xsh, float ysh,
 
 void class_capsule_ibm3D::rotate_and_shift_node_positions(int cellID, float xsh, float ysh, float zsh)
 {
-	float a = 0.0; //M_PI*(float)rand()/RAND_MAX;  // alpha
-	float b = 0.0; //M_PI*(float)rand()/RAND_MAX;  // beta
-	float g = 0.0; //M_PI*(float)rand()/RAND_MAX;  // gamma
+	float a = M_PI*(float)rand()/RAND_MAX;  // alpha
+	float b = M_PI*(float)rand()/RAND_MAX;  // beta
+	float g = M_PI*(float)rand()/RAND_MAX;  // gamma
 	for (int i=0; i<nNodesPerCell; i++) {
 		int indx = i + cellID*nNodesPerCell;
 		// rotate:
