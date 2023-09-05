@@ -119,6 +119,27 @@ __global__ void zero_velocities_forces_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D enforce a maximum node force:
+// --------------------------------------------------------
+
+__global__ void enforce_max_node_force_IBM3D(
+	float3* f,
+	float fmax,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		float fi = length(f[i]);
+		if (fi > fmax) {
+			f[i] *= (fmax/fi);
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D add force in the x-direction:
 // --------------------------------------------------------
 

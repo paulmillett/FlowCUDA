@@ -38,7 +38,14 @@ struct edge {
 // --------------------------------------------------------
 
 struct cell {
+	int cellType;
 	int refNode;
+	int nNodes;
+	int nFaces;
+	int nEdges;
+	int indxN0;  // starting node index for cell
+	int indxF0;  // starting face index for cell
+	int indxE0;  // starting edge index for cell
 	bool intrain;
 	float vol;
 	float vol0;
@@ -50,7 +57,10 @@ struct cell {
 	float kv;
 	float C;
 	float Ca;
+	float maxT1;
+	float D;
 	float3 com;
+	float3 vel;
 };
 
 # endif  // MEMBRANE_DATA_H

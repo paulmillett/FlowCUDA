@@ -195,7 +195,7 @@ __device__ inline void pairwise_interaction_forces(
 		
 		
 		float force = repA/pow(r,2) - repA/pow(repD,2);
-		if (force > repFmax) force = repFmax;
+		//if (force > repFmax) force = repFmax;
 		F[i] += force*(rij/r);
 		
 		if (r < 0.5) printf("separation = %f \n",r);

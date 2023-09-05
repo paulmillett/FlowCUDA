@@ -29,10 +29,8 @@ class class_capsule_ibm3D {
 	int binMax;
 	int nnbins;
 	int nBins;
-	int totalBucketCnt;
 	int3 N;
 	int3 numBins;
-	int3 numBuckets;
 	float sizeBins;
 	float ks,kb,ka,kag,kv;
 	float C;
@@ -40,12 +38,11 @@ class class_capsule_ibm3D {
 	float repA;
 	float repD;
 	float repFmax;
+	float nodeFmax;
 	float gam;
 	float3 Box;
-	float3 sizeBuckets;
 	int3 pbcFlag;
 	bool binsFlag;
-	bool bucketsFlag;
 	std::string ibmUpdate;
 			
 	// host arrays:
@@ -55,7 +52,6 @@ class class_capsule_ibm3D {
 	edge* edgesH;
 	cell* cellsH;
 	int* cellIDsH;
-	int* bucketCnt;
 		
 	// device arrays:
 	float3* r;
@@ -88,6 +84,8 @@ class class_capsule_ibm3D {
 	void set_cell_mechanical_props(int,float,float,float,float,float);
 	void set_cells_radii(float);
 	void set_cell_radius(int,float);
+	void set_cells_types(int);
+	void set_cell_type(int,int);
 	void calculate_cell_membrane_props(float,float,float,float,float,float,
 		                               float,float,float,std::string); 
 	void rescale_cell_radii(float,float,std::string);
@@ -110,6 +108,7 @@ class class_capsule_ibm3D {
 	void update_node_positions_verlet_1(int,int);
 	void update_node_positions_verlet_2(int,int);
 	void zero_velocities_forces(int,int);
+	void enforce_max_node_force(int,int);
 	void add_xdir_force_to_nodes(int,int,float);
 	void relax_node_positions(int,float,float,int,int);
 	void relax_node_positions_skalak(int,float,float,int,int);
@@ -131,7 +130,6 @@ class class_capsule_ibm3D {
 	void scale_edge_lengths(float,int,int);
 	void unwrap_node_coordinates();
 	void membrane_geometry_analysis(std::string,int);
-	void print_cell_distributions_yz_plane(std::string,int);
 	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);
 	void capsule_train_fraction(float,float,int);
 	

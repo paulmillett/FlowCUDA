@@ -25,6 +25,7 @@ __global__ void zero_reference_vol_area_IBM3D(
 		cells[i].vol0 = 0.0;
 		cells[i].area0 = 0.0;
 		cells[i].intrain = false;
+		cells[i].vel = make_float3(0.0f,0.0f,0.0f);
 	}
 }
 

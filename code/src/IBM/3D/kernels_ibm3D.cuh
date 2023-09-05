@@ -57,6 +57,12 @@ __global__ void zero_velocities_forces_IBM3D(
 	int);
 
 
+__global__ void enforce_max_node_force_IBM3D(
+	float3*,
+	float,
+	int);
+
+
 __global__ void add_xdir_force_IBM3D(
 	float3*,
 	float,

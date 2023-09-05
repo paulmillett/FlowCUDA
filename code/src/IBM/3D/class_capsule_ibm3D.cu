@@ -37,11 +37,18 @@ using namespace std;
 class_capsule_ibm3D::class_capsule_ibm3D()
 {
 	// get some parameters:
-	GetPot inputParams("input.dat");	
+	GetPot inputParams("input.dat");
+	
+	// mesh attributes	
 	nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
 	nFacesPerCell = inputParams("IBM/nFacesPerCell",0);	
 	nEdgesPerCell = inputParams("IBM/nEdgesPerCell",0);
 	nCells = inputParams("IBM/nCells",1);
+	nNodes = nNodesPerCell*nCells;
+	nFaces = nFacesPerCell*nCells;
+	nEdges = nEdgesPerCell*nCells;
+	
+	// mechanical properties
 	dt = inputParams("Time/dt",1.0);
 	ks = inputParams("IBM/ks",0.0);
 	kb = inputParams("IBM/kb",0.0);
@@ -51,15 +58,15 @@ class_capsule_ibm3D::class_capsule_ibm3D()
 	C  = inputParams("IBM/C",0.0);
 	repA = inputParams("IBM/repA",0.0);
 	repD = inputParams("IBM/repD",0.0);
-	repFmax = inputParams("IBM/repFmax",0.0);
+	repFmax = inputParams("IBM/repFmax",1000.0);
+	nodeFmax = inputParams("IBM/nodeFmax",1000.0);
 	gam = inputParams("IBM/gamma",0.1);
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
+	
+	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
 	N.y = inputParams("Lattice/Ny",1);
-	N.z = inputParams("Lattice/Nz",1);
-	nNodes = nNodesPerCell*nCells;
-	nFaces = nFacesPerCell*nCells;
-	nEdges = nEdgesPerCell*nCells;
+	N.z = inputParams("Lattice/Nz",1);	
 	Box.x = float(N.x);   // assume dx=1
 	Box.y = float(N.y);
 	Box.z = float(N.z);
@@ -76,23 +83,7 @@ class_capsule_ibm3D::class_capsule_ibm3D()
 	    numBins.z = int(floor(N.z/sizeBins));
 		nBins = numBins.x*numBins.y*numBins.z;
 		nnbins = 26;
-	}
-	
-	// set up buckets for cell distributions in y-z plane:
-	int buckets = inputParams("IBM/buckets",0);
-	if (buckets == 0) bucketsFlag = false;
-	if (buckets == 1) bucketsFlag = true;
-	if (bucketsFlag) {
-		numBuckets.y = inputParams("IBM/numBucketsY",1);
-		numBuckets.z = inputParams("IBM/numBucketsZ",1);
-		numBuckets.x = 1;
-		sizeBuckets.y = float(N.y-1)/float(numBuckets.y);
-		sizeBuckets.z = float(N.z-1)/float(numBuckets.z);
-		sizeBuckets.x = 0.0;
-		totalBucketCnt = 0;
 	}	
-	
-	
 }
 
 
@@ -121,15 +112,12 @@ void class_capsule_ibm3D::allocate()
 	edgesH = (edge*)malloc(nEdges*sizeof(edge));
 	cellsH = (cell*)malloc(nCells*sizeof(cell));
 	cellIDsH = (int*)malloc(nNodes*sizeof(int));
-	if (bucketsFlag) {
-		bucketCnt = (int*)malloc(numBuckets.y*numBuckets.z*sizeof(int));
-		for (int i=0; i<numBuckets.y*numBuckets.z; i++) bucketCnt[i] = 0;
-	}
-	
+		
 	// assign membrane properties to all cells:
 	GetPot inputParams("input.dat");
 	float Ca = inputParams("IBM/Ca",1.0); 
 	set_cells_mechanical_props(ks,kb,kv,C,Ca);
+	set_cells_types(0);
 					
 	// allocate array memory (device):
 	cudaMalloc((void **) &r, nNodes*sizeof(float3));	
@@ -161,10 +149,7 @@ void class_capsule_ibm3D::deallocate()
 	free(edgesH);
 	free(cellsH);
 	free(cellIDsH);
-	if (bucketsFlag) {
-		free(bucketCnt);
-	}
-				
+					
 	// free array memory (device):
 	cudaFree(r);	
 	cudaFree(v);	
@@ -236,13 +221,25 @@ void class_capsule_ibm3D::memcopy_device_to_host()
 
 
 
+
 // --------------------------------------------------------
 // Read IBM information from file:
 // --------------------------------------------------------
 
 void class_capsule_ibm3D::read_ibm_information(std::string tagname)
 {
+	// read data from file:
 	read_ibm_information_long(tagname,nNodesPerCell,nFacesPerCell,nEdgesPerCell,rH,facesH,edgesH);
+	
+	// set up indices for each cell:
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].nNodes = nNodesPerCell;
+		cellsH[c].nFaces = nFacesPerCell;
+		cellsH[c].nEdges = nEdgesPerCell;
+		cellsH[c].indxN0 = c*nNodesPerCell;  // here, all cells are identical,
+		cellsH[c].indxF0 = c*nFacesPerCell;  // so the start indices are 
+		cellsH[c].indxE0 = c*nEdgesPerCell;  // calculated as shown.
+	}
 }
 
 
@@ -314,10 +311,9 @@ void class_capsule_ibm3D::set_cell_mechanical_props(int cID, float ks, float kb,
 
 void class_capsule_ibm3D::resize_cell_radius(int cID, float scale)
 {
-	for (int i=0; i<nNodesPerCell; i++) {
-		int indx = i + cID*nNodesPerCell;
-		rH[indx] *= scale;
-	}
+	int istr = cellsH[cID].indxN0;
+	int iend = istr + cellsH[cID].nNodes;
+	for (int i=istr; i<iend; i++) rH[i] *= scale;
 }
 
 void class_capsule_ibm3D::set_cells_radii(float rad)
@@ -332,6 +328,95 @@ void class_capsule_ibm3D::set_cell_radius(int cID, float rad)
 {
 	// set radius for ONE cell:
 	cellsH[cID].rad = rad;
+}
+
+void class_capsule_ibm3D::set_cells_types(int val)
+{
+	// set cellType for ALL cells:
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].cellType = val;
+	}
+}
+
+void class_capsule_ibm3D::set_cell_type(int cID, int val)
+{
+	// set cellType for ONE cell:
+	cellsH[cID].cellType = val;
+}
+
+
+
+// --------------------------------------------------------
+// Assign the reference node to every cell.  The reference
+// node is arbitrary (here we use the first node), but it
+// is necessary for handling PBC's.
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::assign_refNode_to_cells()
+{
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].refNode = cellsH[c].indxN0;
+	}
+}	
+
+
+
+// --------------------------------------------------------
+// Assign the cell ID to every node:
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::assign_cellIDs_to_nodes()
+{
+	for (int c=0; c<nCells; c++) {
+		int istr = cellsH[c].indxN0;
+		int iend = istr + cellsH[c].nNodes;
+		for (int i=istr; i<iend; i++) cellIDsH[i] = c;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Duplicate the first cell mesh information to all cells:
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::duplicate_cells()
+{
+	if (nCells > 1) {
+		for (int c=1; c<nCells; c++) {
+			
+			// skip if cell 0 is different than cell c:
+			if (cellsH[0].nNodes != cellsH[c].nNodes ||
+				cellsH[0].nFaces != cellsH[c].nFaces ||
+				cellsH[0].nEdges != cellsH[c].nEdges) {
+					cout << "duplicate cells error: cells have different nNodes, nEdges, nFaces" << endl;
+					continue;
+			}
+			
+			// copy node positions:
+			for (int i=0; i<cellsH[0].nNodes; i++) {
+				int ii = i + cellsH[c].indxN0;
+				rH[ii] = rH[i];
+			}
+			// copy edge info:
+			for (int i=0; i<cellsH[0].nEdges; i++) {
+				int ii = i + cellsH[c].indxE0;
+				edgesH[ii].v0 = edgesH[i].v0 + cellsH[c].indxN0;
+				edgesH[ii].v1 = edgesH[i].v1 + cellsH[c].indxN0;
+				edgesH[ii].f0 = edgesH[i].f0 + cellsH[c].indxF0;
+				edgesH[ii].f1 = edgesH[i].f1 + cellsH[c].indxF0;
+			}
+			// copy face info:
+			for (int i=0; i<cellsH[0].nFaces; i++) {
+				int ii = i + cellsH[c].indxF0;
+				facesH[ii].v0 = facesH[i].v0 + cellsH[c].indxN0;
+				facesH[ii].v1 = facesH[i].v1 + cellsH[c].indxN0;
+				facesH[ii].v2 = facesH[i].v2 + cellsH[c].indxN0;
+				facesH[ii].cellID = c;								
+			}
+		}
+	}
+	
 }
 
 
@@ -470,73 +555,6 @@ void class_capsule_ibm3D::rescale_cell_radii(float a, float stddevA, std::string
 
 
 // --------------------------------------------------------
-// Assign the reference node to every cell.  The reference
-// node is arbitrary (here we use the first node), but it
-// is necessary for handling PBC's.
-// --------------------------------------------------------
-
-void class_capsule_ibm3D::assign_refNode_to_cells()
-{
-	for (int c=0; c<nCells; c++) {
-		cellsH[c].refNode = c*nNodesPerCell;
-	}
-}	
-
-
-
-// --------------------------------------------------------
-// Assign the cell ID to every node:
-// --------------------------------------------------------
-
-void class_capsule_ibm3D::assign_cellIDs_to_nodes()
-{
-	for (int c=0; c<nCells; c++) {
-		for (int i=0; i<nNodesPerCell; i++) {
-			int ii = i + c*nNodesPerCell;
-			cellIDsH[ii] = c;
-		}
-	}
-}
-
-
-
-// --------------------------------------------------------
-// Duplicate the first cell mesh information to all cells:
-// --------------------------------------------------------
-
-void class_capsule_ibm3D::duplicate_cells()
-{
-	if (nCells > 1) {
-		for (int c=1; c<nCells; c++) {
-			// copy node positions:
-			for (int i=0; i<nNodesPerCell; i++) {
-				int ii = i + c*nNodesPerCell;
-				rH[ii] = rH[i];
-			}
-			// copy edge info:
-			for (int i=0; i<nEdgesPerCell; i++) {
-				int ii = i + c*nEdgesPerCell;
-				edgesH[ii].v0 = edgesH[i].v0 + c*nNodesPerCell;
-				edgesH[ii].v1 = edgesH[i].v1 + c*nNodesPerCell;
-				edgesH[ii].f0 = edgesH[i].f0 + c*nFacesPerCell;
-				edgesH[ii].f1 = edgesH[i].f1 + c*nFacesPerCell;
-			}
-			// copy face info:
-			for (int i=0; i<nFacesPerCell; i++) {
-				int ii = i + c*nFacesPerCell;
-				facesH[ii].v0 = facesH[i].v0 + c*nNodesPerCell;
-				facesH[ii].v1 = facesH[i].v1 + c*nNodesPerCell;
-				facesH[ii].v2 = facesH[i].v2 + c*nNodesPerCell;
-				facesH[ii].cellID = c;								
-			}
-		}
-	}
-	
-}
-
-
-
-// --------------------------------------------------------
 // Line up cells in a single-file line in the middle of
 // the channel:
 // --------------------------------------------------------
@@ -581,10 +599,7 @@ void class_capsule_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float s
 	
 	// shrink cells by specified amount:
 	for (int c=0; c<nCells; c++) {
-		for (int i=0; i<nNodesPerCell; i++) {
-			int indx = i + c*nNodesPerCell;
-			rH[indx] *= shrinkFactor;
-		}
+		resize_cell_radius(c,shrinkFactor);
 	}
 	
 	// randomly shift cells, without overlapping previous cells:
@@ -685,13 +700,14 @@ float class_capsule_ibm3D::calc_separation_pbc(float3 r1, float3 r2)
 // Shift IBM start positions by specified amount:
 // --------------------------------------------------------
 
-void class_capsule_ibm3D::shift_node_positions(int cellID, float xsh, float ysh, float zsh)
+void class_capsule_ibm3D::shift_node_positions(int cID, float xsh, float ysh, float zsh)
 {
-	for (int i=0; i<nNodesPerCell; i++) {
-		int indx = i + cellID*nNodesPerCell;		 
-		rH[indx].x += xsh;
-		rH[indx].y += ysh;
-		rH[indx].z += zsh;		
+	int istr = cellsH[cID].indxN0;
+	int iend = istr + cellsH[cID].nNodes;
+	for (int i=istr; i<iend; i++) {
+		rH[i].x += xsh;
+		rH[i].y += ysh;
+		rH[i].z += zsh;
 	}
 }
 
@@ -701,21 +717,25 @@ void class_capsule_ibm3D::shift_node_positions(int cellID, float xsh, float ysh,
 // Shift IBM start positions by specified amount:
 // --------------------------------------------------------
 
-void class_capsule_ibm3D::rotate_and_shift_node_positions(int cellID, float xsh, float ysh, float zsh)
+void class_capsule_ibm3D::rotate_and_shift_node_positions(int cID, float xsh, float ysh, float zsh)
 {
+	// random rotation angles:
 	float a = M_PI*(float)rand()/RAND_MAX;  // alpha
 	float b = M_PI*(float)rand()/RAND_MAX;  // beta
 	float g = M_PI*(float)rand()/RAND_MAX;  // gamma
-	for (int i=0; i<nNodesPerCell; i++) {
-		int indx = i + cellID*nNodesPerCell;
+	
+	// update node positions:
+	int istr = cellsH[cID].indxN0;
+	int iend = istr + cellsH[cID].nNodes;
+	for (int i=istr; i<iend; i++) {
 		// rotate:
-		float xrot = rH[indx].x*(cos(a)*cos(b)) + rH[indx].y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + rH[indx].z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
-		float yrot = rH[indx].x*(sin(a)*cos(b)) + rH[indx].y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + rH[indx].z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
-		float zrot = rH[indx].x*(-sin(b))       + rH[indx].y*(cos(b)*sin(g))                      + rH[indx].z*(cos(b)*cos(g));
+		float xrot = rH[i].x*(cos(a)*cos(b)) + rH[i].y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + rH[i].z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
+		float yrot = rH[i].x*(sin(a)*cos(b)) + rH[i].y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + rH[i].z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
+		float zrot = rH[i].x*(-sin(b))       + rH[i].y*(cos(b)*sin(g))                      + rH[i].z*(cos(b)*cos(g));
 		// shift:		 
-		rH[indx].x = xrot + xsh;
-		rH[indx].y = yrot + ysh;
-		rH[indx].z = zrot + zsh;	
+		rH[i].x = xrot + xsh;
+		rH[i].y = yrot + ysh;
+		rH[i].z = zrot + zsh;			
 	}
 }
 
@@ -871,9 +891,11 @@ void class_capsule_ibm3D::relax_node_positions_skalak(int nIts, float scale, flo
 void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
 {
 	
+	// ----------------------------------------------------------
 	// the traditional IBM update, except here
 	// the forces on the IBM nodes are included to calculate the
 	// new node positions (see 'update_node_positions_verlet_1')
+	// ----------------------------------------------------------
 	
 	if (ibmUpdate == "ibm") {
 		
@@ -888,6 +910,7 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThrea
 		compute_node_forces_skalak(nBlocks,nThreads);
 		nonbonded_node_interactions(nBlocks,nThreads);
 		wall_forces_zdir(nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,r,v,nNodes);
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,r,f,nNodes);
 		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
@@ -895,10 +918,12 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThrea
 		
 	} 
 	
+	// ----------------------------------------------------------
 	//  here, the velocity-Verlet algorithm is used to update the 
 	//  node positions - using a viscous drag force proportional
 	//  to the difference between the node velocities and the 
 	//  fluid velocities
+	// ----------------------------------------------------------
 	
 	else if (ibmUpdate == "verlet") {
 	
@@ -916,6 +941,7 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThrea
 		compute_node_forces_skalak(nBlocks,nThreads);
 		nonbonded_node_interactions(nBlocks,nThreads);
 		wall_forces_zdir(nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
 		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,r,v,f,nNodes);
 		update_node_positions_verlet_2(nBlocks,nThreads);
 		
@@ -1025,6 +1051,18 @@ void class_capsule_ibm3D::zero_velocities_forces(int nBlocks, int nThreads)
 {
 	zero_velocities_forces_IBM3D
 	<<<nBlocks,nThreads>>> (v,f,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "enforce_max_node_force_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::enforce_max_node_force(int nBlocks, int nThreads)
+{
+	enforce_max_node_force_IBM3D
+	<<<nBlocks,nThreads>>> (f,nodeFmax,nNodes);
 }
 
 
@@ -1389,17 +1427,18 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 		float mult[10] = {1.0/6.0,1.0/24.0,1.0/24.0,1.0/24.0,1.0/60.0,1.0/60.0,1.0/60.0,1.0/120.0,1.0/120.0,1.0/120.0};
 		float intg[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 		float maxT1 = -100.0;  // maximum principle tension of capsule
+		
+		int fstr = cellsH[c].indxF0;
+		int fend = fstr + cellsH[c].nFaces;
+		for (int f=fstr; f<fend; f++) {
 						
-		for (int f=0; f<nFacesPerCell; f++) {
-			
 			// -----------------------------------------
 			// get vertices of triangle i:
 			// -----------------------------------------
 			
-			int fID = f + c*nFacesPerCell;
-			int v0 = facesH[fID].v0;
-			int v1 = facesH[fID].v1;
-			int v2 = facesH[fID].v2;
+			int v0 = facesH[f].v0;
+			int v1 = facesH[f].v1;
+			int v2 = facesH[f].v2;			
 			float x0 = rH[v0].x;
 			float y0 = rH[v0].y;
 			float z0 = rH[v0].z;
@@ -1467,7 +1506,7 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 			// update maximum tension:
 			// -----------------------------------------
 			
-			if (facesH[fID].T1 > maxT1) maxT1 = facesH[fID].T1;
+			if (facesH[f].T1 > maxT1) maxT1 = facesH[f].T1;
 		}
 		
 		for (int i=0; i<10; i++) intg[i] *= mult[i];
@@ -1483,12 +1522,14 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 		com.z = intg[3]/mass;
 		cellsH[c].com.x = com.x;
 		cellsH[c].com.y = com.y;
-		cellsH[c].com.z = com.z;		
+		cellsH[c].com.z = com.z;
+		cellsH[c].vol = vol;
 		
 		// -----------------------------------------
 		// sum maxT1 for average calculation:
 		// -----------------------------------------
 		
+		cellsH[c].maxT1 = maxT1;
 		maxT1Aver += maxT1;
 		
 		// -----------------------------------------
@@ -1525,7 +1566,7 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 		
 		float Lmax = std::max({L1,L2,L3});
 		float Lmin = std::min({L1,L2,L3});
-		D = (Lmax-Lmin)/(Lmax+Lmin);
+		cellsH[c].D = (Lmax-Lmin)/(Lmax+Lmin);
 		
 		// -----------------------------------------		
 		// calculate the inclination angle:
@@ -1533,18 +1574,7 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 		
 		//phi = 0.5*atan(2*Ixy/(Ixx-Iyy));
 		//phi = phi/pi;
-		
-		// -----------------------------------------
-		// add cell to the y-z bucket:
-		// -----------------------------------------
-		
-		if (bucketsFlag) {
-			int bucketID = int(floor(com.z/sizeBuckets.z))*numBuckets.y + 
-			               int(floor(com.y/sizeBuckets.y));
-			bucketCnt[bucketID]++;
-			totalBucketCnt++;
-		}	
-		
+				
 		// -----------------------------------------
 		// print data:
 		// -----------------------------------------
@@ -1597,33 +1627,6 @@ void class_capsule_ibm3D::subexpressions(
     g0 = f2 + w0*(f1 + w0); 
     g1 = f2 + w1*(f1 + w1);
     g2 = f2 + w2*(f1 + w2);	
-}
-
-
-
-// --------------------------------------------------------
-// Print the cell distributions in the y-z plane:
-// --------------------------------------------------------
-
-void class_capsule_ibm3D::print_cell_distributions_yz_plane(std::string tagname, int tagnum)
-{
-	if (bucketsFlag) {
-		// Define the file location and name:
-		ofstream outfile;
-		std::stringstream filenamecombine;
-		filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".dat";
-		string filename = filenamecombine.str();
-		outfile.open(filename.c_str(), ios::out | ios::app);
-		// print number of buckets in y-dir and z-dir:
-		outfile << numBuckets.y << " " << numBuckets.z << endl;
-		// print distributions:
-		int numBucketsTot = numBuckets.y*numBuckets.z;
-		for (int i=0; i<numBucketsTot; i++) {
-			outfile << float(bucketCnt[i])/float(totalBucketCnt) << endl;
-		}	
-		// close file
-		outfile.close();
-	}	
 }
 
 
@@ -1770,6 +1773,15 @@ void class_capsule_ibm3D::capsule_train_fraction(float rcut, float thetacut, int
 	float fracTrain = float(nCellsTrain)/float(nCells);
 	
 	// -----------------------------------------
+	// Assign 'intrain' to 'cellType':
+	// -----------------------------------------
+	
+	for (int c=0; c<nCells; c++) {
+		if (cellsH[c].intrain == false) cellsH[c].cellType = 0;
+		if (cellsH[c].intrain == true)  cellsH[c].cellType = 1;
+	}
+	
+	// -----------------------------------------
 	// Print results:
 	// -----------------------------------------
 	
@@ -1790,16 +1802,15 @@ void class_capsule_ibm3D::capsule_train_fraction(float rcut, float thetacut, int
 	// calculate capsule velocities & print:
 	// -----------------------------------------
 	
-	for (int i=0; i<nCells; i++) {
-		float3 cellv = make_float3(0.0,0.0,0.0);
-		for (int n=0; n<nNodesPerCell; n++) {
-			int indx = n + i*nNodesPerCell;
-			cellv += vH[indx];
-		}
-		cellv /= nNodesPerCell;
-		outfile2 << fixed << setprecision(6) << cellsH[i].rad << "  " << cellsH[i].Ca << "  "
-			                                 << cellv.x << "  " << cellv.y << "  " << cellv.z << "  " 
-										     << cellsH[i].intrain << endl;
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].vel = make_float3(0.0,0.0,0.0);
+		int istr = cellsH[c].indxN0;
+		int iend = istr + cellsH[c].nNodes;
+		for (int i=istr; i<iend; i++) cellsH[c].vel += vH[i];		
+		cellsH[c].vel /= cellsH[c].nNodes;
+		outfile2 << fixed << setprecision(6) << cellsH[c].rad <<   "  " << cellsH[c].Ca << "  "
+			                                 << cellsH[c].vel.x << "  " << cellsH[c].vel.y << "  " << cellsH[c].vel.z << "  " 
+										     << cellsH[c].intrain << endl;
 	}
 	outfile2.close();
 		

@@ -1122,8 +1122,9 @@ void write_vtk_immersed_boundary_3D_cellID(std::string tagname, int tagnum, int 
 	outfile << "LOOKUP_TABLE default" << endl;
 	for (int i=0; i<nFaces; i++) {
 		int cellID = faces[i].cellID;
-		bool value = cells[cellID].intrain;
-		if (tagnum==0) value = false;   // initial value
+		//bool value = cells[cellID].intrain;
+		//if (tagnum==0) value = false;   // initial value
+		int value = cells[cellID].cellType;
 		outfile << value << endl;
 	}
 	
