@@ -129,7 +129,8 @@ class class_capsule_ibm3D {
 	void scale_equilibrium_cell_size(float,int,int); 
 	void scale_edge_lengths(float,int,int);
 	void unwrap_node_coordinates();
-	void membrane_geometry_analysis(std::string,int);
+	void output_capsule_data();
+	void capsule_geometry_analysis(int);
 	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);
 	void capsule_train_fraction(float,float,int);
 	

@@ -427,8 +427,8 @@ void scsp_3D_capsules_channel::writeOutput(std::string tagname, int step)
 	
 	if (step > 0) { 
 		// analyze membrane geometry:
-		ibm.membrane_geometry_analysis("capdata",step);
-		ibm.capsule_train_fraction(4*a,30.0,step);
+		ibm.capsule_geometry_analysis(step);
+		ibm.output_capsule_data();
 	
 		// calculate relative viscosity:
 		lbm.calculate_relative_viscosity("relative_viscosity_thru_time",Q0,step);

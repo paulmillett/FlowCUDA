@@ -1370,23 +1370,12 @@ void class_capsule_ibm3D::unwrap_node_coordinates()
 
 
 // --------------------------------------------------------
-// Calculate various geometry properties of capsules,
-// including center-of-mass, Taylor deformation index, etc.
+// Write capsule data to file "vtkoutput/capsule_data.dat"
 // --------------------------------------------------------
 
-void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int tagnum)
+void class_capsule_ibm3D::output_capsule_data()
 {
-	
-	// Define the file location and name:
-	/*
-	ofstream outfile;
-	std::stringstream filenamecombine;
-	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".dat";
-	string filename = filenamecombine.str();
-	outfile.open(filename.c_str(), ios::out | ios::app);
-	outfile << nCells << endl;
-	*/
-	
+		
 	// -----------------------------------------
 	// Define the file location and name:
 	// -----------------------------------------
@@ -1397,18 +1386,42 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 	string filename = filenamecombine.str();
 	outfile.open(filename.c_str(), ios::out | ios::app);
 	
-	ofstream outfile2;
-	std::stringstream filenamecombine2;
-	filenamecombine2 << "vtkoutput/" << "cell_free_thickness.dat";
-	string filename2 = filenamecombine2.str();
-	outfile2.open(filename2.c_str(), ios::out | ios::app);
+	// -----------------------------------------
+	// Write to file:
+	// -----------------------------------------
 	
-	ofstream outfile3;
-	std::stringstream filenamecombine3;
-	filenamecombine3 << "vtkoutput/" << "averaged_max_T1.dat";
-	string filename3 = filenamecombine3.str();
-	outfile3.open(filename3.c_str(), ios::out | ios::app);
+	for (int c=0; c<nCells; c++) {
+		
+		outfile << fixed << setprecision(2) << setw(2) << cellsH[c].cellType << " " << setw(2) << cellsH[c].intrain << " "
+			                                << setw(5) << cellsH[c].rad      << " " << setw(8) << cellsH[c].vol     << " " <<
+							setprecision(3) << setw(7) << cellsH[c].Ca       << " " << setw(7) << cellsH[c].D       << " " << setw(7) << cellsH[c].maxT1 << " " <<
+							setprecision(4) << setw(10) << cellsH[c].com.x    << " " << setw(10) << cellsH[c].com.y   << " " << setw(10) << cellsH[c].com.z << " " <<
+							setprecision(6) << setw(10) << cellsH[c].vel.x    << " " << setw(10) << cellsH[c].vel.y   << " " << setw(10) << cellsH[c].vel.z << endl;
+		
+	}
 	
+}
+
+
+
+// --------------------------------------------------------
+// Calculate various geometry properties of capsules,
+// including center-of-mass, Taylor deformation index, etc.
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::capsule_geometry_analysis(int step)
+{
+		
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+		
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "cell_free_thickness.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+		
 	// -----------------------------------------
 	// Loop over the capsules, calculate center-of-mass
 	// and Taylor deformation parameter.  Here, I'm using
@@ -1418,11 +1431,10 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 	
 	float yCFL = float(N.y);
 	float zCFL = float(N.z);
-	float maxT1Aver = 0.0; // average maximum tension
 		
 	for (int c=0; c<nCells; c++) {
 		
-		float D = 0.0;
+		cellsH[c].intrain = false;
 		float3 com = make_float3(0.0,0.0,0.0);
 		float mult[10] = {1.0/6.0,1.0/24.0,1.0/24.0,1.0/24.0,1.0/60.0,1.0/60.0,1.0/60.0,1.0/120.0,1.0/120.0,1.0/120.0};
 		float intg[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
@@ -1526,11 +1538,10 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 		cellsH[c].vol = vol;
 		
 		// -----------------------------------------
-		// sum maxT1 for average calculation:
+		// maxT1:
 		// -----------------------------------------
 		
 		cellsH[c].maxT1 = maxT1;
-		maxT1Aver += maxT1;
 		
 		// -----------------------------------------
 		// inertia tensor relative to center of mass:
@@ -1567,41 +1578,37 @@ void class_capsule_ibm3D::membrane_geometry_analysis(std::string tagname, int ta
 		float Lmax = std::max({L1,L2,L3});
 		float Lmin = std::min({L1,L2,L3});
 		cellsH[c].D = (Lmax-Lmin)/(Lmax+Lmin);
-		
+				
 		// -----------------------------------------		
 		// calculate the inclination angle:
 		// -----------------------------------------
 		
 		//phi = 0.5*atan(2*Ixy/(Ixx-Iyy));
 		//phi = phi/pi;
-				
-		// -----------------------------------------
-		// print data:
+
+		// -----------------------------------------		
+		// calculate the cell velocity:
 		// -----------------------------------------
 		
-		outfile << fixed << setprecision(4) << vol << "  " << com.x << "  " << com.y << "  " << com.z << "  "
-		        << D << "  " << maxT1 << endl;						
+		cellsH[c].vel = make_float3(0.0,0.0,0.0);
+		int istr = cellsH[c].indxN0;
+		int iend = istr + cellsH[c].nNodes;
+		for (int i=istr; i<iend; i++) cellsH[c].vel += vH[i];		
+		cellsH[c].vel /= cellsH[c].nNodes;
+			
 	}
 	
 	// -----------------------------------------
 	// print the cell-free layer thickness in the y-dir and z-dir:
 	// -----------------------------------------
 	
-	outfile2 << fixed << setprecision(4) << tagnum << "  " << yCFL << "  " << zCFL << endl;
-	
-	// -----------------------------------------
-	// print the average maximum T1:
-	// -----------------------------------------
-	
-	outfile3 << fixed << setprecision(5) << tagnum << "  " << maxT1Aver/float(nCells) << endl;
-	
+	outfile << fixed << setprecision(4) << step << "  " << yCFL << "  " << zCFL << endl;
+		
 	// -----------------------------------------	
 	// close file
 	// -----------------------------------------
 	
 	outfile.close();
-	outfile2.close();
-	outfile3.close();
 	
 }
 
@@ -1776,10 +1783,12 @@ void class_capsule_ibm3D::capsule_train_fraction(float rcut, float thetacut, int
 	// Assign 'intrain' to 'cellType':
 	// -----------------------------------------
 	
+	/*
 	for (int c=0; c<nCells; c++) {
 		if (cellsH[c].intrain == false) cellsH[c].cellType = 0;
 		if (cellsH[c].intrain == true)  cellsH[c].cellType = 1;
 	}
+	*/
 	
 	// -----------------------------------------
 	// Print results:
@@ -1788,32 +1797,6 @@ void class_capsule_ibm3D::capsule_train_fraction(float rcut, float thetacut, int
 	outfile << fixed << setprecision(4) << step << "  " << fracTrain << endl;
 	outfile.close();
 	
-	// -----------------------------------------
-	// Define the file location and name:
-	// -----------------------------------------
-	
-	ofstream outfile2;
-	std::stringstream filenamecombine2;
-	filenamecombine2 << "vtkoutput/" << "capsule_dynamics.dat";
-	string filename2 = filenamecombine2.str();
-	outfile2.open(filename2.c_str(), ios::out | ios::app);
-	
-	// -----------------------------------------
-	// calculate capsule velocities & print:
-	// -----------------------------------------
-	
-	for (int c=0; c<nCells; c++) {
-		cellsH[c].vel = make_float3(0.0,0.0,0.0);
-		int istr = cellsH[c].indxN0;
-		int iend = istr + cellsH[c].nNodes;
-		for (int i=istr; i<iend; i++) cellsH[c].vel += vH[i];		
-		cellsH[c].vel /= cellsH[c].nNodes;
-		outfile2 << fixed << setprecision(6) << cellsH[c].rad <<   "  " << cellsH[c].Ca << "  "
-			                                 << cellsH[c].vel.x << "  " << cellsH[c].vel.y << "  " << cellsH[c].vel.z << "  " 
-										     << cellsH[c].intrain << endl;
-	}
-	outfile2.close();
-		
 }
 
 

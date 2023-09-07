@@ -395,8 +395,8 @@ void scsp_3D_capsule_sedimentation::writeOutput(std::string tagname, int step)
 	
 	if (step > 0) { 
 		// analyze membrane geometry:
-		ibm.membrane_geometry_analysis("capdata",step);
-		ibm.capsule_train_fraction(4*a,30.0,step);
+		ibm.capsule_geometry_analysis(step);
+		ibm.output_capsule_data();
 			
 		// write vtk output for LBM and IBM:
 		int intervalVTK = nSteps/nVTKOutputs;

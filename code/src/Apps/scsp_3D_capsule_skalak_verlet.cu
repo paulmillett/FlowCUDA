@@ -248,7 +248,8 @@ void scsp_3D_capsule_skalak_verlet::cycleForward(int stepsPerCycle, int currentC
 void scsp_3D_capsule_skalak_verlet::writeOutput(std::string tagname, int step)
 {	
 	// analyze the capsule:
-	ibm.membrane_geometry_analysis("capdata",step);
+	ibm.capsule_geometry_analysis(step);
+	ibm.output_capsule_data();
 	// calculate the x-dir flow properties:
 	lbm.calculate_flow_rate_xdir("flowdata",step);
 	
