@@ -588,6 +588,31 @@ void class_capsule_ibm3D::single_file_cells(int Nx, int Ny, int Nz, float cellSp
 
 
 // --------------------------------------------------------
+// randomize cell positions and orientations:
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::randomize_cells(float sepWall)
+{
+	// copy node positions from device to host:
+	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	
+	// assign random position and orientation to each cell:
+	for (int c=0; c<nCells; c++) {
+		float3 shift = make_float3(0.0,0.0,0.0);
+		// get random position
+		shift.x = (float)rand()/RAND_MAX*Box.x;
+		shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
+		shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
+		rotate_and_shift_node_positions(c,shift.x,shift.y,shift.z);
+	}
+	
+	// copy node positions from host to device:
+	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+}
+
+
+
+// --------------------------------------------------------
 // With the Host, shrink cells and randomly shift them 
 // within the box:
 // --------------------------------------------------------
@@ -601,7 +626,7 @@ void class_capsule_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float s
 	for (int c=0; c<nCells; c++) {
 		resize_cell_radius(c,shrinkFactor);
 	}
-	
+		
 	// randomly shift cells, without overlapping previous cells:
 	float3* cellCOM = (float3*)malloc(nCells*sizeof(float3));
 	for (int c=0; c<nCells; c++) {
@@ -618,7 +643,7 @@ void class_capsule_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float s
 			// check with other cells
 			for (int d=0; d<c; d++) {
 				float sep = calc_separation_pbc(shift,cellCOM[d]);
-				sep -= cellsH[c].rad + cellsH[d].rad;
+				sep -= (cellsH[c].rad + cellsH[d].rad)*shrinkFactor;
                 if (sep < sepMin) 
                 {
                     tooClose = true;
@@ -810,7 +835,24 @@ void class_capsule_ibm3D::rest_geometries_skalak(int nBlocks, int nThreads)
 	// rest edge angles for bending:
 	rest_edge_angles_IBM3D
 	<<<nBlocks,nThreads>>> (r,edges,faces,nEdges);
+	
+	// rest edge lengths (just for equilibration):
+	rest_edge_lengths_IBM3D
+	<<<nBlocks,nThreads>>> (r,edges,nEdges);
 }
+
+
+
+// --------------------------------------------------------
+// Calculate rest geometries (Skalak model):
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
+{
+	if (pbcFlag.y==0 && pbcFlag.z==1) wall_forces_ydir(nBlocks,nThreads);
+	if (pbcFlag.y==1 && pbcFlag.z==0) wall_forces_zdir(nBlocks,nThreads);
+	if (pbcFlag.y==0 && pbcFlag.z==0) wall_forces_ydir_zdir(nBlocks,nThreads);
+} 
 
 
 
@@ -839,9 +881,8 @@ void class_capsule_ibm3D::relax_node_positions(int nIts, float scale, float M, i
 		reset_bin_lists(nBlocks,nThreads);		
 		build_bin_lists(nBlocks,nThreads);		
 		compute_node_forces(nBlocks,nThreads);		
-		nonbonded_node_interactions(nBlocks,nThreads);		
-		//wall_forces_ydir(nBlocks,nThreads);		
-		wall_forces_ydir_zdir(nBlocks,nThreads);
+		nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
 		update_node_positions_vacuum(M,nBlocks,nThreads);		
 		cudaDeviceSynchronize();
 	}	
@@ -875,8 +916,7 @@ void class_capsule_ibm3D::relax_node_positions_skalak(int nIts, float scale, flo
 		build_bin_lists(nBlocks,nThreads);		
 		compute_node_forces_skalak(nBlocks,nThreads);		
 		nonbonded_node_interactions(nBlocks,nThreads);		
-		//wall_forces_ydir(nBlocks,nThreads);
-		wall_forces_ydir_zdir(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
 		update_node_positions_vacuum(M,nBlocks,nThreads);		
 		cudaDeviceSynchronize();
 	}	
@@ -885,7 +925,7 @@ void class_capsule_ibm3D::relax_node_positions_skalak(int nIts, float scale, flo
 
 
 // --------------------------------------------------------
-// Take step forward with both IBM and LBM:
+// Take step forward for IBM using LBM object:
 // --------------------------------------------------------
 
 void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
@@ -909,7 +949,7 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThrea
 		// update IBM:
 		compute_node_forces_skalak(nBlocks,nThreads);
 		nonbonded_node_interactions(nBlocks,nThreads);
-		wall_forces_zdir(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,r,v,nNodes);
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,r,f,nNodes);
@@ -940,7 +980,7 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThrea
 		// update IBM:
 		compute_node_forces_skalak(nBlocks,nThreads);
 		nonbonded_node_interactions(nBlocks,nThreads);
-		wall_forces_zdir(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
 		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,r,v,f,nNodes);
 		update_node_positions_verlet_2(nBlocks,nThreads);
@@ -948,6 +988,36 @@ void class_capsule_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThrea
 	}
 		
 }
+
+
+
+// --------------------------------------------------------
+// Take step forward for IBM w/o fluid:
+// (note: this uses the velocity-Verlet algorithm)
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::stepIBM_no_fluid(int nSteps, bool zeroFlag, int nBlocks, int nThreads) 
+{		
+	for (int i=0; i<nSteps; i++) {
+		// first step of IBM velocity verlet:
+		update_node_positions_verlet_1(nBlocks,nThreads);
+
+		// re-build bin lists for IBM nodes:
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+		
+		// update IBM:
+		compute_node_forces_skalak(nBlocks,nThreads);
+		nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		add_drag_force_to_nodes(0.001,nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		update_node_positions_verlet_2(nBlocks,nThreads);
+	}
+	if (zeroFlag) zero_velocities_forces(nBlocks,nThreads); 
+}
+
+
 
 
 
@@ -1068,6 +1138,18 @@ void class_capsule_ibm3D::enforce_max_node_force(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "add_drag_force_to_node_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_capsule_ibm3D::add_drag_force_to_nodes(float dragcoeff, int nBlocks, int nThreads)
+{
+	add_drag_force_to_node_IBM3D
+	<<<nBlocks,nThreads>>> (v,f,dragcoeff,nNodes);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "add_xdir_force_IBM3D" kernel:
 // --------------------------------------------------------
 
@@ -1160,8 +1242,8 @@ void class_capsule_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads)
 	if (nCells > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 		nonbonded_node_interactions_IBM3D
-		<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,numBins,sizeBins,
-		                        repA,repD,repFmax,nNodes,binMax,nnbins,Box,pbcFlag);
+		<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,cells,numBins,sizeBins,
+		                        repA,repD,nNodes,binMax,nnbins,Box,pbcFlag);
 	}	
 }
 
@@ -1241,7 +1323,7 @@ void class_capsule_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 	// Fifth, compute the volume conservation force for each face:
 	compute_node_force_membrane_volume_IBM3D
 	<<<nBlocks,nThreads>>> (faces,f,cells,nFaces);
-			
+					
 	// Sixth, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);

@@ -140,6 +140,25 @@ __global__ void enforce_max_node_force_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D add a drag force:
+// --------------------------------------------------------
+
+__global__ void add_drag_force_to_node_IBM3D(
+	float3* v,
+	float3* f,
+	float c,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		f[i] -= c*v[i];
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D add force in the x-direction:
 // --------------------------------------------------------
 

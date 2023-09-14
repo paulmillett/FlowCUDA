@@ -63,6 +63,13 @@ __global__ void enforce_max_node_force_IBM3D(
 	int);
 
 
+__global__ void add_drag_force_to_node_IBM3D(
+	float3*,
+	float3*,
+	float,
+	int);
+
+
 __global__ void add_xdir_force_IBM3D(
 	float3*,
 	float,

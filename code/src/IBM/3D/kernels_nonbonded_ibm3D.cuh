@@ -30,26 +30,27 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	int*,
 	int*,
 	int*,
+	cell*,
 	int3,	
 	float,
 	float,
 	float,
-	float,
 	int,
 	int,
 	int,
-	float3,
+	float3,	
 	int3);
 
 
 __device__ inline void pairwise_interaction_forces(
 	const int, 
 	const int,
+	const int,
 	const float,
 	const float,
-	const float, 
 	float3*,
 	float3*,
+	cell*,
 	float3,
 	int3);
 

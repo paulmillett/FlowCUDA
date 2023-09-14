@@ -35,7 +35,10 @@ scsp_3D_capsules_duct_margination::scsp_3D_capsules_duct_margination() : lbm(),i
 	// ----------------------------------------------
 	
 	nThreads = inputParams("GPU/nThreads",512);
-	nBlocks = (nVoxels+(nThreads-1))/nThreads;  // integer division
+	//nBlocks = (nVoxels+(nThreads-1))/nThreads;  // integer division
+	nBlocks = (1230720+(nThreads-1))/nThreads;  // integer division
+	
+	cout << "nBlocks = " << nBlocks << ", nThreads = " << nThreads << endl;
 	
 	// ----------------------------------------------
 	// time parameters:
@@ -208,11 +211,19 @@ void scsp_3D_capsules_duct_margination::initSystem()
 	// ----------------------------------------------
 		
 	if (initRandom) {
-		float scale = 1.0;   // 0.7;
+		
+		
+		float a = max(a1,a2);
+		ibm.randomize_cells(a+2.0);
+		//ibm.stepIBM_no_fluid(20000,true,nBlocks,nThreads); 
+		
+		
+		/*
+		float scale = 0.2;   // 0.7;
 		float a = max(a1,a2);
 		ibm.shrink_and_randomize_cells(scale,2.0,a+2.0);
 		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
-	
+		
 		
 		cout << " " << endl;
 		cout << "-----------------------------------------------" << endl;
@@ -226,6 +237,7 @@ void scsp_3D_capsules_duct_margination::initSystem()
 		cout << "... done relaxing" << endl;
 		cout << "-----------------------------------------------" << endl;
 		cout << " " << endl;	
+		*/
 	}
 			
 	// ----------------------------------------------
@@ -272,10 +284,16 @@ void scsp_3D_capsules_duct_margination::cycleForward(int stepsPerCycle, int curr
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
+			
+			ibm.stepIBM_no_fluid(1,false,nBlocks,nThreads); 
+			
+			/*
 			ibm.stepIBM(lbm,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
+			lbm.stream_collide_save_forcing(nBlocks,nThreads);
+			*/	
 			cudaDeviceSynchronize();
+			
 		}
 		cout << " " << endl;
 		cout << "... done equilibrating!" << endl;
@@ -288,10 +306,15 @@ void scsp_3D_capsules_duct_margination::cycleForward(int stepsPerCycle, int curr
 	// ----------------------------------------------
 		
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;	
+		cummulativeSteps++;
+		
+		ibm.stepIBM_no_fluid(1,false,nBlocks,nThreads);
+		
+		/*
 		ibm.stepIBM(lbm,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
+		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		*/
 		cudaDeviceSynchronize();
 	}
 	

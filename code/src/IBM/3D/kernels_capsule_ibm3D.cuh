@@ -177,4 +177,11 @@ __global__ void scale_cell_areas_volumes_IBM3D(
 	int);
 		
 
+__global__ void cells_center_of_mass_IBM3D(
+	float3*,
+	cell*,
+	int*,
+	int);
+
+
 # endif  // KERNELS_CAPSULE_IBM3D_H

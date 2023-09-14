@@ -368,6 +368,13 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 		float volFace = triangle_signed_volume(r0,r1,r2);
 		atomicAdd(&cells[cID].vol,volFace); 
 		atomicAdd(&cells[cID].area,area);
+		
+		// add to global cell center-of-mass:
+		int nF = cells[cID].nFaces;
+		float3 rr = (r0+r1+r2)/3.0/float(nF);  // COM of face
+		atomicAdd(&cells[cID].com.x,rr.x);
+		atomicAdd(&cells[cID].com.y,rr.y);
+		atomicAdd(&cells[cID].com.z,rr.z);
 					
 	}	
 }
@@ -711,7 +718,7 @@ __device__ inline void add_force_to_vertex(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to zero node forces and cell volumes:
+// IBM3D kernel to zero node forces:
 // --------------------------------------------------------
 
 __global__ void zero_node_forces_IBM3D(
@@ -726,7 +733,7 @@ __global__ void zero_node_forces_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to zero node forces and cell volumes:
+// IBM3D kernel to zero cell volumes:
 // --------------------------------------------------------
 
 __global__ void zero_cell_volumes_IBM3D(
@@ -738,6 +745,7 @@ __global__ void zero_cell_volumes_IBM3D(
 	if (i < nCells) {
 		cells[i].vol = 0.0;
 		cells[i].area = 0.0;
+		cells[i].com = make_float3(0.0);
 	}
 }
 
@@ -858,6 +866,9 @@ __global__ void scale_cell_areas_volumes_IBM3D(
 		if (cells[i].vol0 > 5000) printf("%i cell vol0 = %f \n",i,cells[i].vol0); 	
 	}
 }
+
+
+
 
 
 

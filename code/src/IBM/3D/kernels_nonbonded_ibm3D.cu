@@ -89,15 +89,15 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	int* binMembers,
 	int* binMap,
 	int* cellIDs,
+	cell* cells,
 	int3 numBins,	
 	float sizeBins,
 	float repA,
 	float repD,
-	float repFmax,
 	int nNodes,
 	int binMax,
 	int nnbins,
-	float3 Box,
+	float3 Box,	
 	int3 pbcFlag)
 {
 	// define node:
@@ -118,6 +118,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 				
 		int offst = binID*binMax;
 		int occup = binOccupancy[binID];
+		if (occup > binMax) occup = binMax;
 		
 		/*
 		if (occup > binMax) {
@@ -129,7 +130,7 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			int j = binMembers[k];
 			if (i==j) continue;
 			if (cellIDs[i]==cellIDs[j]) continue;
-			pairwise_interaction_forces(i,j,repA,repD,repFmax,vertR,vertF,Box,pbcFlag);			
+			pairwise_interaction_forces(i,j,cellIDs[i],repA,repD,vertR,vertF,cells,Box,pbcFlag);			
 		}
 		
 		// -------------------------------
@@ -141,11 +142,12 @@ __global__ void nonbonded_node_interactions_IBM3D(
 			int naborbinID = binMap[binID*nnbins + b];
 			offst = naborbinID*binMax;
 			occup = binOccupancy[naborbinID];
+			if (occup > binMax) occup = binMax;
 			// loop over nodes in this bin:
 			for (int k=offst; k<offst+occup; k++) {
 				int j = binMembers[k];
 				if (cellIDs[i]==cellIDs[j]) continue;				
-				pairwise_interaction_forces(i,j,repA,repD,repFmax,vertR,vertF,Box,pbcFlag);			
+				pairwise_interaction_forces(i,j,cellIDs[i],repA,repD,vertR,vertF,cells,Box,pbcFlag);			
 			}
 		}
 				
@@ -161,11 +163,12 @@ __global__ void nonbonded_node_interactions_IBM3D(
 __device__ inline void pairwise_interaction_forces(
 	const int i, 
 	const int j,
+	const int cID,
 	const float repA,
 	const float repD,
-	const float repFmax,
 	float3* R,
 	float3* F,
+	cell* cells,	
 	float3 Box,
 	int3 pbcFlag)
 {
@@ -173,32 +176,18 @@ __device__ inline void pairwise_interaction_forces(
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);
 	if (r < repD) {
-		// if separation is too small, we must adjust positions:
-		/*
-		if (r < 1.732) {
-			float dr = 1.732 - r;
-			// avoid adjusting positions twice:
-			if (i < j) {
-				R[i] += 0.5*dr*(rij/r);
-				atomicAdd(&R[j].x,-0.5*dr*(rij.x/r));
-				atomicAdd(&R[j].y,-0.5*dr*(rij.y/r));
-				atomicAdd(&R[j].z,-0.5*dr*(rij.z/r));
-			}
-		}
-		// otherwise, calculate soft repulsion as usual:
-		else {
-			float force = repA/pow(r,2) - repA/pow(repD,2);
-			if (force > repFmax) force = repFmax;
-			F[i] += force*(rij/r);
-		}
-		*/
-		
-		
-		float force = repA/pow(r,2) - repA/pow(repD,2);
-		//if (force > repFmax) force = repFmax;
-		F[i] += force*(rij/r);
-		
-		if (r < 0.5) printf("separation = %f \n",r);
+		// linear spring force repulsion
+		float force = repA - (repA/repD)*r;
+		float3 fij = force*(rij/r);
+		// check if fij is pushing node i away from the c.o.m.
+		// of it's cell...  if so, then set force to zero
+		// because there is likely cell-cell overlap here
+		float3 ric = R[i] - cells[cID].com;
+		ric -= roundf(ric/Box)*Box*pbcFlag;  // PBC's
+		float fdir = dot(fij,ric);
+		if (fdir > 0.0) fij = make_float3(0.0);
+		// add force to node i
+		F[i] += fij;
 	} 	
 }
 
@@ -224,12 +213,14 @@ __global__ void wall_forces_ydir_IBM3D(
 		if (yi < d) {
 			const float force = A/pow(yi,2) - A/pow(d,2);
 			F[i].y += force;
+			if (yi < 0.0001) R[i].y = 0.0001;
 		}
 		// top wall
-		else if (yi > Box.y-d) {
-			const float bmyi = Box.y - yi;
+		else if (yi > (Box.y-1.0)-d) {
+			const float bmyi = (Box.y-1.0) - yi;
 			const float force = A/pow(bmyi,2) - A/pow(d,2);
 			F[i].y -= force;
+			if (yi > Box.y-1.0001) R[i].y = Box.y-1.0001;
 		}
 	}
 }
@@ -258,12 +249,14 @@ __global__ void wall_forces_zdir_IBM3D(
 		if (zi < d) {
 			const float force = A/pow(zi,2) - A/pow(d,2);
 			F[i].z += force;
+			if (zi < 0.0001) R[i].z = 0.0001;
 		}
 		// top wall
-		else if (zi > Box.z-d) {
-			const float bmzi = Box.z - zi;
+		else if (zi > (Box.z-1.0)-d) {
+			const float bmzi = (Box.z-1.0) - zi;
 			const float force = A/pow(bmzi,2) - A/pow(d,2);
 			F[i].z -= force;
+			if (zi > Box.z-1.0001) R[i].z = Box.z-1.0001;
 		}
 	}
 }
@@ -293,23 +286,27 @@ __global__ void wall_forces_ydir_zdir_IBM3D(
 		if (yi < d) {
 			const float force = A/pow(yi,2) - A/pow(d,2);
 			F[i].y += force;
+			if (yi < 0.0001) R[i].y = 0.0001;
 		}
 		// top wall
-		else if (yi > Box.y-d) {
-			const float bmyi = Box.y - yi;
+		else if (yi > (Box.y-1.0)-d) {
+			const float bmyi = (Box.y-1.0) - yi;
 			const float force = A/pow(bmyi,2) - A/pow(d,2);
 			F[i].y -= force;
+			if (yi > Box.y-1.0001) R[i].y = Box.y-1.0001;
 		}
 		// back wall
 		if (zi < d) {
 			const float force = A/pow(zi,2) - A/pow(d,2);
 			F[i].z += force;
+			if (zi < 0.0001) R[i].z = 0.0001;
 		}
 		// front wall
-		else if (zi > Box.z-d) {
-			const float bmzi = Box.z - zi;
+		else if (zi > (Box.z-1.0)-d) {
+			const float bmzi = (Box.z-1.0) - zi;
 			const float force = A/pow(bmzi,2) - A/pow(d,2);
 			F[i].z -= force;
+			if (zi > Box.z-1.0001) R[i].z = Box.z-1.0001;
 		}
 	}
 }

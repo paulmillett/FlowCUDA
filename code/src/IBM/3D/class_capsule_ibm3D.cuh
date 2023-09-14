@@ -98,6 +98,7 @@ class class_capsule_ibm3D {
 	void rotate_and_shift_node_positions(int,float,float,float);
 	void rest_geometries(int,int);
 	void rest_geometries_skalak(int,int);
+	void randomize_cells(float);
 	void shrink_and_randomize_cells(float,float,float);
 	void randomize_cells_above_plane(float,float,float,float);
 	float calc_separation_pbc(float3,float3);
@@ -109,10 +110,13 @@ class class_capsule_ibm3D {
 	void update_node_positions_verlet_2(int,int);
 	void zero_velocities_forces(int,int);
 	void enforce_max_node_force(int,int);
+	void add_drag_force_to_nodes(float,int,int);
 	void add_xdir_force_to_nodes(int,int,float);
 	void relax_node_positions(int,float,float,int,int);
 	void relax_node_positions_skalak(int,float,float,int,int);
+	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
+	void stepIBM_no_fluid(int,bool,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
 	void extrapolate_force(float*,float*,float*,int,int);	
