@@ -33,12 +33,21 @@ __global__ void extrapolate_interface_normal_poisson_IBM3D(
 	int Ny,
 	int Nz,
 	int nFaces,
+	int cellType,
+	cell* cells,
 	triangle* faces)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nFaces) {
+		
+		// --------------------------------------
+		// make sure cell type is correct:
+		// --------------------------------------
+		
+		int cID = faces[i].cellID;
+		if (cells[cID].cellType != cellType) return;
 		
 		// --------------------------------------
 		// center of mass of face 
@@ -80,7 +89,7 @@ __global__ void extrapolate_interface_normal_poisson_IBM3D(
 		float yf = float(Ny)*tyave/(2*M_PI);
 		float zf = float(Nz)*tzave/(2*M_PI);
 		
-		//float xf = (r[V0].x + r[V1].x + r[V2].x)/3.0;
+		//float xf = (r[V0].x + r[V1].x + r[V2].x)/3.0;  // this is w/o PBC's!!!
 		//float yf = (r[V0].y + r[V1].y + r[V2].y)/3.0;
 		//float zf = (r[V0].z + r[V1].z + r[V2].z)/3.0;
 		
@@ -260,18 +269,17 @@ __global__ void complex2real(
 
 __global__ void rescale_indicator_array(
 	float* u,
-	float value_in,
-	float value_out,
 	int nVoxels)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;	
 	if (i<nVoxels) {
 		float ui = u[i];
 		ui *= -1.0;
+		// 1.6 is typical max value (depends on interface spread function)
 		if (ui < 0.0) ui = 0.0;
 		if (ui > 1.6) ui = 1.6;
-		ui = value_out + (value_in - value_out)*(ui/1.6);
-		u[i] = ui;
+		ui /= 1.6;
+		u[i] = ui;   // value is now scaled between 0 and 1
 	}
 }
 

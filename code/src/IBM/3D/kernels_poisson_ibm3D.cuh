@@ -19,6 +19,8 @@ __global__ void extrapolate_interface_normal_poisson_IBM3D(
 	int,
 	int,
 	int,
+	int,
+	cell*,
 	triangle*);
 
 
@@ -57,8 +59,6 @@ __global__ void complex2real(
 
 __global__ void rescale_indicator_array(
 	float*,
-	float,
-	float,
 	int);
 			
 

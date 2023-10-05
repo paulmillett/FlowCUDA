@@ -4,7 +4,7 @@
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
-# include "../IBM/3D/class_capsule_ibm3D.cuh"
+# include "../IBM/3D/class_capsules_ibm3D.cuh"
 # include "../IBM/3D/class_poisson_ibm3D.cuh"
 # include <cuda.h>
 # include <string>
@@ -35,6 +35,8 @@ private:
 	float gam;
 	float shearVel;
 	float a;
+	float nu_in;
+	float nu_out;
 	bool initRandom;
 	std::string vtkFormat;
 	std::string ibmFile;
@@ -44,7 +46,7 @@ private:
 	
 	// objects:
 	class_scsp_D3Q19 lbm;
-	class_capsule_ibm3D ibm;
+	class_capsules_ibm3D ibm;
 	class_poisson_ibm3D poisson;
 		
 public:

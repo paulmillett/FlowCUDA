@@ -245,66 +245,6 @@ void class_capsules_binary_ibm3D::read_ibm_file_long(std::string fname, int C0, 
 
 
 // --------------------------------------------------------
-// Assign the reference node to every cell.  The reference
-// node is arbitrary (here we use the first node), but it
-// is necessary for handling PBC's.
-//
-// Override from parent class
-//
-// --------------------------------------------------------
-
-/*
-void class_capsules_binary_ibm3D::assign_refNode_to_cells()
-{
-	// Cell population 1
-	for (int c=0; c<nCells1; c++) {		
-		int cID = c;
-		cellsH[cID].refNode = c*nNodesPerCell1;
-	}
-	
-	// Cell population 2
-	int offset = nCells1*nNodesPerCell1;
-	for (int c=0; c<nCells2; c++) {
-		int cID = c + nCells1;
-		cellsH[cID].refNode = c*nNodesPerCell2 + offset;
-	}
-}	
-
-
-
-// --------------------------------------------------------
-// Assign the cell ID to every node:
-//
-// Override from parent class
-//
-// --------------------------------------------------------
-
-void class_capsules_binary_ibm3D::assign_cellIDs_to_nodes()
-{
-	// Cell population 1
-	for (int c=0; c<nCells1; c++) {
-		int cID = c;
-		for (int i=0; i<nNodesPerCell1; i++) {
-			int ii = i + c*nNodesPerCell1;
-			cellIDsH[ii] = cID;
-		}
-	}
-	
-	// Cell population 2
-	int offset = nCells1*nNodesPerCell1;
-	for (int c=0; c<nCells2; c++) {
-		int cID = c + nCells1;
-		for (int i=0; i<nNodesPerCell2; i++) {
-			int ii = i + c*nNodesPerCell2 + offset;
-			cellIDsH[ii] = cID;
-		}
-	}	
-}
-*/
-
-
-
-// --------------------------------------------------------
 // Duplicate the first cell mesh information to all cells:
 //
 // Override from parent class
@@ -412,30 +352,21 @@ void class_capsules_binary_ibm3D::set_cells_types_binary()
 
 
 
-/*
-
 // --------------------------------------------------------
-// With the Host, shrink cells and randomly shift them 
-// within the box:
-//
-// Override from parent class
-//
+// With the Host, randomly position cells within the box:
+// assumptions:
+//   1.) RBC's can overlap each other and platelets
+//   2.) Platelets cannot overlap each other
 // --------------------------------------------------------
 
-void class_capsules_binary_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float sepMin, float sepWall)
+void class_capsules_binary_ibm3D::randomize_platelets_and_rbcs(float sepMin, float sepWall)
 {
 	// copy node positions from device to host:
 	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
 	
-	// shrink cells by specified amount:
-	for (int c=0; c<nCells; c++) {
-		for (int i=0; i<nNodesPerCell; i++) {
-			int indx = i + c*nNodesPerCell;
-			rH[indx] *= shrinkFactor;
-		}
-	}
-	
 	// randomly shift cells, without overlapping previous cells:
+	// assume that: cellType = 1 are RBC's and 
+	//              cellType = 2 are Platelets
 	float3* cellCOM = (float3*)malloc(nCells*sizeof(float3));
 	for (int c=0; c<nCells; c++) {
 		cellCOM[c] = make_float3(0.0);
@@ -450,15 +381,18 @@ void class_capsules_binary_ibm3D::shrink_and_randomize_cells(float shrinkFactor,
 			shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
 			// check with other cells
 			for (int d=0; d<c; d++) {
-				float sep = calc_separation_pbc(shift,cellCOM[d]);
-				sep -= cellsH[c].rad + cellsH[d].rad;
-                if (sep < sepMin) 
-                {
-                    tooClose = true;
-                    break;
-                }
-			}
-			
+				// only check separation if both cells are platelets
+				if (cellsH[c].cellType==2 && cellsH[d].cellType==2) {
+					float sep = calc_separation_pbc(shift,cellCOM[d]);
+					sep -= cellsH[c].rad + cellsH[d].rad;
+					// if both cells are platelets, check to see if they are too close
+					if (sep < sepMin) 
+	                {
+	                    tooClose = true;
+	                    break;
+	                }
+				}				
+			}			
 		}
 		cellCOM[c] = shift;		
 		rotate_and_shift_node_positions(c,shift.x,shift.y,shift.z);
@@ -471,71 +405,111 @@ void class_capsules_binary_ibm3D::shrink_and_randomize_cells(float shrinkFactor,
 
 
 // --------------------------------------------------------
-// Shift IBM start positions by specified amount:
-//
-// Override from parent class
-//
+// With the Host, randomly position cells within the box:
+// assumptions:
+//   1.) RBC's (cellType==2) can overlap each other
+//   2.) The probe (cellType==1) is already positioned
 // --------------------------------------------------------
 
-void class_capsules_binary_ibm3D::shift_node_positions(int cellID, float xsh, float ysh, float zsh)
+void class_capsules_binary_ibm3D::randomize_probe_and_rbcs(float sepMin, float sepWall)
 {
-	// get the right offsets
-	int offset = 0;
-	int nNodesPerCell = 0;
-	if (cellID < nCells1) {
-		offset = cellID*nNodesPerCell1;
-		nNodesPerCell = nNodesPerCell1;
-	}
-	if (cellID >= nCells1) {
-		offset = nCells1*nNodesPerCell1 + (cellID-nCells1)*nNodesPerCell2;
-		nNodesPerCell = nNodesPerCell2;
+	// copy node positions from device to host:
+	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	
+	// randomly shift cells, without overlapping previous cells:
+	// assume that: cellType = 1 are RBC's and 
+	//              cellType = 2 are Platelets
+	float3* cellCOM = (float3*)malloc(nCells*sizeof(float3));
+	for (int c=0; c<nCells; c++) {
+		cellCOM[c] = make_float3(0.0);
+		float3 shift = make_float3(0.0);		
+		bool tooClose = true;
+		while (tooClose) {
+			// reset tooClose to false
+			tooClose = false;
+			// get random position
+			shift.x = (float)rand()/RAND_MAX*Box.x;
+			shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
+			shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
+			// check with other cells
+			for (int d=0; d<c; d++) {
+				// only check separation for rbc/probe combinations
+				if (cellsH[c].cellType==2 && cellsH[d].cellType==1) {
+					float sep = calc_separation_pbc(shift,cellCOM[d]);
+					sep -= cellsH[c].rad + cellsH[d].rad;
+					// if both cells are platelets, check to see if they are too close
+					if (sep < sepMin) 
+	                {
+	                    tooClose = true;
+	                    break;
+	                }
+				}				
+			}			
+		}
+		// if this cell is the probe, then assign a center position
+		if (cellsH[c].cellType==1) {
+			shift.x = Box.x/2.0;
+			shift.y = Box.y/2.0;
+			shift.z = Box.z/2.0;
+		}
+		cellCOM[c] = shift;		
+		rotate_and_shift_node_positions(c,shift.x,shift.y,shift.z);
 	}
 	
-	for (int i=0; i<nNodesPerCell; i++) {
-		int indx = i + offset;		 
-		rH[indx].x += xsh;
-		rH[indx].y += ysh;
-		rH[indx].z += zsh;		
-	}
+	// last, copy node positions from host to device:
+	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
 }
 
 
 
 // --------------------------------------------------------
-// Shift IBM start positions by specified amount:
-//
-// Override from parent class
-//
+// Take step forward for IBM w/o fluid:
+// (note: this uses the velocity-Verlet algorithm)
 // --------------------------------------------------------
 
-void class_capsules_binary_ibm3D::rotate_and_shift_node_positions(int cellID, float xsh, float ysh, float zsh)
+void class_capsules_binary_ibm3D::stepIBM_no_fluid_rbcs_platelets(int nSteps, bool zeroFlag, int nBlocks, int nThreads) 
+{		
+	// use distinct (smaller) value of repA:
+	float repA0 = repA;
+	repA = 0.0001;
+	
+	for (int i=0; i<nSteps; i++) {
+		// first step of IBM velocity verlet:
+		// NOTE: cellType2 (platelets) is stationary
+		update_node_positions_verlet_1_cellType2_stationary(nBlocks,nThreads);
+
+		// re-build bin lists for IBM nodes:
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+		
+		// update IBM:
+		compute_node_forces_skalak(nBlocks,nThreads);
+		nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		add_drag_force_to_nodes(0.001,nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		update_node_positions_verlet_2(nBlocks,nThreads);
+	}
+	if (zeroFlag) zero_velocities_forces(nBlocks,nThreads); 
+	
+	// reset repA to intended value:
+	repA = repA0;
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_node_position_verlet_1_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_capsules_binary_ibm3D::update_node_positions_verlet_1_cellType2_stationary(int nBlocks, int nThreads)
 {
-	// get the right offsets
-	int offset = 0;
-	int nNodesPerCell = 0;
-	if (cellID < nCells1) {
-		offset = cellID*nNodesPerCell1;
-		nNodesPerCell = nNodesPerCell1;
-	}
-	if (cellID >= nCells1) {
-		offset = nCells1*nNodesPerCell1 + (cellID-nCells1)*nNodesPerCell2;
-		nNodesPerCell = nNodesPerCell2;
-	}
-			
-	float a = M_PI*(float)rand()/RAND_MAX;  // alpha
-	float b = M_PI*(float)rand()/RAND_MAX;  // beta
-	float g = M_PI*(float)rand()/RAND_MAX;  // gamma	
-	for (int i=0; i<nNodesPerCell; i++) {
-		int indx = i + offset;		
-		// rotate:
-		float xrot = rH[indx].x*(cos(a)*cos(b)) + rH[indx].y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + rH[indx].z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
-		float yrot = rH[indx].x*(sin(a)*cos(b)) + rH[indx].y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + rH[indx].z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
-		float zrot = rH[indx].x*(-sin(b))       + rH[indx].y*(cos(b)*sin(g))                      + rH[indx].z*(cos(b)*cos(g));
-		// shift:		 
-		rH[indx].x = xrot + xsh;
-		rH[indx].y = yrot + ysh;
-		rH[indx].z = zrot + zsh;			
-	}
+	update_node_position_verlet_1_cellType2_stationary_IBM3D
+	<<<nBlocks,nThreads>>> (r,v,f,cells,cellIDs,dt,1.0,nNodes);
+	
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
 }
 
-*/
+
+

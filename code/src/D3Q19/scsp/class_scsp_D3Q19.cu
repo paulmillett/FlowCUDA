@@ -658,11 +658,11 @@ void class_scsp_D3Q19::stream_collide_save_forcing(int nBlocks, int nThreads)
 // Call to "scsp_stream_collide_save_forcing_varvisc_D3Q19" kernel:
 // --------------------------------------------------------
 
-void class_scsp_D3Q19::stream_collide_save_forcing_varvisc(float* nuarr, int nBlocks, int nThreads)
+void class_scsp_D3Q19::stream_collide_save_forcing_varvisc(float* indtr, float nu_in, float nu_out, int nBlocks, int nThreads)
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	scsp_stream_collide_save_forcing_varvisc_D3Q19 
-	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,Fx,Fy,Fz,nuarr,streamIndex,voxelType,iolets,nVoxels);
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,Fx,Fy,Fz,indtr,streamIndex,voxelType,iolets,nu_in,nu_out,nVoxels);
 	float* temp = f1;
 	f1 = f2;
 	f2 = temp;
@@ -837,6 +837,22 @@ void class_scsp_D3Q19::viscous_force_IBM_LBM(int nBlocks, int nThreads, float ga
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	viscous_force_velocity_difference_IBM3D
 	<<<nBlocks,nThreads>>> (rIB,vIB,fIB,Fx,Fy,Fz,u,v,w,gam,Nx,Ny,Nz,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "viscous_force_velocity_difference_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::viscous_force_filaments_IBM_LBM(int nBlocks, int nThreads, float gam,
+	                                                   bead* beads, int nBeads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	viscous_force_velocity_difference_bead_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Fx,Fy,Fz,u,v,w,gam,Nx,Ny,Nz,nBeads);	
 }
 
 

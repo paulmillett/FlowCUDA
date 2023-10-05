@@ -950,10 +950,12 @@ __global__ void scsp_stream_collide_save_forcing_varvisc_D3Q19(float* f1,
 													           float* Fx,
 													           float* Fy,
 													           float* Fz,
-													           float* nuarr,
+													           float* indtr,
 										                       int* streamIndex,
 										                       int* voxelType, 
-										                       iolet* iolets,										               
+										                       iolet* iolets,
+															   float nu_in,
+															   float nu_out,									               
 										                       int nVoxels)
 {
 
@@ -1026,7 +1028,7 @@ __global__ void scsp_stream_collide_save_forcing_varvisc_D3Q19(float* f1,
 		// --------------------------------------------------	
 		
 		// useful constants:
-		const float nu = nuarr[i];
+		const float nu = nu_in*indtr[i] + nu_out*(1.0-indtr[i]);
 		const float w0 = 1.0/3.0;
 		const float ws = 1.0/18.0;
 		const float wd = 1.0/36.0;			

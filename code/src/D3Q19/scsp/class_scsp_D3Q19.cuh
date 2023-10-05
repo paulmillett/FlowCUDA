@@ -10,6 +10,8 @@
 # include "../../IO/write_vtk_output.cuh"
 # include "../../IO/read_lattice_geometry.cuh"
 # include "../../IBM/3D/kernels_ibm3D.cuh"
+# include "../../IBM/3D/kernels_filaments_ibm3D.cuh"
+# include "../../IBM/3D/filament_data.h"
 # include "kernels_scsp_D3Q19.cuh"
 # include <cuda.h>
 # include <string>
@@ -122,7 +124,7 @@ public:
 	void initial_equilibrium(int,int);
 	void stream_collide_save(int,int,bool);	
 	void stream_collide_save_forcing(int,int);
-	void stream_collide_save_forcing_varvisc(float*,int,int);
+	void stream_collide_save_forcing_varvisc(float*,float,float,int,int);
 	void stream_collide_save_forcing_solid(int,int);
 	void stream_collide_save_IBforcing(int,int);
 	void set_boundary_shear_velocity(float,float,int,int);
@@ -139,6 +141,7 @@ public:
 	void interpolate_velocity_to_IBM(int,int,float3*,float3*,int);
 	void extrapolate_forces_from_IBM(int,int,float3*,float3*,int);
 	void viscous_force_IBM_LBM(int,int,float,float3*,float3*,float3*,int);
+	void viscous_force_filaments_IBM_LBM(int,int,float,bead*,int);
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);
 	void calculate_relative_viscosity(std::string,float,int);

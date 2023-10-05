@@ -2,6 +2,11 @@
 # include "class_poisson_ibm3D.cuh"
 # include <math.h>
 # include <iostream>
+# include <iomanip>
+# include <fstream>
+# include <string>
+# include <sstream>
+# include <stdlib.h>
 using namespace std;
 
 
@@ -78,7 +83,7 @@ void class_poisson_ibm3D::initialize(int Nxin, int Nyin, int Nzin)
 // Solve poisson equation:
 // --------------------------------------------------------
 
-void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, int nFaces, int nBlocks, int nThreads)
+void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, cell* cells, int nFaces, int cellType, int nBlocks, int nThreads)
 {
 	// zero the 'G' vector array:
 	zero_G_poisson_IBM3D
@@ -86,7 +91,7 @@ void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, int nFaces, 
 		
 	// extrapolate IBM interface normal vectors to fluid grid:
 	extrapolate_interface_normal_poisson_IBM3D
-	<<<nBlocks,nThreads>>> (r,G,Nx,Ny,Nz,nFaces,faces);	
+	<<<nBlocks,nThreads>>> (r,G,Nx,Ny,Nz,nFaces,cellType,cells,faces);	
 		
 	// calculate RHS of poisson equation (div.G):
 	calculate_rhs_poisson_IBM3D
@@ -107,10 +112,8 @@ void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, int nFaces, 
 	<<<nBlocks,nThreads>>> (rhs,indicator,nVoxels);
 	
 	// rescale indicator function:
-	float nu_in = 5.0;
-	float nu_out = 1.0/6.0;
 	rescale_indicator_array
-	<<<nBlocks,nThreads>>> (indicator,nu_in,nu_out,nVoxels);
+	<<<nBlocks,nThreads>>> (indicator,nVoxels);
 	
 }
 
@@ -123,9 +126,7 @@ void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, int nFaces, 
 void class_poisson_ibm3D::write_output(std::string tagname, int tagnum,
                                        int iskip, int jskip, int kskip, int precision)
 {
-	// first, do a memcopy from device to host:
 	cudaMemcpy(indicatorH, indicator, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
-	// second, write the output:
 	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,indicatorH,iskip,jskip,kskip,precision);
 }
 
@@ -146,6 +147,50 @@ void class_poisson_ibm3D::deallocate()
 	cudaFree(indicator);
 	free(indicatorH);
 }
+
+
+
+// --------------------------------------------------------
+// analyze volume fraction data using 'indicatorH' array:
+// --------------------------------------------------------
+
+void class_poisson_ibm3D::volume_fraction_analysis(std::string tagname, float threshold)
+{
+	// device-to-host memcopy:
+	cudaMemcpy(indicatorH, indicator, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	
+	// define the file location and name (flowrate thru time):
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << ".dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// create array for the current phi average in yz-plane:
+	float* phi = (float*)malloc(Ny*Nz*sizeof(float));
+	for (int i=0; i<Ny*Nz; i++) phi[i] = 0.0;
+	
+	// loop over grid and calculate average phi for each voxel
+	// on the yz-plane (for current time):
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			float volTot = 0.0;
+			for (int i=0; i<Nx; i++) {	
+				int ndx = k*Nx*Ny + j*Nx + i;
+				// 0.4 is found to be a good cut-off for RBC's
+				if (indicatorH[ndx]>threshold) volTot += indicatorH[ndx];
+			}
+			phi[k*Ny + j] = volTot/float(Nx);
+		}
+	}
+	
+	// print phi array:
+	for (int i=0; i<Ny*Nz; i++) {
+		outfile << fixed << setprecision(5) << phi[i] << endl; 
+	}
+	
+}
+
 
 
 

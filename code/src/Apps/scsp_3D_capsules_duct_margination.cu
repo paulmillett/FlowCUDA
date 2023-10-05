@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_duct_margination::scsp_3D_capsules_duct_margination() : lbm(),ibm()
+scsp_3D_capsules_duct_margination::scsp_3D_capsules_duct_margination() : lbm(),ibm(),poissonRBC(),poissonPLT()
 {		
 	
 	// ----------------------------------------------
@@ -34,10 +34,12 @@ scsp_3D_capsules_duct_margination::scsp_3D_capsules_duct_margination() : lbm(),i
 	// GPU parameters:
 	// ----------------------------------------------
 	
+	int sizeIBM = ibm.get_max_array_size();
+	int sizeMAX = max(sizeIBM,nVoxels);	
 	nThreads = inputParams("GPU/nThreads",512);
-	//nBlocks = (nVoxels+(nThreads-1))/nThreads;  // integer division
-	nBlocks = (1230720+(nThreads-1))/nThreads;  // integer division
+	nBlocks = (sizeMAX+(nThreads-1))/nThreads;  // integer division
 	
+	cout << "largest array size = " << sizeMAX << endl;
 	cout << "nBlocks = " << nBlocks << ", nThreads = " << nThreads << endl;
 	
 	// ----------------------------------------------
@@ -71,6 +73,8 @@ scsp_3D_capsules_duct_margination::scsp_3D_capsules_duct_margination() : lbm(),i
 	ibmFile2 = inputParams("IBM/ibmFile2","sphere.dat");
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	initRandom = inputParams("IBM/initRandom",1);
+	nu_in = 5.0/6.0;   // internal RBC visc
+	nu_out = 1.0/6.0;  // plasma visc
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -115,6 +119,8 @@ scsp_3D_capsules_duct_margination::~scsp_3D_capsules_duct_margination()
 {
 	lbm.deallocate();
 	ibm.deallocate();	
+	poissonRBC.deallocate();
+	poissonPLT.deallocate();
 }
 
 
@@ -210,14 +216,13 @@ void scsp_3D_capsules_duct_margination::initSystem()
 	// shrink and randomly disperse cells: 
 	// ----------------------------------------------
 		
-	if (initRandom) {
-		
+	if (initRandom) {		
 		
 		float a = max(a1,a2);
-		ibm.randomize_cells(a+2.0);
-		//ibm.stepIBM_no_fluid(20000,true,nBlocks,nThreads); 
-		
-		
+		ibm.randomize_platelets_and_rbcs(3.0,a+2.0);
+		ibm.stepIBM_no_fluid_rbcs_platelets(20000,false,nBlocks,nThreads);  // here, only RBC's move
+		ibm.stepIBM_no_fluid(10000,true,nBlocks,nThreads);   // here, both RBC's and PLT's move
+			
 		/*
 		float scale = 0.2;   // 0.7;
 		float a = max(a1,a2);
@@ -239,6 +244,17 @@ void scsp_3D_capsules_duct_margination::initSystem()
 		cout << " " << endl;	
 		*/
 	}
+	
+	// ----------------------------------------------
+	// initialize poisson solver:
+	// ----------------------------------------------
+	
+	poissonRBC.initialize(Nx,Ny,Nz);
+	poissonPLT.initialize(Nx,Ny,Nz);
+	poissonRBC.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
+	poissonRBC.write_output("indicatorRBC",0,iskip,jskip,kskip,precision);
+	poissonPLT.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,2,nBlocks,nThreads);
+	poissonPLT.write_output("indicatorPLT",0,iskip,jskip,kskip,precision);
 			
 	// ----------------------------------------------
 	// write initial output file:
@@ -284,16 +300,11 @@ void scsp_3D_capsules_duct_margination::cycleForward(int stepsPerCycle, int curr
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			
-			ibm.stepIBM_no_fluid(1,false,nBlocks,nThreads); 
-			
-			/*
+			if (i%5 == 0) poissonRBC.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
 			ibm.stepIBM(lbm,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-			lbm.stream_collide_save_forcing(nBlocks,nThreads);
-			*/	
+			lbm.stream_collide_save_forcing_varvisc(poissonRBC.indicator,nu_in,nu_out,nBlocks,nThreads);
 			cudaDeviceSynchronize();
-			
 		}
 		cout << " " << endl;
 		cout << "... done equilibrating!" << endl;
@@ -307,14 +318,10 @@ void scsp_3D_capsules_duct_margination::cycleForward(int stepsPerCycle, int curr
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		
-		ibm.stepIBM_no_fluid(1,false,nBlocks,nThreads);
-		
-		/*
+		if (cummulativeSteps%5 == 0) poissonRBC.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
 		ibm.stepIBM(lbm,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);
-		*/
+		lbm.stream_collide_save_forcing_varvisc(poissonRBC.indicator,nu_in,nu_out,nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
 	
@@ -348,12 +355,19 @@ void scsp_3D_capsules_duct_margination::writeOutput(std::string tagname, int ste
 		// only print out vtk files
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 		ibm.write_output("ibm",step);
+		poissonRBC.volume_fraction_analysis("vol_frac_RBC",0.4);
+		poissonPLT.volume_fraction_analysis("vol_frac_PLT",0.4);
 	}
 	
 	if (step > 0) { 
 		// analyze membrane geometry:
 		ibm.capsule_geometry_analysis(step);
 		ibm.output_capsule_data();
+		// need to perform PLT poisson solver because it is not performed during
+		// regular time steps
+		poissonPLT.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,2,nBlocks,nThreads);
+		poissonRBC.volume_fraction_analysis("vol_frac_RBC",0.4);
+		poissonPLT.volume_fraction_analysis("vol_frac_PLT",0.4);
 	
 		// calculate relative viscosity:
 		lbm.calculate_relative_viscosity("relative_viscosity_thru_time",Q0,step);
@@ -364,6 +378,8 @@ void scsp_3D_capsules_duct_margination::writeOutput(std::string tagname, int ste
 		if (step%intervalVTK == 0) {
 			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
 			ibm.write_output("ibm",step);
+			//poissonRBC.write_output("indicatorRBC",step,iskip,jskip,kskip,precision);
+			//poissonPLT.write_output("indicatorPLT",step,iskip,jskip,kskip,precision);
 		}
 		
 		// print out final averaged flow profile:
@@ -387,7 +403,7 @@ void scsp_3D_capsules_duct_margination::calcMembraneParams()
 	// 'GetPot' object containing input parameters:
 	GetPot inputParams("input.dat");
 	float Kv = inputParams("IBM/kv",0.0);
-	float C = inputParams("IBM/C",2.0);
+	float C = inputParams("IBM/C",10.0);
 	int nCells1 = inputParams("IBM/nCells1",1);
 	int nCells2 = inputParams("IBM/nCells2",0);
 	
@@ -398,9 +414,9 @@ void scsp_3D_capsules_duct_margination::calcMembraneParams()
 	float Dh = 4.0*(4.0*w*h)/(4.0*(w+h));
 	float infsum = calcInfSum(w,h);	
 	
-	// my calculations:
-	umax = 2.0*Re*nu/Dh;
-	bodyForx = umax*nu*M_PI*M_PI*M_PI/(16.0*w*w*infsum);
+	// per cell calculations:
+	umax = 2.0*Re*nu_out/Dh;
+	bodyForx = umax*nu_out*M_PI*M_PI*M_PI/(16.0*w*w*infsum);
 	for (int i=0; i<nCells1+nCells2; i++) {
 		float rad_i = ibm.cellsH[i].rad;
 		float Ca_i = 0.1;
@@ -409,7 +425,28 @@ void scsp_3D_capsules_duct_margination::calcMembraneParams()
 		float Ks = rho*umax*umax*rad_i/(Ca_i*Re);
 		float Kb = Ks*rad_i*rad_i*0.00287*sqrt(3);		
 		ibm.set_cell_mechanical_props(i,Ks,Kb,Kv,C,Ca_i);
-	}	
+	}
+	
+	// shear rates:
+	float gamma_aver_ydir = umax/w;
+	float gamma_wall_ydir = wall_shear_rate("y");
+	float gamma_aver_zdir = umax/h;
+	float gamma_wall_zdir = wall_shear_rate("z");
+	
+	// reference flux:
+	calcRefFlux();
+	
+	// output the results:
+	cout << "  " << endl;
+	cout << "hydraulic diameter = " << Dh << endl;
+	cout << "umax (bare fluid) = " << umax << endl;
+	cout << "fx = " << bodyForx << endl;
+	cout << "aver shear stress in z-dir = " << gamma_aver_zdir << endl;
+	cout << "wall shear stress in z-dir = " << gamma_wall_zdir << endl;
+	cout << "aver shear stress in y-dir = " << gamma_aver_ydir << endl;
+	cout << "wall shear stress in y-dir = " << gamma_wall_ydir << endl;
+	cout << "  " << endl;
+	
 }
 
 
@@ -430,5 +467,80 @@ float scsp_3D_capsules_duct_margination::calcInfSum(float w, float h)
 		outval += term;
 	}
 	return outval;
+}
+
+
+
+// --------------------------------------------------------
+// Calculate reference flux for the chosen values of w, h,
+// bodyForx, and nu:
+// --------------------------------------------------------
+
+void scsp_3D_capsules_duct_margination::calcRefFlux()
+{
+	// parameters:
+	float w = float(Ny)/2.0;
+	float h = float(Nz)/2.0;
+	Q0 = 0.0;
+	
+	// calculate solution for velocity at every
+	// site in the y-z plane:
+	for (int j=0; j<Ny; j++) {
+		for (int k=0; k<Nz; k++) {
+			float y = float(j) - w;
+			float z = float(k) - h;
+			float u0 = velocity_at_point(y,z,w,h);
+			Q0 += u0;
+		}
+	}
+	
+	// output the results:
+	cout << "reference flux = " << Q0 << endl;
+	cout << "  " << endl;		
+}
+
+
+
+// --------------------------------------------------------
+// Calculate wall shear rate:
+// --------------------------------------------------------
+
+float scsp_3D_capsules_duct_margination::wall_shear_rate(std::string dir)
+{
+	// parameters:
+	float w = float(Ny)/2.0;
+	float h = float(Nz)/2.0;	
+	// calculate solution for velocity at two points
+	// and determine forward finite difference for shear rate
+	if (dir == "z") {
+		float u0 = velocity_at_point(0.0,h,w,h);
+		float u1 = velocity_at_point(0.0,h-1.0,w,h);
+		return (u1-u0)/1.0;
+	} else if (dir == "y") {
+		float u0 = velocity_at_point(w,0.0,w,h);
+		float u1 = velocity_at_point(w-1,0.0,w,h);
+		return (u1-u0)/1.0;
+	} else {
+		return 0.0;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Calculate velocity at point:
+// --------------------------------------------------------
+
+float scsp_3D_capsules_duct_margination::velocity_at_point(float y, float z, float w, float h)
+{
+	float sumval = 0.0;
+	// take first 40 terms of infinite sum
+	for (int n = 1; n<80; n=n+2) {
+		float nf = float(n);
+		float pref = pow(-1.0,(nf-1.0)/2)/(nf*nf*nf);
+		float term = pref*(1 - cosh(nf*M_PI*z/2/w) / cosh(nf*M_PI*h/2/w)) * cos(nf*M_PI*y/2/w);
+		sumval += term;
+	}
+	return (16*bodyForx*w*w/nu/pow(M_PI,3))*sumval;
 }
 

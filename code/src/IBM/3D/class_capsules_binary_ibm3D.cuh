@@ -6,9 +6,9 @@
 # include "../../IO/write_vtk_output.cuh"
 # include "../../Utils/helper_math.h"
 # include "../../D3Q19/scsp/class_scsp_D3Q19.cuh"
-# include "class_capsule_ibm3D.cuh"
+# include "class_capsules_ibm3D.cuh"
 # include "kernels_ibm3D.cuh"
-# include "kernels_capsule_ibm3D.cuh"
+# include "kernels_capsules_ibm3D.cuh"
 # include "kernels_nonbonded_ibm3D.cuh"
 # include "membrane_data.h"
 # include <cuda.h>
@@ -21,7 +21,7 @@
 // ---------------------------------------------------------------------------
 
 
-class class_capsules_binary_ibm3D : public class_capsule_ibm3D {
+class class_capsules_binary_ibm3D : public class_capsules_ibm3D {
 	
 	public:  // treat like a struct
 	
@@ -42,14 +42,13 @@ class class_capsules_binary_ibm3D : public class_capsule_ibm3D {
 	~class_capsules_binary_ibm3D();
 	void read_ibm_information(std::string,std::string);
 	void read_ibm_file_long(std::string,int,int,int,int,int,int,int);
-	//void assign_refNode_to_cells();
-	//void assign_cellIDs_to_nodes();
 	void duplicate_cells();	
 	void set_cells_radii_binary();
 	void set_cells_types_binary();
-	//void shrink_and_randomize_cells(float,float,float);
-	//void shift_node_positions(int,float,float,float);
-	//void rotate_and_shift_node_positions(int,float,float,float);
+	void randomize_platelets_and_rbcs(float,float);
+	void randomize_probe_and_rbcs(float,float);
+	void stepIBM_no_fluid_rbcs_platelets(int,bool,int,int);
+	void update_node_positions_verlet_1_cellType2_stationary(int,int);
 	
 };
 

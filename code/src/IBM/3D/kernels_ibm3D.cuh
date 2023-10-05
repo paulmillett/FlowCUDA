@@ -148,6 +148,18 @@ __global__ void viscous_force_velocity_difference_IBM3D(
 	int,
 	int,
 	int);
+	
+	
+__global__ void repulsive_force_solid_lattice_IBM3D(
+	float3*,
+	float3*,
+	int*,
+	float,
+	float,
+	int,
+	int,
+	int,
+	int);
 			
 
 __global__ void compute_node_force_IBM3D(

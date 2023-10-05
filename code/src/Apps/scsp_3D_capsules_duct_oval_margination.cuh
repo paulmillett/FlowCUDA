@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_CAPSULES_DUCT_MARGINATION_H
-# define SCSP_3D_CAPSULES_DUCT_MARGINATION_H
+# ifndef SCSP_3D_CAPSULES_DUCT_OVAL_MARGINATION_H
+# define SCSP_3D_CAPSULES_DUCT_OVAL_MARGINATION_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -9,7 +9,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_capsules_duct_margination : public FlowBase {
+class scsp_3D_capsules_duct_oval_margination : public FlowBase {
 	
 private:
 
@@ -45,6 +45,8 @@ private:
 	float trainAng;
 	float nu_in;
 	float nu_out;
+	float chA;
+	float chB;
 	bool initRandom;
 	std::string vtkFormat;
 	std::string ibmUpdate;
@@ -62,8 +64,8 @@ private:
 		
 public:
 
-	scsp_3D_capsules_duct_margination();
-	~scsp_3D_capsules_duct_margination();
+	scsp_3D_capsules_duct_oval_margination();
+	~scsp_3D_capsules_duct_oval_margination();
 	void initSystem();
 	void cycleForward(int,int);
 	void stepIBM();

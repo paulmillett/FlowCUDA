@@ -182,6 +182,18 @@ __global__ void cells_center_of_mass_IBM3D(
 	cell*,
 	int*,
 	int);
+	
+
+__global__ void update_node_position_verlet_1_cellType2_stationary_IBM3D(
+	float3*,
+	float3*,
+	float3*,
+	cell*,
+	int*,
+	float,
+	float,	
+	int);
+
 
 
 # endif  // KERNELS_CAPSULE_IBM3D_H

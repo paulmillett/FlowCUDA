@@ -1,6 +1,6 @@
 
 
-# include "kernels_capsule_ibm3D.cuh"
+# include "kernels_capsules_ibm3D.cuh"
 # include <stdio.h>
 
 
@@ -868,6 +868,31 @@ __global__ void scale_cell_areas_volumes_IBM3D(
 }
 
 
+
+// --------------------------------------------------------
+// IBM3D node update kernel:
+// --------------------------------------------------------
+
+__global__ void update_node_position_verlet_1_cellType2_stationary_IBM3D(
+	float3* r,
+	float3* v,
+	float3* f,
+	cell* cells,
+	int* cellIDs,
+	float dt,
+	float m,	
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		int cID = cellIDs[i];
+		if (cells[cID].cellType != 2) {
+			r[i] += v[i]*dt + 0.5*dt*dt*(f[i]/m);
+			v[i] += 0.5*dt*(f[i]/m);
+		}		
+	}
+}
 
 
 

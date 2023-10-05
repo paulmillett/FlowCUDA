@@ -177,7 +177,9 @@ __global__ void scsp_stream_collide_save_forcing_varvisc_D3Q19(
 	float*,
 	int*,
 	int*, 
-	iolet*,										               
+	iolet*,
+	float,
+	float,								               
 	int);
 
 	

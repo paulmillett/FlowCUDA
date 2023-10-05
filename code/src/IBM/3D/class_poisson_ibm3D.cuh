@@ -37,8 +37,9 @@ class class_poisson_ibm3D {
 	class_poisson_ibm3D();
 	~class_poisson_ibm3D();
 	void initialize(int,int,int);
-	void solve_poisson(triangle*,float3*,int,int,int);
+	void solve_poisson(triangle*,float3*,cell*,int,int,int,int);
 	void write_output(std::string,int,int,int,int,int);
+	void volume_fraction_analysis(std::string,float);
 	void deallocate();	
 	
 };

@@ -1,20 +1,20 @@
 
-# ifndef CLASS_CAPSULE_IBM3D_H
-# define CLASS_CAPSULE_IBM3D_H
+# ifndef CLASS_CAPSULES_IBM3D_H
+# define CLASS_CAPSULES_IBM3D_H
 
 # include "../../IO/read_ibm_information.cuh"
 # include "../../IO/write_vtk_output.cuh"
 # include "../../Utils/helper_math.h"
 # include "../../D3Q19/scsp/class_scsp_D3Q19.cuh"
 # include "kernels_ibm3D.cuh"
-# include "kernels_capsule_ibm3D.cuh"
+# include "kernels_capsules_ibm3D.cuh"
 # include "kernels_nonbonded_ibm3D.cuh"
 # include "membrane_data.h"
 # include <cuda.h>
 # include <string>
 
 
-class class_capsule_ibm3D {
+class class_capsules_ibm3D {
 	
 	public:  // treat like a struct
 	
@@ -66,8 +66,8 @@ class class_capsule_ibm3D {
 	int* cellIDs;
 	
 	// methods:
-	class_capsule_ibm3D();
-	~class_capsule_ibm3D();
+	class_capsules_ibm3D();
+	~class_capsules_ibm3D();
 	void allocate();
 	void deallocate();	
 	void memcopy_host_to_device();
@@ -86,6 +86,7 @@ class class_capsule_ibm3D {
 	void set_cell_radius(int,float);
 	void set_cells_types(int);
 	void set_cell_type(int,int);
+	int get_max_array_size();
 	void calculate_cell_membrane_props(float,float,float,float,float,float,
 		                               float,float,float,std::string); 
 	void rescale_cell_radii(float,float,std::string);
@@ -140,4 +141,4 @@ class class_capsule_ibm3D {
 	
 };
 
-# endif  // CLASS_CAPSULE_IBM3D_H
+# endif  // CLASS_CAPSULES_IBM3D_H
