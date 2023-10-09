@@ -7,7 +7,8 @@
 # include "../../Utils/helper_math.h"
 # include "../../D3Q19/scsp/class_scsp_D3Q19.cuh"
 # include "kernels_filaments_ibm3D.cuh"
-# include "filament_data.h"
+# include "data_structs/filament_data.h"
+# include "data_structs/neighbor_bins_data.h"
 # include <cuda.h>
 # include <string>
 
@@ -21,23 +22,20 @@ class class_filaments_ibm3D {
 	int nEdges;
 	int nFilams;
 	int nBeadsPerFilam;
-	int nEdgesPerFilam;
-	int binMax;
-	int nnbins;
-	int nBins;
+	int nEdgesPerFilam;	
 	int3 N;
-	int3 numBins;
-	float sizeBins;
 	float ks,kb;
 	float dt;
 	float repA;
 	float repD;
 	float beadFmax;
 	float gam;
+	float L0;
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;
 	std::string ibmUpdate;
+	bindata bins;
 			
 	// host arrays:
 	bead* beadsH;
@@ -47,11 +45,7 @@ class class_filaments_ibm3D {
 	// device arrays:
 	bead* beads;
 	edgefilam* edges;
-	filament* filams;
-	int* binMembers;
-	int* binOccupancy;
-	int* binMap;
-	int* cellIDs;
+	filament* filams;	
 	
 	// methods:
 	class_filaments_ibm3D();
@@ -60,10 +54,11 @@ class class_filaments_ibm3D {
 	void deallocate();	
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
-	void read_ibm_information(std::string);
+	void create_first_filament();
 	void set_pbcFlag(int,int,int);
 	void set_ks(float);
 	void set_kb(float);
+	void set_fp(float);
 	void set_filams_mechanical_props(float,float);
 	void set_filam_mechanical_props(int,float,float);
 	void set_filams_radii(float);
@@ -77,8 +72,6 @@ class class_filaments_ibm3D {
 	void rotate_and_shift_bead_positions(int,float,float,float);
 	void randomize_filaments(float);
 	float calc_separation_pbc(float3,float3);
-	void write_output(std::string,int);
-	void write_output_long(std::string,int);
 	void update_bead_positions_verlet_1(int,int);
 	void update_bead_positions_verlet_2(int,int);
 	void zero_bead_velocities_forces(int,int);
@@ -96,6 +89,7 @@ class class_filaments_ibm3D {
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
+	void write_output(std::string,int);
 	void unwrap_bead_coordinates();
 	void output_filament_data();
 	

@@ -41,6 +41,7 @@ struct filament {
 	float rad;   // radius of bead 
 	float ks;
 	float kb;
+	float fp;
 	float3 com;
 	float3 vel;
 };

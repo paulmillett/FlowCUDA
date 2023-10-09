@@ -50,6 +50,7 @@ class_filaments_ibm3D::class_filaments_ibm3D()
 	dt = inputParams("Time/dt",1.0);
 	ks = inputParams("IBM_FILAMS/ks",0.0);
 	kb = inputParams("IBM_FILAMS/kb",0.0);
+	L0 = inputParams("IBM_FILAMS/L0",0.5);
 	repA = inputParams("IBM_FILAMS/repA",0.0);
 	repD = inputParams("IBM_FILAMS/repD",0.0);
 	beadFmax = inputParams("IBM_FILAMS/beadFmax",1000.0);
@@ -68,14 +69,14 @@ class_filaments_ibm3D::class_filaments_ibm3D()
 	// if we need bins, do some calculations:
 	binsFlag = false;
 	if (nFilams > 1) binsFlag = true;
-	if (binsFlag) {
-		sizeBins = inputParams("IBM_FILAMS/sizeBins",2.0);
-		binMax = inputParams("IBM_FILAMS/binMax",1);			
-		numBins.x = int(floor(N.x/sizeBins));
-	    numBins.y = int(floor(N.y/sizeBins));
-	    numBins.z = int(floor(N.z/sizeBins));
-		nBins = numBins.x*numBins.y*numBins.z;
-		nnbins = 26;
+	if (binsFlag) {		
+		bins.sizeBins = inputParams("IBM_FILAMS/sizeBins",2.0);
+		bins.binMax = inputParams("IBM_FILAMS/binMax",1);			
+		bins.numBins.x = int(floor(N.x/bins.sizeBins));
+	    bins.numBins.y = int(floor(N.y/bins.sizeBins));
+	    bins.numBins.z = int(floor(N.z/bins.sizeBins));
+		bins.nBins = bins.numBins.x*bins.numBins.y*bins.numBins.z;
+		bins.nnbins = 26;		
 	}	
 }
 
@@ -107,10 +108,10 @@ void class_filaments_ibm3D::allocate()
 	cudaMalloc((void **) &beads, nBeads*sizeof(bead));
 	cudaMalloc((void **) &edges, nEdges*sizeof(edgefilam));
 	cudaMalloc((void **) &filams, nFilams*sizeof(filament));
-	if (binsFlag) {
-		cudaMalloc((void **) &binMembers, nBins*binMax*sizeof(int));
-		cudaMalloc((void **) &binOccupancy, nBins*sizeof(int));
-		cudaMalloc((void **) &binMap, nBins*26*sizeof(int));		
+	if (binsFlag) {		
+		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
+		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
+		cudaMalloc((void **) &bins.binMap, bins.nBins*26*sizeof(int));		
 	}	
 }
 
@@ -131,10 +132,10 @@ void class_filaments_ibm3D::deallocate()
 	cudaFree(beads);
 	cudaFree(edges);
 	cudaFree(filams);	
-	if (binsFlag) {
-		cudaFree(binMembers);
-		cudaFree(binOccupancy);
-		cudaFree(binMap);		
+	if (binsFlag) {		
+		cudaFree(bins.binMembers);
+		cudaFree(bins.binOccupancy);
+		cudaFree(bins.binMap);				
 	}		
 }
 
@@ -195,12 +196,26 @@ void class_filaments_ibm3D::memcopy_device_to_host()
 // Read IBM information from file:
 // --------------------------------------------------------
 
-void class_filaments_ibm3D::read_ibm_information(std::string tagname)
+void class_filaments_ibm3D::create_first_filament()
 {
-	// read data from file:
-	//read_ibm_filament_information(tagname,nBeadsPerFilam,nEdgesPerFilam,beadsH,edgesH);
+	// set up the bead information for first filament:
+	for (int i=0; i<nBeadsPerFilam; i++) {
+		beadsH[i].r.x = 0.0 + float(i)*L0;
+		beadsH[i].r.y = 0.0;
+		beadsH[i].r.z = 0.0;
+		beadsH[i].v = make_float3(0.0f);
+		beadsH[i].f = make_float3(0.0f);
+		beadsH[i].filamID = 0;
+	}
 	
-	// set up indices for each filament:
+	// set up the edge information for first filament:
+	for (int i=0; i<nEdgesPerFilam; i++) {
+		edgesH[i].b0 = i;
+		edgesH[i].b1 = i+1;
+		edgesH[i].length0 = L0;
+	}
+	
+	// set up indices for ALL filament:
 	for (int f=0; f<nFilams; f++) {
 		filamsH[f].nBeads = nBeadsPerFilam;
 		filamsH[f].nEdges = nEdgesPerFilam;
@@ -229,6 +244,11 @@ void class_filaments_ibm3D::set_ks(float val)
 void class_filaments_ibm3D::set_kb(float val)
 {
 	for (int f=0; f<nFilams; f++) filamsH[f].kb = val;
+}
+
+void class_filaments_ibm3D::set_fp(float val)
+{
+	for (int f=0; f<nFilams; f++) filamsH[f].fp = val;
 }
 
 void class_filaments_ibm3D::set_filams_mechanical_props(float ks, float kb)
@@ -314,12 +334,16 @@ void class_filaments_ibm3D::duplicate_filaments()
 			for (int i=0; i<filamsH[0].nBeads; i++) {
 				int ii = i + filamsH[f].indxB0;
 				beadsH[ii].r = beadsH[i].r;
+				beadsH[ii].v = beadsH[i].v;
+				beadsH[ii].f = beadsH[i].f;
+				beadsH[ii].filamID = f;
 			}
 			// copy edge info:
 			for (int i=0; i<filamsH[0].nEdges; i++) {
 				int ii = i + filamsH[f].indxE0;
 				edgesH[ii].b0 = edgesH[i].b0 + filamsH[f].indxB0;
 				edgesH[ii].b1 = edgesH[i].b1 + filamsH[f].indxB0;
+				edgesH[ii].length0 = edgesH[i].length0;
 			}
 		}
 	}
@@ -390,9 +414,9 @@ void class_filaments_ibm3D::shift_bead_positions(int fID, float xsh, float ysh, 
 void class_filaments_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float ysh, float zsh)
 {
 	// random rotation angles:
-	float a = M_PI*(float)rand()/RAND_MAX;  // alpha
-	float b = M_PI*(float)rand()/RAND_MAX;  // beta
-	float g = M_PI*(float)rand()/RAND_MAX;  // gamma
+	float a = M_PI*((float)rand()/RAND_MAX - 0.5);  // alpha
+	float b = M_PI*((float)rand()/RAND_MAX - 0.5);  // beta
+	float g = M_PI*((float)rand()/RAND_MAX - 0.5);  // gamma
 	
 	// update node positions:
 	int istr = filamsH[fID].indxB0;
@@ -407,31 +431,6 @@ void class_filaments_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, 
 		beadsH[i].r.y = yrot + ysh;
 		beadsH[i].r.z = zrot + zsh;			
 	}
-}
-
-
-
-// --------------------------------------------------------
-// Write IBM output to file:
-// --------------------------------------------------------
-
-void class_filaments_ibm3D::write_output(std::string tagname, int tagnum)
-{
-	//write_vtk_immersed_boundary_3D(tagname,tagnum,nNodes,nFaces,rH,facesH);
-	//write_vtk_immersed_boundary_3D_cellID(tagname,tagnum,nNodes,nFaces,rH,facesH,cellsH);
-}
-
-
-
-// --------------------------------------------------------
-// Write IBM output to file, including more information
-// (edge angles):
-// --------------------------------------------------------
-
-void class_filaments_ibm3D::write_output_long(std::string tagname, int tagnum)
-{
-	//write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
-	//nNodes,nFaces,nEdges,rH,facesH,edgesH);
 }
 
 
@@ -614,9 +613,8 @@ void class_filaments_ibm3D::build_binMap(int nBlocks, int nThreads)
 {
 	if (nFilams > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;	
-		cout << "nnbins = " << nnbins << endl;	
 		build_binMap_for_beads_IBM3D
-		<<<nBlocks,nThreads>>> (binMap,numBins,nnbins,nBins);
+		<<<nBlocks,nThreads>>> (bins);		
 	}	
 }
 
@@ -629,9 +627,9 @@ void class_filaments_ibm3D::build_binMap(int nBlocks, int nThreads)
 void class_filaments_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 {
 	if (nFilams > 1) {
-		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;		
 		reset_bin_lists_for_beads_IBM3D
-		<<<nBlocks,nThreads>>> (binOccupancy,binMembers,binMax,nBins);
+		<<<nBlocks,nThreads>>> (bins);
 	}	
 }
 
@@ -644,9 +642,9 @@ void class_filaments_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 void class_filaments_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 {
 	if (nFilams > 1) {
-		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;		
 		build_bin_lists_for_beads_IBM3D
-		<<<nBlocks,nThreads>>> (beads,binOccupancy,binMembers,numBins,sizeBins,nBeads,binMax);
+		<<<nBlocks,nThreads>>> (beads,bins,nBeads);		
 	}	
 }
 
@@ -659,10 +657,9 @@ void class_filaments_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 void class_filaments_ibm3D::nonbonded_bead_interactions(int nBlocks, int nThreads)
 {
 	if (nFilams > 1) {
-		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
 		nonbonded_bead_interactions_IBM3D
-		<<<nBlocks,nThreads>>> (beads,binOccupancy,binMembers,binMap,numBins,sizeBins,
-		                        repA,repD,nBeads,binMax,nnbins,Box,pbcFlag);
+		<<<nBlocks,nThreads>>> (beads,bins,repA,repD,nBeads,Box,pbcFlag);
 	}	
 }
 
@@ -683,14 +680,17 @@ void class_filaments_ibm3D::compute_bead_forces(int nBlocks, int nThreads)
 	unwrap_bead_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (beads,filams,Box,pbcFlag,nBeads);	
 			
-	// Forth, compute the edge extension and bending force for each edge:
+	// Third, compute the edge extension and bending force for each edge:
 	compute_bead_force_IBM3D
 	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
 	
 	compute_bead_force_bending_IBM3D
 	<<<nBlocks,nThreads>>> (beads,filams,nBeads);
-			
-	// Seventh, re-wrap bead coordinates:
+	
+	compute_propulsion_force_IBM3D
+	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
+	
+	// Forth, re-wrap bead coordinates:
 	wrap_bead_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);
 			
@@ -757,6 +757,19 @@ void class_filaments_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 
 
 
+
+
+
+
+// --------------------------------------------------------
+// Write IBM output to file:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::write_output(std::string tagname, int tagnum)
+{
+	write_vtk_immersed_boundary_3D_filaments(tagname,tagnum,
+	nBeads,nEdges,beadsH,edgesH);
+}
 
 
 

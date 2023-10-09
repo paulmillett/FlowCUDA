@@ -1,7 +1,7 @@
 # ifndef READ_IBM_INFORMATION_H
 # define READ_IBM_INFORMATION_H
 # include <string>
-# include "../IBM/3D/membrane_data.h"
+# include "../IBM/3D/data_structs/membrane_data.h"
 
 void read_ibm_information(std::string,int,int,float3*,int*,int*,int*);
 

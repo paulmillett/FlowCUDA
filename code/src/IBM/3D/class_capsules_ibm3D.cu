@@ -76,13 +76,13 @@ class_capsules_ibm3D::class_capsules_ibm3D()
 	binsFlag = false;
 	if (nCells > 1) binsFlag = true;
 	if (binsFlag) {
-		sizeBins = inputParams("IBM/sizeBins",2.0);
-		binMax = inputParams("IBM/binMax",1);			
-		numBins.x = int(floor(N.x/sizeBins));
-	    numBins.y = int(floor(N.y/sizeBins));
-	    numBins.z = int(floor(N.z/sizeBins));
-		nBins = numBins.x*numBins.y*numBins.z;
-		nnbins = 26;
+		bins.sizeBins = inputParams("IBM/sizeBins",2.0);
+		bins.binMax = inputParams("IBM/binMax",1);			
+		bins.numBins.x = int(floor(N.x/bins.sizeBins));
+	    bins.numBins.y = int(floor(N.y/bins.sizeBins));
+	    bins.numBins.z = int(floor(N.z/bins.sizeBins));
+		bins.nBins = bins.numBins.x*bins.numBins.y*bins.numBins.z;
+		bins.nnbins = 26;	
 	}	
 }
 
@@ -128,9 +128,9 @@ void class_capsules_ibm3D::allocate()
 	cudaMalloc((void **) &cells, nCells*sizeof(cell));
 	cudaMalloc((void **) &cellIDs, nNodes*sizeof(int));
 	if (binsFlag) {
-		cudaMalloc((void **) &binMembers, nBins*binMax*sizeof(int));
-		cudaMalloc((void **) &binOccupancy, nBins*sizeof(int));
-		cudaMalloc((void **) &binMap, nBins*26*sizeof(int));		
+		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
+		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
+		cudaMalloc((void **) &bins.binMap, bins.nBins*26*sizeof(int));				
 	}	
 }
 
@@ -159,9 +159,9 @@ void class_capsules_ibm3D::deallocate()
 	cudaFree(cells);
 	cudaFree(cellIDs);
 	if (binsFlag) {
-		cudaFree(binMembers);
-		cudaFree(binOccupancy);
-		cudaFree(binMap);		
+		cudaFree(bins.binMembers);
+		cudaFree(bins.binOccupancy);
+		cudaFree(bins.binMap);	
 	}		
 }
 
@@ -1207,9 +1207,8 @@ void class_capsules_ibm3D::build_binMap(int nBlocks, int nThreads)
 {
 	if (nCells > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;	
-		cout << "nnbins = " << nnbins << endl;	
 		build_binMap_IBM3D
-		<<<nBlocks,nThreads>>> (binMap,numBins,nnbins,nBins);
+		<<<nBlocks,nThreads>>> (bins);
 	}	
 }
 
@@ -1224,7 +1223,7 @@ void class_capsules_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 	if (nCells > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 		reset_bin_lists_IBM3D
-		<<<nBlocks,nThreads>>> (binOccupancy,binMembers,binMax,nBins);
+		<<<nBlocks,nThreads>>> (bins);
 	}	
 }
 
@@ -1239,7 +1238,7 @@ void class_capsules_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 	if (nCells > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 		build_bin_lists_IBM3D
-		<<<nBlocks,nThreads>>> (r,binOccupancy,binMembers,numBins,sizeBins,nNodes,binMax);
+		<<<nBlocks,nThreads>>> (r,bins,nNodes);	
 	}	
 }
 
@@ -1254,8 +1253,7 @@ void class_capsules_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads
 	if (nCells > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 		nonbonded_node_interactions_IBM3D
-		<<<nBlocks,nThreads>>> (r,f,binOccupancy,binMembers,binMap,cellIDs,cells,numBins,sizeBins,
-		                        repA,repD,nNodes,binMax,nnbins,Box,pbcFlag);
+		<<<nBlocks,nThreads>>> (r,f,cellIDs,cells,bins,repA,repD,nNodes,Box,pbcFlag);
 	}	
 }
 

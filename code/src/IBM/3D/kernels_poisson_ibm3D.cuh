@@ -2,7 +2,7 @@
 # define KERNELS_POISSON_IBM3D_H
 
 # include "../../Utils/helper_math.h"
-# include "membrane_data.h"
+# include "data_structs/membrane_data.h"
 # include <cuda.h>
 # include <cufft.h>
 

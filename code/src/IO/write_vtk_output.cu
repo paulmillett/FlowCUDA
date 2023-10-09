@@ -1244,6 +1244,65 @@ void write_vtk_immersed_boundary_normals_3D(std::string tagname, int tagnum, int
 
 
 
+// -------------------------------------------------------------------------
+// Write IBM mesh to 'vtk' file:
+// -------------------------------------------------------------------------
+
+void write_vtk_immersed_boundary_3D_filaments(std::string tagname, int tagnum, int nBeads, int nEdges,
+                                              bead* beads, edgefilam* edges)
+{
+		
+	// -----------------------------------
+	//	Define the file location and name:
+	// -----------------------------------
+
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+
+	// -----------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------
+
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing IBM data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET POLYDATA" << endl;			
+	
+	// -----------------------------------
+	//	Write the bead positions:
+	// -----------------------------------
+
+	outfile << " " << endl;	
+	outfile << "POINTS " << nBeads << " float" << endl;
+	for (int i=0; i<nBeads; i++) {
+		outfile << fixed << setprecision(3) << beads[i].r.x << "  " << beads[i].r.y << "  " << beads[i].r.z << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the line information:
+	// -----------------------------------------------
+	
+	outfile << " " << endl;
+	outfile << "LINES " << nEdges << " " << 3*nEdges << endl;
+	for (int i=0; i<nEdges; i++) {
+		outfile << 2 << " " << edges[i].b0 << " " << edges[i].b1 << endl;
+	}
+		
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+		
+	outfile.close();
+		
+}
+
+
+
 // -----------------------------------------------------------------------------------------
 // Write output in a VTK Unstructured Grid format:
 // -----------------------------------------------------------------------------------------

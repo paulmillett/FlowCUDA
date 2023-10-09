@@ -5,28 +5,70 @@
 
 
 // --------------------------------------------------------
+// IBM3D kernel to build the binMap array:
+// --------------------------------------------------------
+
+__global__ void build_binMap_IBM3D(
+	bindata bins)
+{
+	// define bin:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < bins.nBins) {
+	
+		// -------------------------------
+		// calculate bin's x,y,z coordinates:
+		// -------------------------------
+				
+		int binx = i/(bins.numBins.y*bins.numBins.z);
+		int biny = (i/bins.numBins.z)%bins.numBins.y;
+		int binz = i%bins.numBins.z;
+				
+		// -------------------------------
+		// determine neighboring bins:
+		// -------------------------------
+		
+		int cnt = 0;
+		int offst = i*bins.nnbins;
+		
+		for (int bx = binx-1; bx < binx+2; bx++) {
+			for (int by = biny-1; by < biny+2; by++) {
+				for (int bz = binz-1; bz < binz+2; bz++) {
+					// do not include current bin
+					if (bx==binx && by==biny && bz==binz) continue;
+					// bin index of neighbor
+					bins.binMap[offst+cnt] = bin_index(bx,by,bz,bins.numBins);
+					// update counter
+					cnt++;
+				}
+			}
+		}		
+		
+	}	
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to reset bin arrays:
 // --------------------------------------------------------
 
 __global__ void reset_bin_lists_IBM3D(
-	int* binOccupancy,
-	int* binMembers,
-	int binMax,
-	int nBins)
+	bindata bins)
 {
 	// define bin:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nBins) {
+	if (i < bins.nBins) {
 		
 		// -------------------------------
 		// reset binOccupancy[] to zero,
 		// and binMembers[] array to -1:
 		// -------------------------------
 		
-		binOccupancy[i] = 0;
-		int offst = i*binMax;
-		for (int k=offst; k<offst+binMax; k++) {
-			binMembers[k] = -1;
+		bins.binOccupancy[i] = 0;
+		int offst = i*bins.binMax;
+		for (int k=offst; k<offst+bins.binMax; k++) {
+			bins.binMembers[k] = -1;
 		}
 		
 	}	
@@ -40,14 +82,10 @@ __global__ void reset_bin_lists_IBM3D(
 
 __global__ void build_bin_lists_IBM3D(
 	float3* vertR,
-	int* binOccupancy,
-	int* binMembers,	
-	int3 numBins,	
-	float sizeBins,
-	int nNodes,
-	int binMax)
+	bindata bins,
+	int nNodes)
 {
-	// define node:
+	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {		
 		
@@ -55,19 +93,19 @@ __global__ void build_bin_lists_IBM3D(
 		// calculate bin ID:
 		// -------------------------------
 		
-		int binID = int(floor(vertR[i].x/sizeBins))*numBins.z*numBins.y +  
-			        int(floor(vertR[i].y/sizeBins))*numBins.z +
-		            int(floor(vertR[i].z/sizeBins));		
-						
+		int binID = int(floor(vertR[i].x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(vertR[i].y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(vertR[i].z/bins.sizeBins));
+								
 		// -------------------------------
 		// update the lists:
 		// -------------------------------
 		
-		if (binID >= 0 && binID < numBins.x*numBins.y*numBins.z) {
-			atomicAdd(&binOccupancy[binID],1);
-			int offst = binID*binMax;
-			for (int k=offst; k<offst+binMax; k++) {
-				int flag = atomicCAS(&binMembers[k],-1,i); 
+		if (binID >= 0 && binID < bins.nBins) {
+			atomicAdd(&bins.binOccupancy[binID],1);
+			int offst = binID*bins.binMax;
+			for (int k=offst; k<offst+bins.binMax; k++) {
+				int flag = atomicCAS(&bins.binMembers[k],-1,i); 
 				if (flag == -1) break;  
 			}
 		}
@@ -85,22 +123,16 @@ __global__ void build_bin_lists_IBM3D(
 __global__ void nonbonded_node_interactions_IBM3D(
 	float3* vertR,
 	float3* vertF,
-	int* binOccupancy,
-	int* binMembers,
-	int* binMap,
 	int* cellIDs,
 	cell* cells,
-	int3 numBins,	
-	float sizeBins,
+	bindata bins,
 	float repA,
 	float repD,
 	int nNodes,
-	int binMax,
-	int nnbins,
 	float3 Box,	
 	int3 pbcFlag)
 {
-	// define node:
+	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {		
 		
@@ -108,45 +140,39 @@ __global__ void nonbonded_node_interactions_IBM3D(
 		// calculate bin ID:
 		// -------------------------------
 		
-		int binID = int(floor(vertR[i].x/sizeBins))*numBins.z*numBins.y +  
-			        int(floor(vertR[i].y/sizeBins))*numBins.z +
-		            int(floor(vertR[i].z/sizeBins));		
+		int binID = int(floor(vertR[i].x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(vertR[i].y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(vertR[i].z/bins.sizeBins));	
 		
 		// -------------------------------
 		// loop over nodes in the same bin:
 		// -------------------------------
 				
-		int offst = binID*binMax;
-		int occup = binOccupancy[binID];
-		if (occup > binMax) occup = binMax;
-		
-		/*
-		if (occup > binMax) {
-			printf("Warning: linked-list bin has exceeded max capacity.  Occup. # = %i \n",occup);
-		}
-		*/
-						
+		int offst = binID*bins.binMax;
+		int occup = bins.binOccupancy[binID];
+		if (occup > bins.binMax) occup = bins.binMax;
+								
 		for (int k=offst; k<offst+occup; k++) {
-			int j = binMembers[k];
+			int j = bins.binMembers[k];
 			if (i==j) continue;
 			if (cellIDs[i]==cellIDs[j]) continue;
-			pairwise_interaction_forces(i,j,cellIDs[i],repA,repD,vertR,vertF,cells,Box,pbcFlag);			
+			pairwise_interaction_forces(i,j,cellIDs[i],repA,repD,vertR,vertF,cells,Box,pbcFlag);
 		}
 		
 		// -------------------------------
 		// loop over neighboring bins:
 		// -------------------------------
 		
-        for (int b=0; b<nnbins; b++) {
+        for (int b=0; b<bins.nnbins; b++) {
             // get neighboring bin ID
-			int naborbinID = binMap[binID*nnbins + b];
-			offst = naborbinID*binMax;
-			occup = binOccupancy[naborbinID];
-			if (occup > binMax) occup = binMax;
+			int naborbinID = bins.binMap[binID*bins.nnbins + b];
+			offst = naborbinID*bins.binMax;
+			occup = bins.binOccupancy[naborbinID];
+			if (occup > bins.binMax) occup = bins.binMax;
 			// loop over nodes in this bin:
 			for (int k=offst; k<offst+occup; k++) {
-				int j = binMembers[k];
-				if (cellIDs[i]==cellIDs[j]) continue;				
+				int j = bins.binMembers[k];
+				if (cellIDs[i]==cellIDs[j]) continue;			
 				pairwise_interaction_forces(i,j,cellIDs[i],repA,repD,vertR,vertF,cells,Box,pbcFlag);			
 			}
 		}
@@ -312,53 +338,6 @@ __global__ void wall_forces_ydir_zdir_IBM3D(
 }
 
 
-
-// --------------------------------------------------------
-// IBM3D kernel to build the binMap array:
-// --------------------------------------------------------
-
-__global__ void build_binMap_IBM3D(
-	int* binMap,
-	int3 numBins,
-	int nnbins,
-	int nBins)
-{
-	// define bin:
-	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nBins) {
-	
-		// -------------------------------
-		// calculate bin's x,y,z coordinates:
-		// -------------------------------
-				
-		int binx = i/(numBins.y*numBins.z);
-		int biny = (i/numBins.z)%numBins.y;
-		int binz = i%numBins.z;
-		
-		// -------------------------------
-		// determine neighboring bins:
-		// -------------------------------
-		
-		int cnt = 0;
-		int offst = i*nnbins;
-		
-		for (int bx = binx-1; bx < binx+2; bx++) {
-			for (int by = biny-1; by < biny+2; by++) {
-				for (int bz = binz-1; bz < binz+2; bz++) {
-					// do not include current bin
-					if (bx==binx && by==biny && bz==binz) continue;
-					// bin index of neighbor
-					binMap[offst+cnt] = bin_index(bx,by,bz,numBins);
-					// update counter
-					cnt++;
-				}
-			}
-		}		
-		
-	}	
-}
-	
-	
 
 // --------------------------------------------------------
 // IBM3D kernel to calculate i-j force:

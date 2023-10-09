@@ -11,7 +11,7 @@
 # include "../../IO/read_lattice_geometry.cuh"
 # include "../../IBM/3D/kernels_ibm3D.cuh"
 # include "../../IBM/3D/kernels_filaments_ibm3D.cuh"
-# include "../../IBM/3D/filament_data.h"
+# include "../../IBM/3D/data_structs/filament_data.h"
 # include "kernels_scsp_D3Q19.cuh"
 # include <cuda.h>
 # include <string>

@@ -80,14 +80,14 @@ class_capsules_binary_ibm3D::class_capsules_binary_ibm3D()
 	// if we need bins, do some calculations:
 	binsFlag = false;
 	if (nCells > 1) binsFlag = true;
-	if (binsFlag) {
-		sizeBins = inputParams("IBM/sizeBins",2.0);
-		binMax = inputParams("IBM/binMax",1);			
-		numBins.x = int(floor(N.x/sizeBins));
-	    numBins.y = int(floor(N.y/sizeBins));
-	    numBins.z = int(floor(N.z/sizeBins));
-		nBins = numBins.x*numBins.y*numBins.z;
-		nnbins = 26;
+	if (binsFlag) {		
+		bins.sizeBins = inputParams("IBM/sizeBins",2.0);
+		bins.binMax = inputParams("IBM/binMax",1);			
+		bins.numBins.x = int(floor(N.x/bins.sizeBins));
+	    bins.numBins.y = int(floor(N.y/bins.sizeBins));
+	    bins.numBins.z = int(floor(N.z/bins.sizeBins));
+		bins.nBins = bins.numBins.x*bins.numBins.y*bins.numBins.z;
+		bins.nnbins = 26;			
 	}	
 }
 

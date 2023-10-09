@@ -10,7 +10,7 @@
 # include "kernels_ibm3D.cuh"
 # include "kernels_capsules_ibm3D.cuh"
 # include "kernels_nonbonded_ibm3D.cuh"
-# include "membrane_data.h"
+# include "data_structs/membrane_data.h"
 # include <cuda.h>
 # include <string>
 

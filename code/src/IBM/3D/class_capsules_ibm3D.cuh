@@ -9,7 +9,8 @@
 # include "kernels_ibm3D.cuh"
 # include "kernels_capsules_ibm3D.cuh"
 # include "kernels_nonbonded_ibm3D.cuh"
-# include "membrane_data.h"
+# include "data_structs/membrane_data.h"
+# include "data_structs/neighbor_bins_data.h"
 # include <cuda.h>
 # include <string>
 
@@ -18,20 +19,15 @@ class class_capsules_ibm3D {
 	
 	public:  // treat like a struct
 	
-	// data:
+	// scalars:
 	int nNodes;
 	int nFaces; 
 	int nEdges;
 	int nCells;
 	int nNodesPerCell;
 	int nFacesPerCell; 
-	int nEdgesPerCell;
-	int binMax;
-	int nnbins;
-	int nBins;
+	int nEdgesPerCell;	
 	int3 N;
-	int3 numBins;
-	float sizeBins;
 	float ks,kb,ka,kag,kv;
 	float C;
 	float dt;
@@ -44,6 +40,7 @@ class class_capsules_ibm3D {
 	int3 pbcFlag;
 	bool binsFlag;
 	std::string ibmUpdate;
+	bindata bins;
 			
 	// host arrays:
 	float3* rH;
@@ -59,10 +56,7 @@ class class_capsules_ibm3D {
 	float3* f;
 	triangle* faces;
 	edge* edges;
-	cell* cells;
-	int* binMembers;
-	int* binOccupancy;
-	int* binMap;
+	cell* cells;	
 	int* cellIDs;
 	
 	// methods:
