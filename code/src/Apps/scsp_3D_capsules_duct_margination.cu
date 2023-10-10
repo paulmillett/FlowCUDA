@@ -251,9 +251,9 @@ void scsp_3D_capsules_duct_margination::initSystem()
 	
 	poissonRBC.initialize(Nx,Ny,Nz);
 	poissonPLT.initialize(Nx,Ny,Nz);
-	poissonRBC.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
+	poissonRBC.solve_poisson(ibm.faces,ibm.nodes,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
 	poissonRBC.write_output("indicatorRBC",0,iskip,jskip,kskip,precision);
-	poissonPLT.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,2,nBlocks,nThreads);
+	poissonPLT.solve_poisson(ibm.faces,ibm.nodes,ibm.cells,ibm.nFaces,2,nBlocks,nThreads);
 	poissonPLT.write_output("indicatorPLT",0,iskip,jskip,kskip,precision);
 			
 	// ----------------------------------------------
@@ -300,7 +300,7 @@ void scsp_3D_capsules_duct_margination::cycleForward(int stepsPerCycle, int curr
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			if (i%5 == 0) poissonRBC.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
+			if (i%5 == 0) poissonRBC.solve_poisson(ibm.faces,ibm.nodes,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
 			ibm.stepIBM(lbm,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing_varvisc(poissonRBC.indicator,nu_in,nu_out,nBlocks,nThreads);
@@ -318,7 +318,7 @@ void scsp_3D_capsules_duct_margination::cycleForward(int stepsPerCycle, int curr
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		if (cummulativeSteps%5 == 0) poissonRBC.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
+		if (cummulativeSteps%5 == 0) poissonRBC.solve_poisson(ibm.faces,ibm.nodes,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
 		ibm.stepIBM(lbm,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing_varvisc(poissonRBC.indicator,nu_in,nu_out,nBlocks,nThreads);
@@ -365,7 +365,7 @@ void scsp_3D_capsules_duct_margination::writeOutput(std::string tagname, int ste
 		ibm.output_capsule_data();
 		// need to perform PLT poisson solver because it is not performed during
 		// regular time steps
-		poissonPLT.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,2,nBlocks,nThreads);
+		poissonPLT.solve_poisson(ibm.faces,ibm.nodes,ibm.cells,ibm.nFaces,2,nBlocks,nThreads);
 		poissonRBC.volume_fraction_analysis("vol_frac_RBC",0.4);
 		poissonPLT.volume_fraction_analysis("vol_frac_PLT",0.4);
 	

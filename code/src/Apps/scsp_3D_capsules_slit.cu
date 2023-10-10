@@ -354,10 +354,10 @@ void scsp_3D_capsules_slit::stepIBM()
 	ibm.compute_node_forces_skalak(nBlocks,nThreads);
 	ibm.nonbonded_node_interactions(nBlocks,nThreads);
 	ibm.wall_forces_zdir(nBlocks,nThreads);
-	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
+	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
 			
 	// update fluid:
-	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
+	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
 	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 	lbm.stream_collide_save_forcing(nBlocks,nThreads);
 	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
@@ -395,7 +395,7 @@ void scsp_3D_capsules_slit::stepVerlet()
 	ibm.wall_forces_zdir(nBlocks,nThreads);
 			
 	// update fluid:
-	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.r,ibm.v,ibm.f,nNodes);
+	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.nodes,nNodes);
 	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 	lbm.stream_collide_save_forcing(nBlocks,nThreads);
 	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);

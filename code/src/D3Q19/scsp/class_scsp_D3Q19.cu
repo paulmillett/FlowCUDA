@@ -785,11 +785,11 @@ void class_scsp_D3Q19::set_boundary_duct_density(int nBlocks, int nThreads)
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::extrapolate_velocity_from_IBM(int nBlocks, int nThreads,
-	                                                 float3* rIB, float3* vIB, int nNodes)
+	                                                 node* nodes, int nNodes)
 {
 	if (!velIBFlag) cout << "Warning: IB velocity arrays have not been initialized" << endl;
 	extrapolate_velocity_IBM3D
-	<<<nBlocks,nThreads>>> (rIB,vIB,uIBvox,vIBvox,wIBvox,weights,Nx,Ny,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,uIBvox,vIBvox,wIBvox,weights,Nx,Ny,nNodes);
 }
 
 
@@ -801,10 +801,10 @@ void class_scsp_D3Q19::extrapolate_velocity_from_IBM(int nBlocks, int nThreads,
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::interpolate_velocity_to_IBM(int nBlocks, int nThreads,
-	                                               float3* rIB, float3* vIB, int nNodes)
+	                                               node* nodes, int nNodes)
 {
 	interpolate_velocity_IBM3D
-	<<<nBlocks,nThreads>>> (rIB,vIB,u,v,w,Nx,Ny,Nz,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,u,v,w,Nx,Ny,Nz,nNodes);
 }
 
 
@@ -816,11 +816,11 @@ void class_scsp_D3Q19::interpolate_velocity_to_IBM(int nBlocks, int nThreads,
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::extrapolate_forces_from_IBM(int nBlocks, int nThreads,
-	                                               float3* rIB, float3* fIB, int nNodes)
+	                                               node* nodes, int nNodes)
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	extrapolate_force_IBM3D
-	<<<nBlocks,nThreads>>> (rIB,fIB,Fx,Fy,Fz,Nx,Ny,Nz,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,Fx,Fy,Fz,Nx,Ny,Nz,nNodes);
 }
 
 
@@ -832,11 +832,11 @@ void class_scsp_D3Q19::extrapolate_forces_from_IBM(int nBlocks, int nThreads,
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::viscous_force_IBM_LBM(int nBlocks, int nThreads, float gam,
-	                                         float3* rIB, float3* vIB, float3* fIB, int nNodes)
+	                                         node* nodes, int nNodes)
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	viscous_force_velocity_difference_IBM3D
-	<<<nBlocks,nThreads>>> (rIB,vIB,fIB,Fx,Fy,Fz,u,v,w,gam,Nx,Ny,Nz,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,Fx,Fy,Fz,u,v,w,gam,Nx,Ny,Nz,nNodes);	
 }
 
 

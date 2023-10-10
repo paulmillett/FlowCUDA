@@ -83,7 +83,7 @@ void class_poisson_ibm3D::initialize(int Nxin, int Nyin, int Nzin)
 // Solve poisson equation:
 // --------------------------------------------------------
 
-void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, cell* cells, int nFaces, int cellType, int nBlocks, int nThreads)
+void class_poisson_ibm3D::solve_poisson(triangle* faces, node* nodes, cell* cells, int nFaces, int cellType, int nBlocks, int nThreads)
 {
 	// zero the 'G' vector array:
 	zero_G_poisson_IBM3D
@@ -91,7 +91,7 @@ void class_poisson_ibm3D::solve_poisson(triangle* faces, float3* r, cell* cells,
 		
 	// extrapolate IBM interface normal vectors to fluid grid:
 	extrapolate_interface_normal_poisson_IBM3D
-	<<<nBlocks,nThreads>>> (r,G,Nx,Ny,Nz,nFaces,cellType,cells,faces);	
+	<<<nBlocks,nThreads>>> (nodes,G,Nx,Ny,Nz,nFaces,cellType,cells,faces);	
 		
 	// calculate RHS of poisson equation (div.G):
 	calculate_rhs_poisson_IBM3D

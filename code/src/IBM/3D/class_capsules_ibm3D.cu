@@ -106,12 +106,10 @@ class_capsules_ibm3D::~class_capsules_ibm3D()
 void class_capsules_ibm3D::allocate()
 {
 	// allocate array memory (host):
-	rH = (float3*)malloc(nNodes*sizeof(float3));
-	vH = (float3*)malloc(nNodes*sizeof(float3));
+	nodesH = (node*)malloc(nNodes*sizeof(node));
 	facesH = (triangle*)malloc(nFaces*sizeof(triangle));
 	edgesH = (edge*)malloc(nEdges*sizeof(edge));
 	cellsH = (cell*)malloc(nCells*sizeof(cell));
-	cellIDsH = (int*)malloc(nNodes*sizeof(int));
 		
 	// assign membrane properties to all cells:
 	GetPot inputParams("input.dat");
@@ -120,13 +118,10 @@ void class_capsules_ibm3D::allocate()
 	set_cells_types(0);
 					
 	// allocate array memory (device):
-	cudaMalloc((void **) &r, nNodes*sizeof(float3));	
-	cudaMalloc((void **) &v, nNodes*sizeof(float3));	
-	cudaMalloc((void **) &f, nNodes*sizeof(float3));
+	cudaMalloc((void **) &nodes, nNodes*sizeof(node));
 	cudaMalloc((void **) &faces, nFaces*sizeof(triangle));
 	cudaMalloc((void **) &edges, nEdges*sizeof(edge));
 	cudaMalloc((void **) &cells, nCells*sizeof(cell));
-	cudaMalloc((void **) &cellIDs, nNodes*sizeof(int));
 	if (binsFlag) {
 		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
 		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
@@ -143,21 +138,16 @@ void class_capsules_ibm3D::allocate()
 void class_capsules_ibm3D::deallocate()
 {
 	// free array memory (host):
-	free(rH);
-	free(vH);
+	free(nodesH);
 	free(facesH);
 	free(edgesH);
 	free(cellsH);
-	free(cellIDsH);
 					
 	// free array memory (device):
-	cudaFree(r);	
-	cudaFree(v);	
-	cudaFree(f);
+	cudaFree(nodes);	
 	cudaFree(faces);
 	cudaFree(edges);
 	cudaFree(cells);
-	cudaFree(cellIDs);
 	if (binsFlag) {
 		cudaFree(bins.binMembers);
 		cudaFree(bins.binOccupancy);
@@ -173,11 +163,10 @@ void class_capsules_ibm3D::deallocate()
 
 void class_capsules_ibm3D::memcopy_host_to_device()
 {
-	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);	
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);	
 	cudaMemcpy(faces, facesH, sizeof(triangle)*nFaces, cudaMemcpyHostToDevice);	
 	cudaMemcpy(edges, edgesH, sizeof(edge)*nEdges, cudaMemcpyHostToDevice);
 	cudaMemcpy(cells, cellsH, sizeof(cell)*nCells, cudaMemcpyHostToDevice);
-	cudaMemcpy(cellIDs, cellIDsH, sizeof(int)*nNodes, cudaMemcpyHostToDevice);
 }
 	
 
@@ -188,8 +177,7 @@ void class_capsules_ibm3D::memcopy_host_to_device()
 
 void class_capsules_ibm3D::memcopy_device_to_host()
 {
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(vH, v, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);
 	cudaMemcpy(facesH, faces, sizeof(triangle)*nFaces, cudaMemcpyDeviceToHost);
 	//cudaMemcpy(edgesH, edges, sizeof(edge)*nEdges, cudaMemcpyDeviceToHost);
 	
@@ -229,7 +217,7 @@ void class_capsules_ibm3D::memcopy_device_to_host()
 void class_capsules_ibm3D::read_ibm_information(std::string tagname)
 {
 	// read data from file:
-	read_ibm_information_long(tagname,nNodesPerCell,nFacesPerCell,nEdgesPerCell,rH,facesH,edgesH);
+	read_ibm_information_long(tagname,nNodesPerCell,nFacesPerCell,nEdgesPerCell,nodesH,facesH,edgesH);
 	
 	// set up indices for each cell:
 	for (int c=0; c<nCells; c++) {
@@ -313,7 +301,7 @@ void class_capsules_ibm3D::resize_cell_radius(int cID, float scale)
 {
 	int istr = cellsH[cID].indxN0;
 	int iend = istr + cellsH[cID].nNodes;
-	for (int i=istr; i<iend; i++) rH[i] *= scale;
+	for (int i=istr; i<iend; i++) nodesH[i].r *= scale;
 }
 
 void class_capsules_ibm3D::set_cells_radii(float rad)
@@ -375,7 +363,7 @@ void class_capsules_ibm3D::assign_cellIDs_to_nodes()
 	for (int c=0; c<nCells; c++) {
 		int istr = cellsH[c].indxN0;
 		int iend = istr + cellsH[c].nNodes;
-		for (int i=istr; i<iend; i++) cellIDsH[i] = c;
+		for (int i=istr; i<iend; i++) nodesH[i].cellID = c;
 	}
 }
 
@@ -401,7 +389,7 @@ void class_capsules_ibm3D::duplicate_cells()
 			// copy node positions:
 			for (int i=0; i<cellsH[0].nNodes; i++) {
 				int ii = i + cellsH[c].indxN0;
-				rH[ii] = rH[i];
+				nodesH[ii].r = nodesH[i].r;
 			}
 			// copy edge info:
 			for (int i=0; i<cellsH[0].nEdges; i++) {
@@ -567,7 +555,7 @@ void class_capsules_ibm3D::rescale_cell_radii(float a, float stddevA, std::strin
 void class_capsules_ibm3D::single_file_cells(int Nx, int Ny, int Nz, float cellSpacingX, float offsetY)
 {
 	// copy node positions from device to host:
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);
 	
 	// determine cell spacing:
 	float evenSpacingX = float(Nx)/nCells;
@@ -587,7 +575,7 @@ void class_capsules_ibm3D::single_file_cells(int Nx, int Ny, int Nz, float cellS
 	}
 	
 	// last, copy node positions from host to device:
-	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);
 }
 
 
@@ -599,7 +587,7 @@ void class_capsules_ibm3D::single_file_cells(int Nx, int Ny, int Nz, float cellS
 void class_capsules_ibm3D::randomize_cells(float sepWall)
 {
 	// copy node positions from device to host:
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);
 	
 	// assign random position and orientation to each cell:
 	for (int c=0; c<nCells; c++) {
@@ -612,7 +600,7 @@ void class_capsules_ibm3D::randomize_cells(float sepWall)
 	}
 	
 	// copy node positions from host to device:
-	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);
 }
 
 
@@ -625,7 +613,7 @@ void class_capsules_ibm3D::randomize_cells(float sepWall)
 void class_capsules_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float sepMin, float sepWall)
 {
 	// copy node positions from device to host:
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);	
 	
 	// shrink cells by specified amount:
 	for (int c=0; c<nCells; c++) {
@@ -662,7 +650,7 @@ void class_capsules_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 	}
 	
 	// last, copy node positions from host to device:
-	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);
 }
 
 
@@ -675,7 +663,7 @@ void class_capsules_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 void class_capsules_ibm3D::randomize_cells_above_plane(float shrinkFactor, float sepMin, float sepWall, float zmin)
 {
 	// copy node positions from device to host:
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);	
 		
 	// randomly shift cells, without overlapping previous cells:
 	float zdepth = Box.z - zmin;
@@ -708,7 +696,7 @@ void class_capsules_ibm3D::randomize_cells_above_plane(float shrinkFactor, float
 	}
 	
 	// last, copy node positions from host to device:
-	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);
 }
 
 
@@ -735,9 +723,9 @@ void class_capsules_ibm3D::shift_node_positions(int cID, float xsh, float ysh, f
 	int istr = cellsH[cID].indxN0;
 	int iend = istr + cellsH[cID].nNodes;
 	for (int i=istr; i<iend; i++) {
-		rH[i].x += xsh;
-		rH[i].y += ysh;
-		rH[i].z += zsh;
+		nodesH[i].r.x += xsh;
+		nodesH[i].r.y += ysh;
+		nodesH[i].r.z += zsh;
 	}
 }
 
@@ -759,13 +747,13 @@ void class_capsules_ibm3D::rotate_and_shift_node_positions(int cID, float xsh, f
 	int iend = istr + cellsH[cID].nNodes;
 	for (int i=istr; i<iend; i++) {
 		// rotate:
-		float xrot = rH[i].x*(cos(a)*cos(b)) + rH[i].y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + rH[i].z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
-		float yrot = rH[i].x*(sin(a)*cos(b)) + rH[i].y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + rH[i].z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
-		float zrot = rH[i].x*(-sin(b))       + rH[i].y*(cos(b)*sin(g))                      + rH[i].z*(cos(b)*cos(g));
+		float xrot = nodesH[i].r.x*(cos(a)*cos(b)) + nodesH[i].r.y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + nodesH[i].r.z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
+		float yrot = nodesH[i].r.x*(sin(a)*cos(b)) + nodesH[i].r.y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + nodesH[i].r.z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
+		float zrot = nodesH[i].r.x*(-sin(b))       + nodesH[i].r.y*(cos(b)*sin(g))                      + nodesH[i].r.z*(cos(b)*cos(g));
 		// shift:		 
-		rH[i].x = xrot + xsh;
-		rH[i].y = yrot + ysh;
-		rH[i].z = zrot + zsh;			
+		nodesH[i].r.x = xrot + xsh;
+		nodesH[i].r.y = yrot + ysh;
+		nodesH[i].r.z = zrot + zsh;			
 	}
 }
 
@@ -778,9 +766,9 @@ void class_capsules_ibm3D::rotate_and_shift_node_positions(int cID, float xsh, f
 void class_capsules_ibm3D::write_output(std::string tagname, int tagnum)
 {
 	//write_vtk_immersed_boundary_3D(tagname,tagnum,
-	//nNodes,nFaces,rH,facesH);
+	//nNodes,nFaces,nodesH,facesH);
 	write_vtk_immersed_boundary_3D_cellID(tagname,tagnum,
-	nNodes,nFaces,rH,facesH,cellsH);
+	nNodes,nFaces,nodesH,facesH,cellsH);
 }
 
 
@@ -793,7 +781,7 @@ void class_capsules_ibm3D::write_output(std::string tagname, int tagnum)
 void class_capsules_ibm3D::write_output_long(std::string tagname, int tagnum)
 {
 	write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
-	nNodes,nFaces,nEdges,rH,facesH,edgesH);
+	nNodes,nFaces,nEdges,nodesH,facesH,edgesH);
 }
 
 
@@ -810,15 +798,15 @@ void class_capsules_ibm3D::rest_geometries(int nBlocks, int nThreads)
 	
 	// rest edge lengths:
 	rest_edge_lengths_IBM3D
-	<<<nBlocks,nThreads>>> (r,edges,nEdges);
+	<<<nBlocks,nThreads>>> (nodes,edges,nEdges);
 	
 	// rest edge angles:
 	rest_edge_angles_IBM3D
-	<<<nBlocks,nThreads>>> (r,edges,faces,nEdges);
+	<<<nBlocks,nThreads>>> (nodes,edges,faces,nEdges);
 	
 	// rest triangle area:
 	rest_triangle_areas_IBM3D
-	<<<nBlocks,nThreads>>> (r,faces,cells,nFaces);
+	<<<nBlocks,nThreads>>> (nodes,faces,cells,nFaces);
 }
 
 
@@ -835,15 +823,15 @@ void class_capsules_ibm3D::rest_geometries_skalak(int nBlocks, int nThreads)
 	
 	// rest triangle properties:
 	rest_triangle_skalak_IBM3D
-	<<<nBlocks,nThreads>>> (r,faces,cells,nFaces);
+	<<<nBlocks,nThreads>>> (nodes,faces,cells,nFaces);
 		
 	// rest edge angles for bending:
 	rest_edge_angles_IBM3D
-	<<<nBlocks,nThreads>>> (r,edges,faces,nEdges);
+	<<<nBlocks,nThreads>>> (nodes,edges,faces,nEdges);
 	
 	// rest edge lengths (just for equilibration):
 	rest_edge_lengths_IBM3D
-	<<<nBlocks,nThreads>>> (r,edges,nEdges);
+	<<<nBlocks,nThreads>>> (nodes,edges,nEdges);
 }
 
 
@@ -876,7 +864,7 @@ void class_capsules_ibm3D::relax_node_positions(int nIts, float scale, float M, 
 	// make sure node coordinates are wrapped for 
 	// PBC's prior to building bin-lists the first time:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
 	
 	// iterate to relax node positions while scaling equilibirum
 	// cell size:
@@ -910,7 +898,7 @@ void class_capsules_ibm3D::relax_node_positions_skalak(int nIts, float scale, fl
 	// make sure node coordinates are wrapped for 
 	// PBC's prior to building bin-lists the first time:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
 	
 	// iterate to relax node positions while scaling equilibirum
 	// cell size:
@@ -956,8 +944,8 @@ void class_capsules_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThre
 		nonbonded_node_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
-		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,r,v,nNodes);
-		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,r,f,nNodes);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
 		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
 		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
 		
@@ -987,7 +975,7 @@ void class_capsules_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThre
 		nonbonded_node_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
-		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,r,v,f,nNodes);
+		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,nodes,nNodes);
 		update_node_positions_verlet_2(nBlocks,nThreads);
 		
 	}
@@ -1060,10 +1048,10 @@ void class_capsules_ibm3D::stepIBM_no_fluid(int nSteps, bool zeroFlag, int nBloc
 void class_capsules_ibm3D::update_node_positions_vacuum(float M, int nBlocks, int nThreads)
 {
 	update_node_position_vacuum_IBM3D
-	<<<nBlocks,nThreads>>> (r,f,M,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,M,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
 }
 
 
@@ -1075,10 +1063,10 @@ void class_capsules_ibm3D::update_node_positions_vacuum(float M, int nBlocks, in
 void class_capsules_ibm3D::update_node_positions(int nBlocks, int nThreads)
 {
 	update_node_position_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
 }
 
 
@@ -1090,10 +1078,10 @@ void class_capsules_ibm3D::update_node_positions(int nBlocks, int nThreads)
 void class_capsules_ibm3D::update_node_positions_dt(int nBlocks, int nThreads)
 {
 	update_node_position_dt_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,dt,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,dt,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
 }
 
 
@@ -1105,10 +1093,10 @@ void class_capsules_ibm3D::update_node_positions_dt(int nBlocks, int nThreads)
 void class_capsules_ibm3D::update_node_positions_verlet_1(int nBlocks, int nThreads)
 {
 	update_node_position_verlet_1_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,f,dt,1.0,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,dt,1.0,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
 }
 
 
@@ -1120,7 +1108,7 @@ void class_capsules_ibm3D::update_node_positions_verlet_1(int nBlocks, int nThre
 void class_capsules_ibm3D::update_node_positions_verlet_2(int nBlocks, int nThreads)
 {
 	update_node_position_verlet_2_IBM3D
-	<<<nBlocks,nThreads>>> (v,f,dt,1.0,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,dt,1.0,nNodes);
 }
 
 
@@ -1132,7 +1120,7 @@ void class_capsules_ibm3D::update_node_positions_verlet_2(int nBlocks, int nThre
 void class_capsules_ibm3D::zero_velocities_forces(int nBlocks, int nThreads)
 {
 	zero_velocities_forces_IBM3D
-	<<<nBlocks,nThreads>>> (v,f,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
 }
 
 
@@ -1144,7 +1132,7 @@ void class_capsules_ibm3D::zero_velocities_forces(int nBlocks, int nThreads)
 void class_capsules_ibm3D::enforce_max_node_force(int nBlocks, int nThreads)
 {
 	enforce_max_node_force_IBM3D
-	<<<nBlocks,nThreads>>> (f,nodeFmax,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,nodeFmax,nNodes);
 }
 
 
@@ -1156,7 +1144,7 @@ void class_capsules_ibm3D::enforce_max_node_force(int nBlocks, int nThreads)
 void class_capsules_ibm3D::add_drag_force_to_nodes(float dragcoeff, int nBlocks, int nThreads)
 {
 	add_drag_force_to_node_IBM3D
-	<<<nBlocks,nThreads>>> (v,f,dragcoeff,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,dragcoeff,nNodes);
 }
 
 
@@ -1168,7 +1156,7 @@ void class_capsules_ibm3D::add_drag_force_to_nodes(float dragcoeff, int nBlocks,
 void class_capsules_ibm3D::add_xdir_force_to_nodes(int nBlocks, int nThreads, float fx)
 {
 	add_xdir_force_IBM3D
-	<<<nBlocks,nThreads>>> (f,fx,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,fx,nNodes);
 }
 
 
@@ -1181,7 +1169,7 @@ void class_capsules_ibm3D::interpolate_velocity(float* uLBM, float* vLBM,
 	float* wLBM, int nBlocks, int nThreads)
 {
 	interpolate_velocity_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,uLBM,vLBM,wLBM,N.x,N.y,N.z,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,uLBM,vLBM,wLBM,N.x,N.y,N.z,nNodes);	
 }
 
 
@@ -1194,7 +1182,7 @@ void class_capsules_ibm3D::extrapolate_force(float* fxLBM, float* fyLBM,
 	float* fzLBM, int nBlocks, int nThreads)
 {
 	extrapolate_force_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,fxLBM,fyLBM,fzLBM,N.x,N.y,N.z,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,fxLBM,fyLBM,fzLBM,N.x,N.y,N.z,nNodes);	
 }
 
 
@@ -1238,7 +1226,7 @@ void class_capsules_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 	if (nCells > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 		build_bin_lists_IBM3D
-		<<<nBlocks,nThreads>>> (r,bins,nNodes);	
+		<<<nBlocks,nThreads>>> (nodes,bins,nNodes);	
 	}	
 }
 
@@ -1253,7 +1241,7 @@ void class_capsules_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads
 	if (nCells > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
 		nonbonded_node_interactions_IBM3D
-		<<<nBlocks,nThreads>>> (r,f,cellIDs,cells,bins,repA,repD,nNodes,Box,pbcFlag);
+		<<<nBlocks,nThreads>>> (nodes,cells,bins,repA,repD,nNodes,Box,pbcFlag);
 	}	
 }
 
@@ -1268,37 +1256,37 @@ void class_capsules_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 {
 	// First, zero the node forces and the cell volumes:
 	zero_node_forces_IBM3D
-	<<<nBlocks,nThreads>>> (f,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
 			
 	zero_cell_volumes_IBM3D
 	<<<nBlocks,nThreads>>> (cells,nCells);
 	
 	// Second, unwrap node coordinates:
 	unwrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,cells,Box,pbcFlag,nNodes);	
 					
 	// Third, compute the area dilation force for each face:
 	compute_node_force_membrane_area_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,cells,ka,nFaces);	
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,ka,nFaces);	
 		
 	// Forth, compute the edge extension and bending force for each edge:
 	compute_node_force_membrane_edge_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,edges,ks,nEdges);
+	<<<nBlocks,nThreads>>> (faces,nodes,edges,ks,nEdges);
 	
 	compute_node_force_membrane_bending_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,edges,cells,nEdges);
+	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);
 		
 	// Fifth, compute the volume conservation force for each face:
 	compute_node_force_membrane_volume_IBM3D
-	<<<nBlocks,nThreads>>> (faces,f,cells,nFaces);
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
 	
 	// Sixth, compute the global area conservation force for each face:
 	compute_node_force_membrane_globalarea_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,cells,kag,nFaces);
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,kag,nFaces);
 		
 	// Seventh, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);
 			
 }
 
@@ -1313,30 +1301,30 @@ void class_capsules_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 {
 	// First, zero the node forces and the cell volumes:
 	zero_node_forces_IBM3D
-	<<<nBlocks,nThreads>>> (f,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
 			
 	zero_cell_volumes_IBM3D
 	<<<nBlocks,nThreads>>> (cells,nCells);
 	
 	// Second, unwrap node coordinates:
 	unwrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,cells,cellIDs,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,cells,Box,pbcFlag,nNodes);	
 					
 	// Third, compute the Skalak forces for each face:
 	compute_node_force_membrane_skalak_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,cells,nFaces);
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
 	
 	// Fourth, compute the bending force for each edge:		
 	compute_node_force_membrane_bending_IBM3D
-	<<<nBlocks,nThreads>>> (faces,r,f,edges,cells,nEdges);
+	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);
 		
 	// Fifth, compute the volume conservation force for each face:
 	compute_node_force_membrane_volume_IBM3D
-	<<<nBlocks,nThreads>>> (faces,f,cells,nFaces);
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
 					
 	// Sixth, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);
 			
 }
 
@@ -1349,7 +1337,7 @@ void class_capsules_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 void class_capsules_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)
 {
 	wall_forces_ydir_IBM3D
-	<<<nBlocks,nThreads>>> (r,f,Box,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,Box,repA,repD,nNodes);
 }
 
 
@@ -1361,7 +1349,7 @@ void class_capsules_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)
 void class_capsules_ibm3D::wall_forces_zdir(int nBlocks, int nThreads)
 {
 	wall_forces_zdir_IBM3D
-	<<<nBlocks,nThreads>>> (r,f,Box,repA,repD,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,Box,repA,repD,nNodes);
 }
 
 
@@ -1374,7 +1362,7 @@ void class_capsules_ibm3D::wall_forces_zdir(int nBlocks, int nThreads)
 void class_capsules_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 {
 	wall_forces_ydir_zdir_IBM3D
-	<<<nBlocks,nThreads>>> (r,f,Box,repA,repD,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,Box,repA,repD,nNodes);
 }
 
 
@@ -1452,10 +1440,10 @@ void class_capsules_ibm3D::scale_edge_lengths(float scale, int nBlocks, int nThr
 void class_capsules_ibm3D::unwrap_node_coordinates()
 {
 	for (int i=0; i<nNodes; i++) {
-		int c = cellIDsH[i];
+		int c = nodesH[i].cellID;
 		int j = cellsH[c].refNode;
-		float3 rij = rH[j] - rH[i];
-		rH[i] = rH[i] + roundf(rij/Box)*Box*pbcFlag; // PBC's		
+		float3 rij = nodesH[j].r - nodesH[i].r;
+		nodesH[i].r = nodesH[i].r + roundf(rij/Box)*Box*pbcFlag; // PBC's		
 	}	
 }
 
@@ -1543,15 +1531,15 @@ void class_capsules_ibm3D::capsule_geometry_analysis(int step)
 			int v0 = facesH[f].v0;
 			int v1 = facesH[f].v1;
 			int v2 = facesH[f].v2;			
-			float x0 = rH[v0].x;
-			float y0 = rH[v0].y;
-			float z0 = rH[v0].z;
-			float x1 = rH[v1].x;
-			float y1 = rH[v1].y;
-			float z1 = rH[v1].z;
-			float x2 = rH[v2].x;
-			float y2 = rH[v2].y;
-			float z2 = rH[v2].z;
+			float x0 = nodesH[v0].r.x;
+			float y0 = nodesH[v0].r.y;
+			float z0 = nodesH[v0].r.z;
+			float x1 = nodesH[v1].r.x;
+			float y1 = nodesH[v1].r.y;
+			float z1 = nodesH[v1].r.z;
+			float x2 = nodesH[v2].r.x;
+			float y2 = nodesH[v2].r.y;
+			float z2 = nodesH[v2].r.z;
 			
 			// -----------------------------------------
 			// get edges and cross product of edges:
@@ -1685,7 +1673,7 @@ void class_capsules_ibm3D::capsule_geometry_analysis(int step)
 		cellsH[c].vel = make_float3(0.0,0.0,0.0);
 		int istr = cellsH[c].indxN0;
 		int iend = istr + cellsH[c].nNodes;
-		for (int i=istr; i<iend; i++) cellsH[c].vel += vH[i];		
+		for (int i=istr; i<iend; i++) cellsH[c].vel += nodesH[i].v;		
 		cellsH[c].vel /= cellsH[c].nNodes;
 			
 	}

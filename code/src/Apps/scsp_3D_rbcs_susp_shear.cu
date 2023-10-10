@@ -233,12 +233,12 @@ void scsp_3D_rbcs_susp_shear::cycleForward(int stepsPerCycle, int currentCycle)
 		ibm.wall_forces_ydir(nBlocks,nThreads);
 		
 		// update fluid:
-		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		
 		// update membrane:
-		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
 		ibm.update_node_positions(nBlocks,nThreads);
 				
 		cudaDeviceSynchronize();

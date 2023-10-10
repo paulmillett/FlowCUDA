@@ -245,7 +245,7 @@ void scsp_3D_capsule_visc_contrast::initSystem()
 	// ----------------------------------------------
 	
 	poisson.initialize(Nx,Ny,Nz);
-	poisson.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
+	poisson.solve_poisson(ibm.faces,ibm.nodes,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
 	poisson.write_output("indicator",0,iskip,jskip,kskip,precision);
 	
 	// ----------------------------------------------
@@ -292,7 +292,7 @@ void scsp_3D_capsule_visc_contrast::cycleForward(int stepsPerCycle, int currentC
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			poisson.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
+			poisson.solve_poisson(ibm.faces,ibm.nodes,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
 			ibm.stepIBM(lbm,nBlocks,nThreads);
 			//lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			lbm.stream_collide_save_forcing_varvisc(poisson.indicator,nu_in,nu_out,nBlocks,nThreads);
@@ -311,7 +311,7 @@ void scsp_3D_capsule_visc_contrast::cycleForward(int stepsPerCycle, int currentC
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		poisson.solve_poisson(ibm.faces,ibm.r,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
+		poisson.solve_poisson(ibm.faces,ibm.nodes,ibm.cells,ibm.nFaces,1,nBlocks,nThreads);
 		ibm.stepIBM(lbm,nBlocks,nThreads);		
 		//lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		lbm.stream_collide_save_forcing_varvisc(poisson.indicator,nu_in,nu_out,nBlocks,nThreads);

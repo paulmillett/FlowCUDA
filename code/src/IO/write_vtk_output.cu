@@ -922,7 +922,7 @@ void write_vtk_polydata(std::string tagname, int tagnum, int nVoxels,
 // -------------------------------------------------------------------------
 
 void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes, int nFaces,
-                                    float3* r, int* v1, int* v2, int* v3)
+                                    node* nodes, int* v1, int* v2, int* v3)
 {
 	
 	// -----------------------------------
@@ -953,7 +953,7 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 	outfile << " " << endl;	
 	outfile << "POINTS " << nNodes << " float" << endl;
 	for (int n=0; n<nNodes; n++) {
-		outfile << fixed << setprecision(3) << r[n].x << "  " << r[n].y << "  " << r[n].z << endl;
+		outfile << fixed << setprecision(3) << nodes[n].r.x << "  " << nodes[n].r.y << "  " << nodes[n].r.z << endl;
 	}
 	
 	// -----------------------------------------------
@@ -981,7 +981,7 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 // -------------------------------------------------------------------------
 
 void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes, int nFaces,
-                                    float3* r, triangle* faces)
+                                    node* nodes, triangle* faces)
 {
 		
 	// -----------------------------------
@@ -1012,7 +1012,7 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 	outfile << " " << endl;	
 	outfile << "POINTS " << nNodes << " float" << endl;
 	for (int n=0; n<nNodes; n++) {
-		outfile << fixed << setprecision(3) << r[n].x << "  " << r[n].y << "  " << r[n].z << endl;
+		outfile << fixed << setprecision(3) << nodes[n].r.x << "  " << nodes[n].r.y << "  " << nodes[n].r.z << endl;
 	}
 	
 	// -----------------------------------------------
@@ -1054,7 +1054,7 @@ void write_vtk_immersed_boundary_3D(std::string tagname, int tagnum, int nNodes,
 // -------------------------------------------------------------------------
 
 void write_vtk_immersed_boundary_3D_cellID(std::string tagname, int tagnum, int nNodes, int nFaces,
-                                           float3* r, triangle* faces, cell* cells)
+                                           node* nodes, triangle* faces, cell* cells)
 {
 		
 	// -----------------------------------
@@ -1085,7 +1085,7 @@ void write_vtk_immersed_boundary_3D_cellID(std::string tagname, int tagnum, int 
 	outfile << " " << endl;	
 	outfile << "POINTS " << nNodes << " float" << endl;
 	for (int n=0; n<nNodes; n++) {
-		outfile << fixed << setprecision(3) << r[n].x << "  " << r[n].y << "  " << r[n].z << endl;
+		outfile << fixed << setprecision(3) << nodes[n].r.x << "  " << nodes[n].r.y << "  " << nodes[n].r.z << endl;
 	}
 	
 	// -----------------------------------------------
@@ -1143,7 +1143,7 @@ void write_vtk_immersed_boundary_3D_cellID(std::string tagname, int tagnum, int 
 // -------------------------------------------------------------------------
 
 void write_vtk_immersed_boundary_normals_3D(std::string tagname, int tagnum, int nNodes, int nFaces,
-                                            int nEdges, float3* r, triangle* faces, edge* edges)
+                                            int nEdges, node* nodes, triangle* faces, edge* edges)
 {
 	
 	// -----------------------------------
@@ -1174,7 +1174,7 @@ void write_vtk_immersed_boundary_normals_3D(std::string tagname, int tagnum, int
 	outfile << " " << endl;	
 	outfile << "POINTS " << nNodes << " float" << endl;
 	for (int n=0; n<nNodes; n++) {
-		outfile << fixed << setprecision(3) << r[n].x << "  " << r[n].y << "  " << r[n].z << endl;
+		outfile << fixed << setprecision(3) << nodes[n].r.x << "  " << nodes[n].r.y << "  " << nodes[n].r.z << endl;
 	}
 	
 	// -----------------------------------------------

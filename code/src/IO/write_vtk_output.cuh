@@ -18,13 +18,13 @@ void write_vtk_structured_grid_2D(std::string,int,int,int,int,float*,
 								  
 void write_vtk_immersed_boundary_2D(std::string,int,int,float*,float*);
 
-void write_vtk_immersed_boundary_3D(std::string,int,int,int,float3*,int*,int*,int*);
+void write_vtk_immersed_boundary_3D(std::string,int,int,int,node*,int*,int*,int*);
 
-void write_vtk_immersed_boundary_3D(std::string,int,int,int,float3*,triangle*);
+void write_vtk_immersed_boundary_3D(std::string,int,int,int,node*,triangle*);
 
-void write_vtk_immersed_boundary_3D_cellID(std::string,int,int,int,float3*,triangle*,cell*);
+void write_vtk_immersed_boundary_3D_cellID(std::string,int,int,int,node*,triangle*,cell*);
 
-void write_vtk_immersed_boundary_normals_3D(std::string,int,int,int,int,float3*,triangle*,edge*);
+void write_vtk_immersed_boundary_normals_3D(std::string,int,int,int,int,node*,triangle*,edge*);
 
 void write_vtk_structured_grid(std::string,int,int,int,int,float*,
                                int,int,int,int);

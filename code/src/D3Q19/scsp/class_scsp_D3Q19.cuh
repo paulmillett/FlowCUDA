@@ -11,6 +11,7 @@
 # include "../../IO/read_lattice_geometry.cuh"
 # include "../../IBM/3D/kernels_ibm3D.cuh"
 # include "../../IBM/3D/kernels_filaments_ibm3D.cuh"
+# include "../../IBM/3D/data_structs/membrane_data.h"
 # include "../../IBM/3D/data_structs/filament_data.h"
 # include "kernels_scsp_D3Q19.cuh"
 # include <cuda.h>
@@ -137,10 +138,10 @@ public:
 	void add_body_force(float,float,float,int,int);
 	void add_body_force_divided(float,float,int,int,int);
 	void add_body_force_with_solid(float,float,float,int,int);	
-	void extrapolate_velocity_from_IBM(int,int,float3*,float3*,int);
-	void interpolate_velocity_to_IBM(int,int,float3*,float3*,int);
-	void extrapolate_forces_from_IBM(int,int,float3*,float3*,int);
-	void viscous_force_IBM_LBM(int,int,float,float3*,float3*,float3*,int);
+	void extrapolate_velocity_from_IBM(int,int,node*,int);
+	void interpolate_velocity_to_IBM(int,int,node*,int);
+	void extrapolate_forces_from_IBM(int,int,node*,int);
+	void viscous_force_IBM_LBM(int,int,float,node*,int);
 	void viscous_force_filaments_IBM_LBM(int,int,float,bead*,int);
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);

@@ -16,15 +16,13 @@ __global__ void reset_bin_lists_IBM3D(
 
 
 __global__ void build_bin_lists_IBM3D(
-	float3*,
+	node*,
 	bindata,
 	int);
 
 
 __global__ void nonbonded_node_interactions_IBM3D(
-	float3*,
-	float3*,
-	int*,
+	node*,
 	cell*,
 	bindata,
 	float,
@@ -37,26 +35,24 @@ __global__ void nonbonded_node_interactions_IBM3D(
 __device__ inline void pairwise_interaction_forces(
 	const int, 
 	const int,
-	const int,
 	const float,
 	const float,
-	float3*,
-	float3*,
+	node*,
 	cell*,
 	float3,
 	int3);
 
 
 __global__ void wall_forces_ydir_IBM3D(
-	float3*,
-	float3*,
+	node*,
 	float3,
+	float,
+	float,
 	int);
 
 
 __global__ void wall_forces_zdir_IBM3D(
-	float3*,
-	float3*,
+	node*,
 	float3,
 	float,
 	float,
@@ -64,8 +60,7 @@ __global__ void wall_forces_zdir_IBM3D(
 		
 		
 __global__ void wall_forces_ydir_zdir_IBM3D(
-	float3*,
-	float3*,
+	node*,
 	float3,
 	float,
 	float,

@@ -210,7 +210,7 @@ void scsp_3D_capsule_skalak_verlet::cycleForward(int stepsPerCycle, int currentC
 		ibm.compute_node_forces_skalak(nBlocks,nThreads);
 		
 		// compute viscous force between IBM & LBM:
-		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.r,ibm.v,ibm.f,nNodes);
+		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.nodes,nNodes);
 		
 		// update fluid:
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);

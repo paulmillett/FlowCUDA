@@ -8,6 +8,7 @@
 # include <cuda.h>
 # include <string>
 # include "../../Utils/helper_math.h"
+# include "data_structs/membrane_data.h"
 
 class class_ibm3D {
 	
@@ -20,7 +21,7 @@ class class_ibm3D {
 	bool facesFlag;
 		
 	// host arrays:
-	float3* rH;	
+	node* nodesH;
 	float3* rH_start;
 	float3* rH_end;
 	int* faceV1;
@@ -28,11 +29,9 @@ class class_ibm3D {
 	int* faceV3;
 		
 	// device arrays:
-	float3* r;
+	node* nodes;
 	float3* r_start;
-	float3* r_end;
-	float3* v;
-	float3* f;		
+	float3* r_end;	
 	
 	// methods:
 	class_ibm3D();

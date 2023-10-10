@@ -11,34 +11,34 @@ __global__ void zero_reference_vol_area_IBM3D(
 		
 		
 __global__ void rest_triangle_skalak_IBM3D(
-	float3*,
+	node*,
 	triangle*,
 	cell*, 
 	int);
 
 
 __global__ void rest_edge_lengths_IBM3D(
-    float3*,
+    node*,
 	edge*,
 	int);
 
 
 __global__ void rest_edge_angles_IBM3D(
-	float3*,
+	node*,
 	edge*,
 	triangle*,
 	int);
 
 
 __global__ void rest_triangle_areas_IBM3D(
-	float3*,
+	node*,
 	triangle*,
 	cell*,
 	int);
 	
 	
 __global__ void rest_cell_volumes_IBM3D(
-	float3*,
+	node*,
 	triangle*,
 	cell*,
 	int);
@@ -46,16 +46,14 @@ __global__ void rest_cell_volumes_IBM3D(
 
 __global__ void compute_node_force_membrane_skalak_IBM3D(
 	triangle*,
-	float3*,
-	float3*,
+	node*,
 	cell*,	
 	int);
 
 
 __global__ void compute_node_force_membrane_area_IBM3D(
 	triangle*,
-    float3*,
-	float3*,
+    node*,
 	cell*,
     float,
 	int);
@@ -63,8 +61,7 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 	
 __global__ void compute_node_force_membrane_edge_IBM3D(
 	triangle*,
-	float3*,
-	float3*,
+	node*,
 	edge*,
     float,
     int);
@@ -72,8 +69,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 
 __global__ void compute_node_force_membrane_bending_IBM3D(
 	triangle*,
-	float3*,
-	float3*,
+	node*,
 	edge*,
 	cell*,
     int);
@@ -81,15 +77,14 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 
 __global__ void compute_node_force_membrane_volume_IBM3D(
 	triangle*,
-	float3*,
+	node*,
 	cell*,
     int);
 
 
 __global__ void compute_node_force_membrane_globalarea_IBM3D(
 	triangle*,
-	float3*,
-	float3*,
+	node*,
 	cell*,	
 	float,
 	int);
@@ -123,12 +118,12 @@ __device__ inline int unique_triangle_vertex(
 
 __device__ inline void add_force_to_vertex(
 	int,
-	float3*,
+	node*,
 	const float3); 
 
 
 __global__ void zero_node_forces_IBM3D(
-    float3*,
+    node*,
 	int);
 
 
@@ -138,16 +133,15 @@ __global__ void zero_cell_volumes_IBM3D(
 
 
 __global__ void unwrap_node_coordinates_IBM3D(
-	float3*,
+	node*,
 	cell*,
-	int*,
 	float3,
 	int3,
 	int);
 
 
 __global__ void wrap_node_coordinates_IBM3D(
-	float3*,	
+	node*,	
 	float3,
 	int3,
 	int);
@@ -185,11 +179,8 @@ __global__ void cells_center_of_mass_IBM3D(
 	
 
 __global__ void update_node_position_verlet_1_cellType2_stationary_IBM3D(
-	float3*,
-	float3*,
-	float3*,
+	node*,
 	cell*,
-	int*,
 	float,
 	float,	
 	int);

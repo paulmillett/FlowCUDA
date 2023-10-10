@@ -5,6 +5,6 @@
 
 void read_ibm_information(std::string,int,int,float3*,int*,int*,int*);
 
-void read_ibm_information_long(std::string,int,int,int,float3*,triangle*,edge*);
+void read_ibm_information_long(std::string,int,int,int,node*,triangle*,edge*);
 
 # endif  // READ_IBM_INFORMATION_H

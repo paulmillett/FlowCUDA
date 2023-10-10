@@ -9,13 +9,12 @@
 // --------------------------------------------------------
 
 __global__ void update_node_position_IBM3D(
-	float3* r,
-	float3* v,	
+	node* nodes,	
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) r[i] += v[i];  // assume dt = 1
+	if (i < nNodes) nodes[i].r += nodes[i].v;  // assume dt = 1
 }
 
 
@@ -25,14 +24,13 @@ __global__ void update_node_position_IBM3D(
 // --------------------------------------------------------
 
 __global__ void update_node_position_dt_IBM3D(
-	float3* r,
-	float3* v,
+	node* nodes,
 	float dt,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) r[i] += v[i]*dt;
+	if (i < nNodes) nodes[i].r += nodes[i].v*dt;
 }
 
 
@@ -42,9 +40,7 @@ __global__ void update_node_position_dt_IBM3D(
 // --------------------------------------------------------
 
 __global__ void update_node_position_verlet_1_IBM3D(
-	float3* r,
-	float3* v,
-	float3* f,
+	node* nodes,
 	float dt,
 	float m,	
 	int nNodes)
@@ -52,8 +48,8 @@ __global__ void update_node_position_verlet_1_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		r[i] += v[i]*dt + 0.5*dt*dt*(f[i]/m);
-		v[i] += 0.5*dt*(f[i]/m);
+		nodes[i].r += nodes[i].v*dt + 0.5*dt*dt*(nodes[i].f/m);
+		nodes[i].v += 0.5*dt*(nodes[i].f/m);
 	}
 }
 
@@ -64,8 +60,7 @@ __global__ void update_node_position_verlet_1_IBM3D(
 // --------------------------------------------------------
 
 __global__ void update_node_position_verlet_2_IBM3D(
-	float3* v,
-	float3* f,
+	node* nodes,
 	float dt,
 	float m,
 	int nNodes)
@@ -73,7 +68,7 @@ __global__ void update_node_position_verlet_2_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		v[i] += 0.5*dt*(f[i]/m);
+		nodes[i].v += 0.5*dt*(nodes[i].f/m);
 	}
 }
 
@@ -85,15 +80,14 @@ __global__ void update_node_position_verlet_2_IBM3D(
 // --------------------------------------------------------
 
 __global__ void update_node_position_vacuum_IBM3D(
-	float3* r,
-	float3* f,
+	node* nodes,
 	float M,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		r[i] += M*f[i];
+		nodes[i].r += M*nodes[i].f;
 	}
 }
 
@@ -104,15 +98,14 @@ __global__ void update_node_position_vacuum_IBM3D(
 // --------------------------------------------------------
 
 __global__ void zero_velocities_forces_IBM3D(
-	float3* v,
-	float3* f,
+	node* nodes,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		v[i] = make_float3(0.0f,0.0f,0.0f);
-		f[i] = make_float3(0.0f,0.0f,0.0f);
+		nodes[i].v = make_float3(0.0f,0.0f,0.0f);
+		nodes[i].f = make_float3(0.0f,0.0f,0.0f);
 	}
 }
 
@@ -123,16 +116,16 @@ __global__ void zero_velocities_forces_IBM3D(
 // --------------------------------------------------------
 
 __global__ void enforce_max_node_force_IBM3D(
-	float3* f,
+	node* nodes,
 	float fmax,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		float fi = length(f[i]);
+		float fi = length(nodes[i].f);
 		if (fi > fmax) {
-			f[i] *= (fmax/fi);
+			nodes[i].f *= (fmax/fi);
 		}
 	}
 }
@@ -144,15 +137,14 @@ __global__ void enforce_max_node_force_IBM3D(
 // --------------------------------------------------------
 
 __global__ void add_drag_force_to_node_IBM3D(
-	float3* v,
-	float3* f,
+	node* nodes,
 	float c,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		f[i] -= c*v[i];
+		nodes[i].f -= c*nodes[i].v;
 	}
 }
 
@@ -163,14 +155,14 @@ __global__ void add_drag_force_to_node_IBM3D(
 // --------------------------------------------------------
 
 __global__ void add_xdir_force_IBM3D(
-	float3* f,
+	node* nodes,
 	float fx,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		f[i].x += fx;
+		nodes[i].f.x += fx;
 	}
 }
 
@@ -181,10 +173,9 @@ __global__ void add_xdir_force_IBM3D(
 // --------------------------------------------------------
 
 __global__ void update_node_position_IBM3D(
-	float3* r,
+	node* nodes,
 	float3* r_start,
 	float3* r_end,
-	float3* v,	
 	int step,
 	int nSteps,
 	int nNodes)
@@ -192,11 +183,11 @@ __global__ void update_node_position_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		float3 r_old = r[i];		
+		float3 r_old = nodes[i].r;		
 		//float psi = sin(float(step)/float(nSteps)*M_PI/2.0);
 		float psi = 0.5*(sin(M_PI*(float(step)/float(nSteps) - 0.5)) + 1.0); 
-		r[i] = r_start[i] + psi*(r_end[i] - r_start[i]);
-		v[i] = r[i] - r_old;  // assume dt = 1		
+		nodes[i].r = r_start[i] + psi*(r_end[i] - r_start[i]);
+		nodes[i].v = nodes[i].r - r_old;  // assume dt = 1		
 	}
 }
 
@@ -245,13 +236,13 @@ __global__ void update_node_ref_position_IBM3D(
 // --------------------------------------------------------
 
 __global__ void set_reference_node_positions_IBM3D(
-	float3* r,
+	node* nodes,
 	float3* r0,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) r0[i] = r[i];
+	if (i < nNodes) r0[i] = nodes[i].r;
 }
 
 
@@ -261,8 +252,7 @@ __global__ void set_reference_node_positions_IBM3D(
 // --------------------------------------------------------
 
 __global__ void interpolate_velocity_IBM3D(
-	float3* r,
-	float3* v,
+	node* nodes,
 	float* uLBM,
 	float* vLBM,
 	float* wLBM,
@@ -280,15 +270,15 @@ __global__ void interpolate_velocity_IBM3D(
 		// zero out velocities for node "i"
 		// --------------------------------------
 		
-		v[i] = make_float3(0.0);		
+		nodes[i].v = make_float3(0.0);		
 				
 		// --------------------------------------
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
 		
-		int i0 = int(floor(r[i].x));
-		int j0 = int(floor(r[i].y));
-		int k0 = int(floor(r[i].z));
+		int i0 = int(floor(nodes[i].r.x));
+		int j0 = int(floor(nodes[i].r.y));
+		int k0 = int(floor(nodes[i].r.z));
 		
 		// --------------------------------------
 		// loop over footprint
@@ -298,13 +288,13 @@ __global__ void interpolate_velocity_IBM3D(
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {
 					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
-					float rx = r[i].x - float(ii);
-					float ry = r[i].y - float(jj);
-					float rz = r[i].z - float(kk);
+					float rx = nodes[i].r.x - float(ii);
+					float ry = nodes[i].r.y - float(jj);
+					float rz = nodes[i].r.z - float(kk);
 					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
-					v[i].x += del*uLBM[ndx];
-					v[i].y += del*vLBM[ndx];
-					v[i].z += del*wLBM[ndx];
+					nodes[i].v.x += del*uLBM[ndx];
+					nodes[i].v.y += del*vLBM[ndx];
+					nodes[i].v.z += del*wLBM[ndx];
 				}
 			}		
 		}		
@@ -318,8 +308,7 @@ __global__ void interpolate_velocity_IBM3D(
 // --------------------------------------------------------
 
 __global__ void extrapolate_velocity_IBM3D(
-	float3* r,
-	float3* v,
+	node* nodes,
 	float* uIBvox,
 	float* vIBvox,
 	float* wIBvox,
@@ -337,9 +326,9 @@ __global__ void extrapolate_velocity_IBM3D(
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
 		
-		int i0 = int(floor(r[i].x));
-		int j0 = int(floor(r[i].y));
-		int k0 = int(floor(r[i].z));
+		int i0 = int(floor(nodes[i].r.x));
+		int j0 = int(floor(nodes[i].r.y));
+		int k0 = int(floor(nodes[i].r.z));
 		
 		// --------------------------------------
 		// loop over footprint
@@ -349,13 +338,13 @@ __global__ void extrapolate_velocity_IBM3D(
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {				
 					int ndx = kk*Nx*Ny + jj*Nx + ii;
-					float rx = r[i].x - float(ii);
-					float ry = r[i].y - float(jj);
-					float rz = r[i].z - float(kk);
+					float rx = nodes[i].r.x - float(ii);
+					float ry = nodes[i].r.y - float(jj);
+					float rz = nodes[i].r.z - float(kk);
 					float del = sqrt(rx*rx + ry*ry + rz*rz);
-					atomicAdd(&uIBvox[ndx],del*v[i].x);
-					atomicAdd(&vIBvox[ndx],del*v[i].y);
-					atomicAdd(&wIBvox[ndx],del*v[i].z);
+					atomicAdd(&uIBvox[ndx],del*nodes[i].v.x);
+					atomicAdd(&vIBvox[ndx],del*nodes[i].v.y);
+					atomicAdd(&wIBvox[ndx],del*nodes[i].v.z);
 					atomicAdd(&weight[ndx],del);
 				}
 			}		
@@ -370,8 +359,7 @@ __global__ void extrapolate_velocity_IBM3D(
 // --------------------------------------------------------
 
 __global__ void extrapolate_force_IBM3D(
-	float3* r,
-	float3* f,
+	node* nodes,
 	float* fxLBM,
 	float* fyLBM,
 	float* fzLBM,
@@ -389,9 +377,9 @@ __global__ void extrapolate_force_IBM3D(
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
 		
-		int i0 = int(floor(r[i].x));
-		int j0 = int(floor(r[i].y));
-		int k0 = int(floor(r[i].z));
+		int i0 = int(floor(nodes[i].r.x));
+		int j0 = int(floor(nodes[i].r.y));
+		int k0 = int(floor(nodes[i].r.z));
 		
 		// --------------------------------------
 		// loop over footprint
@@ -401,13 +389,13 @@ __global__ void extrapolate_force_IBM3D(
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {				
 					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
-					float rx = r[i].x - float(ii);
-					float ry = r[i].y - float(jj);
-					float rz = r[i].z - float(kk);
+					float rx = nodes[i].r.x - float(ii);
+					float ry = nodes[i].r.y - float(jj);
+					float rz = nodes[i].r.z - float(kk);
 					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
-					atomicAdd(&fxLBM[ndx],del*f[i].x);
-					atomicAdd(&fyLBM[ndx],del*f[i].y);
-					atomicAdd(&fzLBM[ndx],del*f[i].z);
+					atomicAdd(&fxLBM[ndx],del*nodes[i].f.x);
+					atomicAdd(&fyLBM[ndx],del*nodes[i].f.y);
+					atomicAdd(&fzLBM[ndx],del*nodes[i].f.z);
 				}
 			}		
 		}		
@@ -422,9 +410,7 @@ __global__ void extrapolate_force_IBM3D(
 // --------------------------------------------------------
 
 __global__ void viscous_force_velocity_difference_IBM3D(
-	float3* r,
-	float3* v,
-	float3* f,
+	node* nodes,
 	float* fxLBM,
 	float* fyLBM,
 	float* fzLBM,
@@ -446,9 +432,9 @@ __global__ void viscous_force_velocity_difference_IBM3D(
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
 		
-		int i0 = int(floor(r[i].x));
-		int j0 = int(floor(r[i].y));
-		int k0 = int(floor(r[i].z));
+		int i0 = int(floor(nodes[i].r.x));
+		int j0 = int(floor(nodes[i].r.y));
+		int k0 = int(floor(nodes[i].r.z));
 		
 		// --------------------------------------
 		// loop over footprint to get 
@@ -462,17 +448,17 @@ __global__ void viscous_force_velocity_difference_IBM3D(
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {				
 					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
-					float rx = r[i].x - float(ii);
-					float ry = r[i].y - float(jj);
-					float rz = r[i].z - float(kk);
+					float rx = nodes[i].r.x - float(ii);
+					float ry = nodes[i].r.y - float(jj);
+					float rz = nodes[i].r.z - float(kk);
 					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
 					vxLBMi += del*uLBM[ndx];
 					vyLBMi += del*vLBM[ndx];
 					vzLBMi += del*wLBM[ndx];
 					// extrapolate elastic forces to LBM fluid:
-					atomicAdd(&fxLBM[ndx],del*f[i].x);
-					atomicAdd(&fyLBM[ndx],del*f[i].y);
-					atomicAdd(&fzLBM[ndx],del*f[i].z);					
+					atomicAdd(&fxLBM[ndx],del*nodes[i].f.x);
+					atomicAdd(&fyLBM[ndx],del*nodes[i].f.y);
+					atomicAdd(&fzLBM[ndx],del*nodes[i].f.z);					
 				}
 			}
 		}
@@ -482,12 +468,12 @@ __global__ void viscous_force_velocity_difference_IBM3D(
 		// to IBM node:
 		// --------------------------------------
 		
-		float vfx = gam*(vxLBMi - v[i].x);
-		float vfy = gam*(vyLBMi - v[i].y);
-		float vfz = gam*(vzLBMi - v[i].z);
-		f[i].x += vfx;
-		f[i].y += vfy;
-		f[i].z += vfz;
+		float vfx = gam*(vxLBMi - nodes[i].v.x);
+		float vfy = gam*(vyLBMi - nodes[i].v.y);
+		float vfz = gam*(vzLBMi - nodes[i].v.z);
+		nodes[i].f.x += vfx;
+		nodes[i].f.y += vfy;
+		nodes[i].f.z += vfz;
 				
 	}	
 }
@@ -500,8 +486,7 @@ __global__ void viscous_force_velocity_difference_IBM3D(
 // --------------------------------------------------------
 
 __global__ void repulsive_force_solid_lattice_IBM3D(
-	float3* r,
-	float3* f,
+	node* nodes,
 	int* solid,
 	float repA,
 	float repD,
@@ -519,9 +504,9 @@ __global__ void repulsive_force_solid_lattice_IBM3D(
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
 		
-		int i0 = int(floor(r[i].x));
-		int j0 = int(floor(r[i].y));
-		int k0 = int(floor(r[i].z));
+		int i0 = int(floor(nodes[i].r.x));
+		int j0 = int(floor(nodes[i].r.y));
+		int k0 = int(floor(nodes[i].r.z));
 		
 		// --------------------------------------
 		// loop over footprint to get 
@@ -533,15 +518,15 @@ __global__ void repulsive_force_solid_lattice_IBM3D(
 				for (int ii=i0; ii<=i0+1; ii++) {				
 					int ndx = voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
 					if (solid[ndx] == 1) {
-						float rx = r[i].x - float(ii);
-						float ry = r[i].y - float(jj);
-						float rz = r[i].z - float(kk);
+						float rx = nodes[i].r.x - float(ii);
+						float ry = nodes[i].r.y - float(jj);
+						float rz = nodes[i].r.z - float(kk);
 						float r = sqrt(rx*rx + ry*ry + rz*rz);
 						if (r <= repD) {
 							float force = repA - (repA/repD)*r;
-							f[i].x += force*(rx/r);
-							f[i].y += force*(ry/r);
-							f[i].z += force*(rz/r);
+							nodes[i].f.x += force*(rx/r);
+							nodes[i].f.y += force*(ry/r);
+							nodes[i].f.z += force*(rz/r);
 						}						
 					}				
 				}
@@ -557,15 +542,14 @@ __global__ void repulsive_force_solid_lattice_IBM3D(
 // --------------------------------------------------------
 
 __global__ void compute_node_force_IBM3D(
-	float3* r,
+	node* nodes,
 	float3* r0,
-	float3* f,
 	float kstiff,
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) f[i] = -kstiff*(r[i] - r0[i]);
+	if (i < nNodes) nodes[i].f = -kstiff*(nodes[i].r - r0[i]);
 }
 
 

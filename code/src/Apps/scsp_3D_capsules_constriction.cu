@@ -283,12 +283,12 @@ void scsp_3D_capsules_constriction::cycleForward(int stepsPerCycle, int currentC
 		//ibm.wall_forces_ydir(nBlocks,nThreads);
 				
 		// update fluid:
-		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.r,ibm.f,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
 		lbm.add_body_force_with_solid(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);
 		
 		// update membrane:
-		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.r,ibm.v,nNodes);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
 		ibm.update_node_positions(nBlocks,nThreads);
 				
 		cudaDeviceSynchronize();

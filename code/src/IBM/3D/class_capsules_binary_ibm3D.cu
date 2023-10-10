@@ -189,7 +189,7 @@ void class_capsules_binary_ibm3D::read_ibm_file_long(std::string fname, int C0, 
 
 	for (int i=0; i<nNodes; i++) {
 		int n = i + N0;  // adjusted index
-		infile >> rH[n].x >> rH[n].y >> rH[n].z;
+		infile >> nodesH[n].r.x >> nodesH[n].r.y >> nodesH[n].r.z;
 	}
 	
 	// -----------------------------------------------
@@ -259,7 +259,7 @@ void class_capsules_binary_ibm3D::duplicate_cells()
 			// copy node positions:
 			for (int i=0; i<nNodesPerCell1; i++) {
 				int ii = i + c*nNodesPerCell1;
-				rH[ii] = rH[i];
+				nodesH[ii].r = nodesH[i].r;
 			}
 			// copy edge info:
 			for (int i=0; i<nEdgesPerCell1; i++) {
@@ -289,7 +289,7 @@ void class_capsules_binary_ibm3D::duplicate_cells()
 			// copy node positions:
 			for (int i=0; i<nNodesPerCell2; i++) {
 				int ii = i + c*nNodesPerCell2 + offsetN;
-				rH[ii] = rH[i+offsetN];
+				nodesH[ii].r = nodesH[i+offsetN].r;
 			}
 			// copy edge info:
 			for (int i=0; i<nEdgesPerCell2; i++) {
@@ -362,7 +362,7 @@ void class_capsules_binary_ibm3D::set_cells_types_binary()
 void class_capsules_binary_ibm3D::randomize_platelets_and_rbcs(float sepMin, float sepWall)
 {
 	// copy node positions from device to host:
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);
 	
 	// randomly shift cells, without overlapping previous cells:
 	// assume that: cellType = 1 are RBC's and 
@@ -399,7 +399,7 @@ void class_capsules_binary_ibm3D::randomize_platelets_and_rbcs(float sepMin, flo
 	}
 	
 	// last, copy node positions from host to device:
-	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);
 }
 
 
@@ -414,7 +414,7 @@ void class_capsules_binary_ibm3D::randomize_platelets_and_rbcs(float sepMin, flo
 void class_capsules_binary_ibm3D::randomize_probe_and_rbcs(float sepMin, float sepWall)
 {
 	// copy node positions from device to host:
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);
 	
 	// randomly shift cells, without overlapping previous cells:
 	// assume that: cellType = 1 are RBC's and 
@@ -457,7 +457,7 @@ void class_capsules_binary_ibm3D::randomize_probe_and_rbcs(float sepMin, float s
 	}
 	
 	// last, copy node positions from host to device:
-	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);
 }
 
 
@@ -505,10 +505,10 @@ void class_capsules_binary_ibm3D::stepIBM_no_fluid_rbcs_platelets(int nSteps, bo
 void class_capsules_binary_ibm3D::update_node_positions_verlet_1_cellType2_stationary(int nBlocks, int nThreads)
 {
 	update_node_position_verlet_1_cellType2_stationary_IBM3D
-	<<<nBlocks,nThreads>>> (r,v,f,cells,cellIDs,dt,1.0,nNodes);
+	<<<nBlocks,nThreads>>> (nodes,cells,dt,1.0,nNodes);
 	
 	wrap_node_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (r,Box,pbcFlag,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
 }
 
 

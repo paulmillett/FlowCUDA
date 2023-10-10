@@ -13,7 +13,7 @@ __global__ void zero_G_poisson_IBM3D(
 		
 
 __global__ void extrapolate_interface_normal_poisson_IBM3D(
-	float3*,
+	node*,
 	float3*,
 	int,
 	int,

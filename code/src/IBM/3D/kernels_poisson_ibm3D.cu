@@ -27,7 +27,7 @@ __global__ void zero_G_poisson_IBM3D(
 // --------------------------------------------------------
 
 __global__ void extrapolate_interface_normal_poisson_IBM3D(
-	float3* r,
+	node* nodes,
 	float3* G,
 	int Nx,
 	int Ny,
@@ -59,9 +59,9 @@ __global__ void extrapolate_interface_normal_poisson_IBM3D(
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
 		
-		float r0x = r[V0].x, r1x = r[V1].x, r2x = r[V2].x;
-		float r0y = r[V0].y, r1y = r[V1].y, r2y = r[V2].y;
-		float r0z = r[V0].z, r1z = r[V1].z, r2z = r[V2].z;
+		float r0x = nodes[V0].r.x, r1x = nodes[V1].r.x, r2x = nodes[V2].r.x;
+		float r0y = nodes[V0].r.y, r1y = nodes[V1].r.y, r2y = nodes[V2].r.y;
+		float r0z = nodes[V0].r.z, r1z = nodes[V1].r.z, r2z = nodes[V2].r.z;
 		
 		float t0x = r0x/float(Nx)*2*M_PI, t1x = r1x/float(Nx)*2*M_PI, t2x = r2x/float(Nx)*2*M_PI;
 		float t0y = r0y/float(Ny)*2*M_PI, t1y = r1y/float(Ny)*2*M_PI, t2y = r2y/float(Ny)*2*M_PI;

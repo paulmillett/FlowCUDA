@@ -38,16 +38,14 @@ class_ibm3D::~class_ibm3D()
 void class_ibm3D::allocate()
 {
 	// allocate array memory (host):
-	rH = (float3*)malloc(nNodes*sizeof(float3));		
+	nodesH = (node*)malloc(nNodes*sizeof(node));		
 	rH_start = (float3*)malloc(nNodes*sizeof(float3));	
 	rH_end = (float3*)malloc(nNodes*sizeof(float3));		    
 			
 	// allocate array memory (device):
-	cudaMalloc((void **) &r, nNodes*sizeof(float3));	
+	cudaMalloc((void **) &nodes, nNodes*sizeof(node));	
 	cudaMalloc((void **) &r_start, nNodes*sizeof(float3));	
-	cudaMalloc((void **) &r_end, nNodes*sizeof(float3));	
-	cudaMalloc((void **) &v, nNodes*sizeof(float3));	
-	cudaMalloc((void **) &f, nNodes*sizeof(float3));	
+	cudaMalloc((void **) &r_end, nNodes*sizeof(float3));		
 }
 
 
@@ -74,7 +72,7 @@ void class_ibm3D::allocate_faces()
 void class_ibm3D::deallocate()
 {
 	// free array memory (host):
-	free(rH);	
+	free(nodesH);	
 	free(rH_start);	
 	free(rH_end);	
 	if (facesFlag) {
@@ -84,11 +82,9 @@ void class_ibm3D::deallocate()
 	}
 			
 	// free array memory (device):
-	cudaFree(r);	
+	cudaFree(nodes);	
 	cudaFree(r_start);	
-	cudaFree(r_end);	
-	cudaFree(v);	
-	cudaFree(f);	
+	cudaFree(r_end);		
 }
 
 
@@ -99,7 +95,7 @@ void class_ibm3D::deallocate()
 
 void class_ibm3D::memcopy_host_to_device()
 {
-	cudaMemcpy(r, rH, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);	
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);	
 	cudaMemcpy(r_start, rH_start, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);	
 	cudaMemcpy(r_end, rH_end, sizeof(float3)*nNodes, cudaMemcpyHostToDevice);
 }
@@ -112,7 +108,7 @@ void class_ibm3D::memcopy_host_to_device()
 
 void class_ibm3D::memcopy_device_to_host()
 {
-	cudaMemcpy(rH, r, sizeof(float3)*nNodes, cudaMemcpyDeviceToHost);	
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);	
 }
 
 
@@ -176,7 +172,7 @@ void class_ibm3D::shift_end_positions(float xsh, float ysh, float zsh)
 void class_ibm3D::initialize_positions_to_start()
 {
 	for (int i=0; i<nNodes; i++) {
-		rH[i] = rH_start[i];
+		nodesH[i].r = rH_start[i];
 	}
 }
 
@@ -189,7 +185,7 @@ void class_ibm3D::initialize_positions_to_start()
 void class_ibm3D::write_output(std::string tagname, int tagnum)
 {
 	write_vtk_immersed_boundary_3D(tagname,tagnum,
-	nNodes,nFaces,rH,faceV1,faceV2,faceV3);
+	nNodes,nFaces,nodes,faceV1,faceV2,faceV3);
 }
 
 
@@ -199,10 +195,10 @@ void class_ibm3D::write_output(std::string tagname, int tagnum)
 // --------------------------------------------------------
 
 void class_ibm3D::update_node_positions(int nBlocks, int nThreads,
-                                         int currentStep, int nSteps)
+                                        int currentStep, int nSteps)
 {
 	update_node_position_IBM3D
-	<<<nBlocks,nThreads>>> (r,r_start,r_end,v,currentStep,nSteps,nNodes);	
+	<<<nBlocks,nThreads>>> (nodes,r_start,r_end,currentStep,nSteps,nNodes);	
 }
 
 

@@ -36,7 +36,7 @@ __global__ void zero_reference_vol_area_IBM3D(
 // --------------------------------------------------------
 
 __global__ void rest_triangle_skalak_IBM3D(
-	float3* vertR,
+	node* nodes,
 	triangle* faces,
 	cell* cells, 
 	int nFaces)
@@ -47,9 +47,9 @@ __global__ void rest_triangle_skalak_IBM3D(
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		float3 r0 = vertR[V0]; 
-		float3 r1 = vertR[V1];
-		float3 r2 = vertR[V2];
+		float3 r0 = nodes[V0].r; 
+		float3 r1 = nodes[V1].r;
+		float3 r2 = nodes[V2].r;
 		float3 vec1 = r1 - r0;
 		float3 vec2 = r2 - r0;
 		float3 norm = cross(vec1,vec2);
@@ -74,7 +74,7 @@ __global__ void rest_triangle_skalak_IBM3D(
 // --------------------------------------------------------
 
 __global__ void rest_edge_lengths_IBM3D(
-	float3* vertR,
+	node* nodes,
 	edge* edges,
 	int nEdges)
 {
@@ -82,8 +82,8 @@ __global__ void rest_edge_lengths_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nEdges) {
 		// calculate resting edge length:
-		float3 r0 = vertR[edges[i].v0]; 
-		float3 r1 = vertR[edges[i].v1];
+		float3 r0 = nodes[edges[i].v0].r; 
+		float3 r1 = nodes[edges[i].v1].r;
 		float3 r01 = r1 - r0;
 		edges[i].length0 = length(r01);
 	}
@@ -96,7 +96,7 @@ __global__ void rest_edge_lengths_IBM3D(
 // --------------------------------------------------------
 
 __global__ void rest_edge_angles_IBM3D(
-	float3* vertR,
+	node* nodes,
 	edge* edges,
 	triangle* faces,
 	int nEdges)
@@ -105,19 +105,19 @@ __global__ void rest_edge_angles_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nEdges) {
 		// calculate edge vector:
-		float3 r01 = vertR[edges[i].v1] - vertR[edges[i].v0];
+		float3 r01 = nodes[edges[i].v1].r - nodes[edges[i].v0].r;
 		r01 /= length(r01);
 		// calculate normal vector for face 0:
 		int f0 = edges[i].f0;  // face ID
-		float3 r0 = vertR[faces[f0].v0]; 
-		float3 r1 = vertR[faces[f0].v1];
-		float3 r2 = vertR[faces[f0].v2];
+		float3 r0 = nodes[faces[f0].v0].r; 
+		float3 r1 = nodes[faces[f0].v1].r;
+		float3 r2 = nodes[faces[f0].v2].r;
 		float3 n0 = triangle_normalvector(r0,r1,r2);
 		// calculate normal vector for face 1:
 		int f1 = edges[i].f1;  // face ID
-		r0 = vertR[faces[f1].v0]; 
-		r1 = vertR[faces[f1].v1];
-		r2 = vertR[faces[f1].v2];
+		r0 = nodes[faces[f1].v0].r; 
+		r1 = nodes[faces[f1].v1].r;
+		r2 = nodes[faces[f1].v2].r;
 		float3 n1 = triangle_normalvector(r0,r1,r2);
 		// angle between faces:
 		edges[i].theta0 = angle_between_faces(n0,n1,r01);	
@@ -132,7 +132,7 @@ __global__ void rest_edge_angles_IBM3D(
 // --------------------------------------------------------
 
 __global__ void rest_triangle_areas_IBM3D(
-	float3* vertR,
+	node* nodes,
 	triangle* faces,
 	cell* cells, 
 	int nFaces)
@@ -143,9 +143,9 @@ __global__ void rest_triangle_areas_IBM3D(
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		float3 r0 = vertR[V0]; 
-		float3 r1 = vertR[V1];
-		float3 r2 = vertR[V2];
+		float3 r0 = nodes[V0].r; 
+		float3 r1 = nodes[V1].r;
+		float3 r2 = nodes[V2].r;
 		float3 norm = cross(r1 - r0, r2 - r0);
 		faces[i].area0 = 0.5*length(norm);
 		// calculate global cell geometries:
@@ -164,7 +164,7 @@ __global__ void rest_triangle_areas_IBM3D(
 // --------------------------------------------------------
 
 __global__ void rest_cell_volumes_IBM3D(
-	float3* vertR,
+	node* nodes,
 	triangle* faces,
 	cell* cells, 
 	int nFaces)
@@ -175,9 +175,9 @@ __global__ void rest_cell_volumes_IBM3D(
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		float3 r0 = vertR[V0]; 
-		float3 r1 = vertR[V1];
-		float3 r2 = vertR[V2];
+		float3 r0 = nodes[V0].r; 
+		float3 r1 = nodes[V1].r;
+		float3 r2 = nodes[V2].r;
 		int cID = faces[i].cellID;
 		float volFace = triangle_signed_volume(r0,r1,r2);
 		atomicAdd(&cells[cID].vol0,volFace); 
@@ -204,8 +204,7 @@ __global__ void rest_cell_volumes_IBM3D(
 
 __global__ void compute_node_force_membrane_skalak_IBM3D(
 	triangle* faces,
-	float3* vertR,
-	float3* vertF,
+	node* nodes,
 	cell* cells,	
 	int nFaces)
 {
@@ -223,9 +222,9 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		float3 r0 = vertR[V0]; 
-		float3 r1 = vertR[V1];
-		float3 r2 = vertR[V2];
+		float3 r0 = nodes[V0].r; 
+		float3 r1 = nodes[V1].r;
+		float3 r2 = nodes[V2].r;
 		float3 vec1 = r1 - r0;
 		float3 vec2 = r2 - r0;
 		const float l = length(vec2);
@@ -360,9 +359,9 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 	    float3 force2 = -force0-force1;
 		
 		// add forces to nodes
-		add_force_to_vertex(V0,vertF,force0);
-		add_force_to_vertex(V1,vertF,force1);
-		add_force_to_vertex(V2,vertF,force2);
+		add_force_to_vertex(V0,nodes,force0);
+		add_force_to_vertex(V1,nodes,force1);
+		add_force_to_vertex(V2,nodes,force2);
 						
 		// add to global cell geometries:		
 		float volFace = triangle_signed_volume(r0,r1,r2);
@@ -398,8 +397,7 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 
 __global__ void compute_node_force_membrane_area_IBM3D(
 	triangle* faces,
-	float3* vertR,
-	float3* vertF,
+	node* nodes,
 	cell* cells,	
 	float ka,
 	int nFaces)
@@ -413,9 +411,9 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		float3 r0 = vertR[V0]; 
-		float3 r1 = vertR[V1];
-		float3 r2 = vertR[V2];
+		float3 r0 = nodes[V0].r; 
+		float3 r1 = nodes[V1].r;
+		float3 r2 = nodes[V2].r;
 		float3 norm = cross(r1 - r0, r2 - r0);
 		float  area = 0.5*length(norm);			
 		faces[i].area = area;
@@ -431,9 +429,9 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 		float3 ar1 = centroid - r1;
 		float3 ar2 = centroid - r2;
 		float areaForceMag = ka*darea/(length2(ar0) + length2(ar1) + length2(ar2));
-		add_force_to_vertex(V0,vertF,areaForceMag*ar0);
-		add_force_to_vertex(V1,vertF,areaForceMag*ar1);
-		add_force_to_vertex(V2,vertF,areaForceMag*ar2);			
+		add_force_to_vertex(V0,nodes,areaForceMag*ar0);
+		add_force_to_vertex(V1,nodes,areaForceMag*ar1);
+		add_force_to_vertex(V2,nodes,areaForceMag*ar2);			
 		
 		// add to global cell geometries:
 		int cID = faces[i].cellID;
@@ -454,8 +452,7 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 
 __global__ void compute_node_force_membrane_edge_IBM3D(
 	triangle* faces,
-	float3* vertR,
-	float3* vertF,
+	node* nodes,
 	edge* edges,
 	float ks,
 	int nEdges)
@@ -467,8 +464,8 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		// calculate edge length:
 		int V0 = edges[i].v0;
 		int V1 = edges[i].v1;
-		float3 r0 = vertR[V0]; 
-		float3 r1 = vertR[V1];
+		float3 r0 = nodes[V0].r; 
+		float3 r1 = nodes[V1].r;
 		float3 r01 = r1 - r0;
 		float edgeL = length(r01);
 		float length0 = edges[i].length0;
@@ -476,8 +473,8 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		//float lengthRatio = (edgeL-length0)/length0;
 		float lengthForceMag = ks*(edgeL-length0); //ks*(lengthRatio + lengthRatio/abs(9.0-lengthRatio*lengthRatio));
 		r01 /= edgeL;  // normalize vector
-		add_force_to_vertex(V0,vertF, lengthForceMag*r01);
-		add_force_to_vertex(V1,vertF,-lengthForceMag*r01);		
+		add_force_to_vertex(V0,nodes, lengthForceMag*r01);
+		add_force_to_vertex(V1,nodes,-lengthForceMag*r01);		
 	}
 }
 
@@ -491,8 +488,7 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 
 __global__ void compute_node_force_membrane_bending_IBM3D(
 	triangle* faces,
-	float3* vertR,
-	float3* vertF,
+	node* nodes,
 	edge* edges,
 	cell* cells,
 	int nEdges)
@@ -504,7 +500,7 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 		// get basic data about edge:
 		int V0 = edges[i].v0;
 		int V1 = edges[i].v1;
-		float3 n01 = normalize(vertR[V1] - vertR[V0]);	
+		float3 n01 = normalize(nodes[V1].r - nodes[V0].r);	
 		// calculate bending force magnitude:
 		int F0 = edges[i].f0;
 		int F1 = edges[i].f1;
@@ -519,10 +515,10 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 		int pB = V1;
 		int pC = unique_triangle_vertex(faces[F0].v0,faces[F0].v1,faces[F0].v2,pA,pB);
 		int pD = unique_triangle_vertex(faces[F1].v0,faces[F1].v1,faces[F1].v2,pA,pB);
-		float3 A = vertR[pA];
-		float3 B = vertR[pB];
-		float3 C = vertR[pC];
-		float3 D = vertR[pD];
+		float3 A = nodes[pA].r;
+		float3 B = nodes[pB].r;
+		float3 C = nodes[pC].r;
+		float3 D = nodes[pD].r;
 		float3 nC = n0/length2(n0);
 		float3 nD = n1/length2(n1);
 		float BmA = length(B-A);
@@ -530,10 +526,10 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 		float3 FB = bendForceMag*(nC*dot(A-B,A-C)/BmA + nD*dot(A-B,A-D)/BmA);
 		float3 FC = -bendForceMag*BmA*nC;
 		float3 FD = -bendForceMag*BmA*nD;
-		add_force_to_vertex(pA,vertF,FA);
-		add_force_to_vertex(pB,vertF,FB);
-		add_force_to_vertex(pC,vertF,FC);
-		add_force_to_vertex(pD,vertF,FD);											
+		add_force_to_vertex(pA,nodes,FA);
+		add_force_to_vertex(pB,nodes,FB);
+		add_force_to_vertex(pC,nodes,FC);
+		add_force_to_vertex(pD,nodes,FD);											
 	}	
 }
 
@@ -547,7 +543,7 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 
 __global__ void compute_node_force_membrane_volume_IBM3D(
 	triangle* faces,
-	float3* vertF,
+	node* nodes,
 	cell* cells,	
 	int nFaces)
 {
@@ -567,9 +563,9 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 		float volForceMag = -kv*volRatio;
 		volForceMag *= area;	
 		volForceMag /= 3.0;	
-		add_force_to_vertex(V0,vertF,volForceMag*unitnorm);
-		add_force_to_vertex(V1,vertF,volForceMag*unitnorm);
-		add_force_to_vertex(V2,vertF,volForceMag*unitnorm);					
+		add_force_to_vertex(V0,nodes,volForceMag*unitnorm);
+		add_force_to_vertex(V1,nodes,volForceMag*unitnorm);
+		add_force_to_vertex(V2,nodes,volForceMag*unitnorm);					
 	}	
 }
 
@@ -583,8 +579,7 @@ __global__ void compute_node_force_membrane_volume_IBM3D(
 
 __global__ void compute_node_force_membrane_globalarea_IBM3D(
 	triangle* faces,
-	float3* vertR,
-	float3* vertF,
+	node* nodes,
 	cell* cells,	
 	float kag,
 	int nFaces)
@@ -598,9 +593,9 @@ __global__ void compute_node_force_membrane_globalarea_IBM3D(
 		int V0 = faces[i].v0;
 		int V1 = faces[i].v1;
 		int V2 = faces[i].v2;
-		float3 r0 = vertR[V0]; 
-		float3 r1 = vertR[V1];
-		float3 r2 = vertR[V2];
+		float3 r0 = nodes[V0].r; 
+		float3 r1 = nodes[V1].r;
+		float3 r2 = nodes[V2].r;
 		float area = cells[cID].area;
 		float area0 = cells[cID].area0;
 		float areaRatio = (area-area0)/area0;
@@ -610,9 +605,9 @@ __global__ void compute_node_force_membrane_globalarea_IBM3D(
 		float3 ar2 = centroid - r2;
 		float areaForceMag = kag*faces[i].area*areaRatio;
 		areaForceMag /= length2(ar0) + length2(ar1) + length2(ar2);
-		add_force_to_vertex(V0,vertF,areaForceMag*ar0);
-		add_force_to_vertex(V1,vertF,areaForceMag*ar1);
-		add_force_to_vertex(V2,vertF,areaForceMag*ar2);			
+		add_force_to_vertex(V0,nodes,areaForceMag*ar0);
+		add_force_to_vertex(V1,nodes,areaForceMag*ar1);
+		add_force_to_vertex(V2,nodes,areaForceMag*ar2);			
 	}	
 }
 
@@ -707,12 +702,12 @@ __device__ inline int unique_triangle_vertex(
 
 __device__ inline void add_force_to_vertex(
 	int i,
-	float3* f,
+	node* nodes,
 	const float3 g)
 {
-	atomicAdd(&f[i].x,g.x);
-	atomicAdd(&f[i].y,g.y);
-	atomicAdd(&f[i].z,g.z);	
+	atomicAdd(&nodes[i].f.x,g.x);
+	atomicAdd(&nodes[i].f.y,g.y);
+	atomicAdd(&nodes[i].f.z,g.z);	
 }
 
 
@@ -722,12 +717,12 @@ __device__ inline void add_force_to_vertex(
 // --------------------------------------------------------
 
 __global__ void zero_node_forces_IBM3D(
-	float3* vertF,	
+	node* nodes,	
 	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) vertF[i] = make_float3(0.0);
+	if (i < nNodes) nodes[i].f = make_float3(0.0);
 }
 
 
@@ -759,9 +754,8 @@ __global__ void zero_cell_volumes_IBM3D(
 // --------------------------------------------------------
 
 __global__ void unwrap_node_coordinates_IBM3D(
-	float3* r,
+	node* nodes,
 	cell* cells,
-	int* cellIDs,
 	float3 Box,
 	int3 pbcFlag,
 	int nNodes)
@@ -769,10 +763,10 @@ __global__ void unwrap_node_coordinates_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		int c = cellIDs[i];
+		int c = nodes[i].cellID;
 		int j = cells[c].refNode;
-		float3 rij = r[j] - r[i];		
-		r[i] = r[i] + roundf(rij/Box)*Box*pbcFlag; // PBC's
+		float3 rij = nodes[j].r - nodes[i].r;		
+		nodes[i].r = nodes[i].r + roundf(rij/Box)*Box*pbcFlag; // PBC's
 	}
 }
 
@@ -783,7 +777,7 @@ __global__ void unwrap_node_coordinates_IBM3D(
 // --------------------------------------------------------
 
 __global__ void wrap_node_coordinates_IBM3D(
-	float3* r,	
+	node* nodes,	
 	float3 Box,
 	int3 pbcFlag,
 	int nNodes)
@@ -791,7 +785,7 @@ __global__ void wrap_node_coordinates_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {	
-		r[i] = r[i] - floorf(r[i]/Box)*Box*pbcFlag;		
+		nodes[i].r = nodes[i].r - floorf(nodes[i].r/Box)*Box*pbcFlag;		
 	}
 }
 
@@ -874,11 +868,8 @@ __global__ void scale_cell_areas_volumes_IBM3D(
 // --------------------------------------------------------
 
 __global__ void update_node_position_verlet_1_cellType2_stationary_IBM3D(
-	float3* r,
-	float3* v,
-	float3* f,
+	node* nodes,
 	cell* cells,
-	int* cellIDs,
 	float dt,
 	float m,	
 	int nNodes)
@@ -886,10 +877,10 @@ __global__ void update_node_position_verlet_1_cellType2_stationary_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		int cID = cellIDs[i];
+		int cID = nodes[i].cellID;
 		if (cells[cID].cellType != 2) {
-			r[i] += v[i]*dt + 0.5*dt*dt*(f[i]/m);
-			v[i] += 0.5*dt*(f[i]/m);
+			nodes[i].r += nodes[i].v*dt + 0.5*dt*dt*(nodes[i].f/m);
+			nodes[i].v += 0.5*dt*(nodes[i].f/m);
 		}		
 	}
 }

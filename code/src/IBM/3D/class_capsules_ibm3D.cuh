@@ -43,21 +43,16 @@ class class_capsules_ibm3D {
 	bindata bins;
 			
 	// host arrays:
-	float3* rH;
-	float3* vH;
+	node* nodesH;
 	triangle* facesH;
 	edge* edgesH;
 	cell* cellsH;
-	int* cellIDsH;
 		
 	// device arrays:
-	float3* r;
-	float3* v;
-	float3* f;
+	node* nodes;
 	triangle* faces;
 	edge* edges;
 	cell* cells;	
-	int* cellIDs;
 	
 	// methods:
 	class_capsules_ibm3D();

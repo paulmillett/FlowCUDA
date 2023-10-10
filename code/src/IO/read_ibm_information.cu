@@ -73,7 +73,7 @@ void read_ibm_information(std::string fname, int nNodes, int nFaces,
 // --------------------------------------------------------
 
 void read_ibm_information_long(std::string fname, int nNodes, int nFaces, int nEdges,
-                               float3* r, triangle* faces, edge* edges)
+                               node* nodes, triangle* faces, edge* edges)
 {
 	
 	// -----------------------------------------------
@@ -103,7 +103,7 @@ void read_ibm_information_long(std::string fname, int nNodes, int nFaces, int nE
 	// -----------------------------------------------
 	
 	for (int i=0; i<nNodes; i++) {
-		infile >> r[i].x >> r[i].y >> r[i].z;
+		infile >> nodes[i].r.x >> nodes[i].r.y >> nodes[i].r.z;
 	}
 	
 	// -----------------------------------------------

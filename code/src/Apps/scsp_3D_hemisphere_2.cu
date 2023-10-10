@@ -219,7 +219,7 @@ void scsp_3D_hemisphere_2::cycleForward(int stepsPerCycle, int currentCycle)
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
 		lbm.zero_forces_with_IBM(nBlocks,nThreads);
-		lbm.extrapolate_velocity_from_IBM(nBlocksIB,nThreads,ibm.r,ibm.v,ibm.nNodes);		
+		lbm.extrapolate_velocity_from_IBM(nBlocksIB,nThreads,ibm.nodes,ibm.nNodes);		
 		lbm.stream_collide_save_IBforcing(nBlocks,nThreads);
 		ibm.update_node_positions(nBlocksIB,nThreads,cummulativeSteps,nSteps);
 		cudaDeviceSynchronize();
