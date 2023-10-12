@@ -2,6 +2,7 @@
 # define KERNELS_NONBONDED_IBM3D_H
 # include "../../Utils/helper_math.h"
 # include "data_structs/membrane_data.h"
+# include "data_structs/filament_data.h"
 # include "data_structs/neighbor_bins_data.h"
 # include <cuda.h>
 
@@ -32,6 +33,17 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	int3);
 
 
+__global__ void nonbonded_node_bead_interactions_IBM3D(
+	node*,
+	bead*,
+	bindata,
+	float,
+	float,
+	int,
+	float3,	
+	int3);
+
+
 __device__ inline void pairwise_interaction_forces(
 	const int, 
 	const int,
@@ -39,6 +51,17 @@ __device__ inline void pairwise_interaction_forces(
 	const float,
 	node*,
 	cell*,
+	float3,
+	int3);
+
+
+__device__ inline void pairwise_node_bead_interaction_forces(
+	const int, 
+	const int,
+	const float,
+	const float,
+	node*,
+	bead*,	
 	float3,
 	int3);
 

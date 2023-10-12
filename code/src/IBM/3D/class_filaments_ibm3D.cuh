@@ -7,6 +7,7 @@
 # include "../../Utils/helper_math.h"
 # include "../../D3Q19/scsp/class_scsp_D3Q19.cuh"
 # include "kernels_filaments_ibm3D.cuh"
+# include "class_capsules_ibm3D.cuh"
 # include "data_structs/filament_data.h"
 # include "data_structs/neighbor_bins_data.h"
 # include <cuda.h>
@@ -71,6 +72,7 @@ class class_filaments_ibm3D {
 	void shift_bead_positions(int,float,float,float);
 	void rotate_and_shift_bead_positions(int,float,float,float);
 	void randomize_filaments(float);
+	void randomize_filaments_inside_sphere(float,float,float,float,float);
 	float calc_separation_pbc(float3,float3);
 	void update_bead_positions_verlet_1(int,int);
 	void update_bead_positions_verlet_2(int,int);
@@ -80,11 +82,13 @@ class class_filaments_ibm3D {
 	void add_xdir_force_to_beads(int,int,float);
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
+	void stepIBM_capsules_filaments(class_scsp_D3Q19&,class_capsules_ibm3D&,int,int); 
 	void stepIBM_no_fluid(int,bool,int,int);
 	void build_binMap(int,int);
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);
-	void nonbonded_bead_interactions(int,int);	
+	void nonbonded_bead_interactions(int,int);
+	void nonbonded_bead_node_interactions(class_capsules_ibm3D&,int,int);
 	void compute_bead_forces(int,int);
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);

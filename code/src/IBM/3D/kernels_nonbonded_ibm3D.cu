@@ -181,6 +181,69 @@ __global__ void nonbonded_node_interactions_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to calculate nonbonded node-bead interactions
+// using the bin lists.  Here, the beads are from the 
+// 'class_filaments_ibm3D' class
+// --------------------------------------------------------
+
+__global__ void nonbonded_node_bead_interactions_IBM3D(
+	node* nodes,
+	bead* beads,
+	bindata bins,
+	float repA,
+	float repD,
+	int nNodes,
+	float3 Box,	
+	int3 pbcFlag)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {		
+		
+		// -------------------------------
+		// calculate bin ID:
+		// -------------------------------
+		
+		int binID = int(floor(nodes[i].r.x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(nodes[i].r.y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(nodes[i].r.z/bins.sizeBins));
+		
+		// -------------------------------
+		// loop over nodes in the same bin:
+		// -------------------------------
+				
+		int offst = binID*bins.binMax;
+		int occup = bins.binOccupancy[binID];
+		if (occup > bins.binMax) occup = bins.binMax;
+								
+		for (int k=offst; k<offst+occup; k++) {
+			int j = bins.binMembers[k];
+			pairwise_node_bead_interaction_forces(i,j,repA,repD,nodes,beads,Box,pbcFlag);
+		}
+		
+		// -------------------------------
+		// loop over neighboring bins:
+		// -------------------------------
+		
+        for (int b=0; b<bins.nnbins; b++) {
+            // get neighboring bin ID
+			int naborbinID = bins.binMap[binID*bins.nnbins + b];
+			offst = naborbinID*bins.binMax;
+			occup = bins.binOccupancy[naborbinID];
+			if (occup > bins.binMax) occup = bins.binMax;
+			// loop over nodes in this bin:
+			for (int k=offst; k<offst+occup; k++) {
+				int j = bins.binMembers[k];
+				pairwise_node_bead_interaction_forces(i,j,repA,repD,nodes,beads,Box,pbcFlag);	
+			}
+		}
+				
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to calculate i-j force:
 // --------------------------------------------------------
 
@@ -210,6 +273,34 @@ __device__ inline void pairwise_interaction_forces(
 		float fdir = dot(fij,ric);
 		if (fdir > 0.0) fij = make_float3(0.0);
 		// add force to node i
+		nodes[i].f += fij;
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j force:
+// NOTE: here 'i' is a node and 'j' is a bead
+// --------------------------------------------------------
+
+__device__ inline void pairwise_node_bead_interaction_forces(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	node* nodes,
+	bead* beads,	
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = nodes[i].r - beads[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	if (r < repD) {
+		// linear spring force repulsion
+		float force = repA - (repA/repD)*r;
+		float3 fij = force*(rij/r);
 		nodes[i].f += fij;
 	} 	
 }

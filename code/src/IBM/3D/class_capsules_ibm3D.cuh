@@ -58,10 +58,12 @@ class class_capsules_ibm3D {
 	class_capsules_ibm3D();
 	~class_capsules_ibm3D();
 	void allocate();
+	void allocate_bin_arrays();
 	void deallocate();	
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
 	void read_ibm_information(std::string);
+	void initialize_bins();
 	void set_pbcFlag(int,int,int);
 	void set_ks(float);
 	void set_ka(float);
@@ -113,7 +115,8 @@ class class_capsules_ibm3D {
 	void build_binMap(int,int);
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);
-	void nonbonded_node_interactions(int,int);	
+	void nonbonded_node_interactions(int,int);
+	void nonbonded_node_bead_interactions(bead*,bindata,int,int);	
 	void compute_node_forces(int,int);
 	void compute_node_forces_skalak(int,int);
 	void wall_forces_ydir(int,int);

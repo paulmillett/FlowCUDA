@@ -122,11 +122,20 @@ void class_capsules_ibm3D::allocate()
 	cudaMalloc((void **) &faces, nFaces*sizeof(triangle));
 	cudaMalloc((void **) &edges, nEdges*sizeof(edge));
 	cudaMalloc((void **) &cells, nCells*sizeof(cell));
-	if (binsFlag) {
-		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
-		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
-		cudaMalloc((void **) &bins.binMap, bins.nBins*26*sizeof(int));				
-	}	
+	if (binsFlag) allocate_bin_arrays();
+}
+
+
+
+// --------------------------------------------------------
+// Allocate bin arrays:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::allocate_bin_arrays()
+{
+	cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
+	cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
+	cudaMalloc((void **) &bins.binMap, bins.nBins*26*sizeof(int));	
 }
 
 
@@ -195,6 +204,9 @@ void class_capsules_ibm3D::memcopy_device_to_host()
 
 
 
+
+
+
 // **********************************************************************************************
 // Initialization Stuff...
 // **********************************************************************************************
@@ -228,6 +240,30 @@ void class_capsules_ibm3D::read_ibm_information(std::string tagname)
 		cellsH[c].indxF0 = c*nFacesPerCell;  // so the start indices are 
 		cellsH[c].indxE0 = c*nEdgesPerCell;  // calculated as shown.
 	}
+}
+
+
+
+// --------------------------------------------------------
+// Initialize bins ONLY if bins have not yet been 
+// initialized (e.g. when nCells = 1):
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::initialize_bins()
+{
+	// only do this if it hasn't been done yet!
+	if (!binsFlag) {
+		binsFlag = true;
+		GetPot inputParams("input.dat");
+		bins.sizeBins = inputParams("IBM/sizeBins",2.0);
+		bins.binMax = inputParams("IBM/binMax",1);			
+		bins.numBins.x = int(floor(N.x/bins.sizeBins));
+	    bins.numBins.y = int(floor(N.y/bins.sizeBins));
+	    bins.numBins.z = int(floor(N.z/bins.sizeBins));
+		bins.nBins = bins.numBins.x*bins.numBins.y*bins.numBins.z;
+		bins.nnbins = 26;
+		allocate_bin_arrays();
+	}	
 }
 
 
@@ -1193,11 +1229,12 @@ void class_capsules_ibm3D::extrapolate_force(float* fxLBM, float* fyLBM,
 
 void class_capsules_ibm3D::build_binMap(int nBlocks, int nThreads)
 {
-	if (nCells > 1) {
-		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;	
+	if (binsFlag) {			
 		build_binMap_IBM3D
 		<<<nBlocks,nThreads>>> (bins);
-	}	
+	} else {
+		cout << "IBM bin arrays have not been initialized" << endl;
+	}
 }
 
 
@@ -1208,11 +1245,12 @@ void class_capsules_ibm3D::build_binMap(int nBlocks, int nThreads)
 
 void class_capsules_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 {
-	if (nCells > 1) {
-		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+	if (binsFlag) {	
 		reset_bin_lists_IBM3D
 		<<<nBlocks,nThreads>>> (bins);
-	}	
+	} else {
+		cout << "IBM bin arrays have not been initialized" << endl;
+	}
 }
 
 
@@ -1223,11 +1261,12 @@ void class_capsules_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 
 void class_capsules_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 {
-	if (nCells > 1) {
-		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+	if (binsFlag) {	
 		build_bin_lists_IBM3D
 		<<<nBlocks,nThreads>>> (nodes,bins,nNodes);	
-	}	
+	} else {
+		cout << "IBM bin arrays have not been initialized" << endl;
+	}
 }
 
 
@@ -1238,11 +1277,29 @@ void class_capsules_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 
 void class_capsules_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads)
 {
-	if (nCells > 1) {
-		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;
+	if (binsFlag) {	
 		nonbonded_node_interactions_IBM3D
 		<<<nBlocks,nThreads>>> (nodes,cells,bins,repA,repD,nNodes,Box,pbcFlag);
-	}	
+	} else {
+		cout << "IBM bin arrays have not been initialized" << endl;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::nonbonded_node_bead_interactions(bead* beads, bindata binsFil, 
+                                                            int nBlocks, int nThreads)
+{
+	if (binsFlag) {	
+		nonbonded_node_bead_interactions_IBM3D
+		<<<nBlocks,nThreads>>> (nodes,beads,binsFil,repA,repD,nNodes,Box,pbcFlag);
+	} else {
+		cout << "IBM bin arrays have not been initialized" << endl;
+	}
 }
 
 

@@ -2,6 +2,7 @@
 # define KERNELS_FILAMENTS_IBM3D_H
 # include <cuda.h>
 # include "data_structs/filament_data.h"
+# include "data_structs/membrane_data.h"
 # include "data_structs/neighbor_bins_data.h"
 # include "../../Utils/helper_math.h"
 
@@ -58,6 +59,12 @@ __global__ void compute_bead_force_bending_IBM3D(
 __global__ void compute_propulsion_force_IBM3D(
 	bead*,
 	edgefilam*,
+	filament*,
+	int);
+
+
+__global__ void compute_thermal_force_IBM3D(
+	bead*,
 	filament*,
 	int);
 
@@ -140,12 +147,34 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 	int3);
 
 
+__global__ void nonbonded_bead_node_interactions_IBM3D(
+	bead*,
+	node*,
+	bindata,
+	float,
+	float,
+	int,
+	float3,	
+	int3);
+
+
 __device__ inline void pairwise_bead_interaction_forces(
 	const int, 
 	const int,
 	const float,
 	const float,
 	bead*,
+	float3,
+	int3);
+
+
+__device__ inline void pairwise_bead_node_interaction_forces(
+	const int, 
+	const int,
+	const float,
+	const float,
+	bead*,
+	node*,
 	float3,
 	int3);
 

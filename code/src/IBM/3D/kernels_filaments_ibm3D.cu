@@ -233,6 +233,26 @@ __global__ void compute_propulsion_force_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to compute thermal force 
+// --------------------------------------------------------
+
+__global__ void compute_thermal_force_IBM3D(
+	bead* beads,
+	filament* filams,
+	int nBeads)
+{		
+	// define edge:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nBeads) {
+		// random vector
+			
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to calculate viscous force due to velocity
 // difference between IBM bead and LBM fluid
 // --------------------------------------------------------
@@ -609,7 +629,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 		            int(floor(beads[i].r.z/bins.sizeBins));		
 		
 		// -------------------------------
-		// loop over nodes in the same bin:
+		// loop over beads in the same bin:
 		// -------------------------------
 				
 		int offst = binID*bins.binMax;
@@ -638,6 +658,69 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 				int j = bins.binMembers[k];
 				if (beads[i].filamID == beads[j].filamID) continue;				
 				pairwise_bead_interaction_forces(i,j,repA,repD,beads,Box,pbcFlag);			
+			}
+		}
+				
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate nonbonded bead-node interactions
+// using the bin lists.  Here, the nodes are from the 
+// 'class_capsules_ibm3D' class
+// --------------------------------------------------------
+
+__global__ void nonbonded_bead_node_interactions_IBM3D(
+	bead* beads,
+	node* nodes,
+	bindata bins,
+	float repA,
+	float repD,
+	int nBeads,
+	float3 Box,	
+	int3 pbcFlag)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {		
+		
+		// -------------------------------
+		// calculate bin ID:
+		// -------------------------------
+		
+		int binID = int(floor(beads[i].r.x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(beads[i].r.y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(beads[i].r.z/bins.sizeBins));		
+		
+		// -------------------------------
+		// loop over beads in the same bin:
+		// -------------------------------
+				
+		int offst = binID*bins.binMax;
+		int occup = bins.binOccupancy[binID];
+		if (occup > bins.binMax) occup = bins.binMax;
+								
+		for (int k=offst; k<offst+occup; k++) {
+			int j = bins.binMembers[k];
+			pairwise_bead_node_interaction_forces(i,j,repA,repD,beads,nodes,Box,pbcFlag);			
+		}
+		
+		// -------------------------------
+		// loop over neighboring bins:
+		// -------------------------------
+		
+        for (int b=0; b<bins.nnbins; b++) {
+            // get neighboring bin ID
+			int naborbinID = bins.binMap[binID*bins.nnbins + b];
+			offst = naborbinID*bins.binMax;
+			occup = bins.binOccupancy[naborbinID];
+			if (occup > bins.binMax) occup = bins.binMax;
+			// loop over nodes in this bin:
+			for (int k=offst; k<offst+occup; k++) {
+				int j = bins.binMembers[k];
+				pairwise_bead_node_interaction_forces(i,j,repA,repD,beads,nodes,Box,pbcFlag);		
 			}
 		}
 				
@@ -687,6 +770,34 @@ __device__ inline void pairwise_bead_interaction_forces(
 	int3 pbcFlag)
 {
 	float3 rij = beads[i].r - beads[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	if (r < repD) {
+		// linear spring force repulsion
+		float force = repA - (repA/repD)*r;
+		float3 fij = force*(rij/r);
+		beads[i].f += fij;
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j force:
+// NOTE: here 'i' is a bead and 'j' is a node
+// --------------------------------------------------------
+
+__device__ inline void pairwise_bead_node_interaction_forces(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	bead* beads,
+	node* nodes,
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = beads[i].r - nodes[j].r;
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);
 	if (r < repD) {

@@ -378,6 +378,37 @@ void class_filaments_ibm3D::randomize_filaments(float sepWall)
 
 
 // --------------------------------------------------------
+// randomize cell positions and orientations:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::randomize_filaments_inside_sphere(float xs, float ys, float zs, float rs, float sepWall)
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(bead)*nBeads, cudaMemcpyDeviceToHost);
+	
+	// assign random position and orientation to each filament inside a sphere:
+	float3 sphere = make_float3(xs,ys,zs);
+	for (int f=0; f<nFilams; f++) {
+		float3 shift = make_float3(0.0,0.0,0.0);
+		bool outsideSphere = true;
+		while (outsideSphere) {
+			// get random position
+			shift.x = (float)rand()/RAND_MAX*Box.x;
+			shift.y = (float)rand()/RAND_MAX*Box.y;
+			shift.z = (float)rand()/RAND_MAX*Box.z;
+			float r = length(shift - sphere);
+			if (r <= (rs - sepWall)) outsideSphere = false;
+		}
+		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
+	}
+	
+	// copy node positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(bead)*nBeads, cudaMemcpyHostToDevice);	
+}
+
+
+
+// --------------------------------------------------------
 // calculate separation distance using PBCs:
 // --------------------------------------------------------
 
@@ -457,8 +488,8 @@ void class_filaments_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThr
 		
 	// ----------------------------------------------------------
 	//  here, the velocity-Verlet algorithm is used to update the 
-	//  node positions - using a viscous drag force proportional
-	//  to the difference between the node velocities and the 
+	//  bead positions - using a viscous drag force proportional
+	//  to the difference between the bead velocities and the 
 	//  fluid velocities
 	// ----------------------------------------------------------
 	
@@ -468,7 +499,7 @@ void class_filaments_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThr
 	// first step of IBM velocity verlet:
 	update_bead_positions_verlet_1(nBlocks,nThreads);
 	
-	// re-build bin lists for IBM nodes:
+	// re-build bin lists for filament beads:
 	reset_bin_lists(nBlocks,nThreads);
 	build_bin_lists(nBlocks,nThreads);
 			
@@ -479,6 +510,64 @@ void class_filaments_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThr
 	enforce_max_bead_force(nBlocks,nThreads);
 	lbm.viscous_force_filaments_IBM_LBM(nBlocks,nThreads,gam,beads,nBeads);
 	update_bead_positions_verlet_2(nBlocks,nThreads);
+		
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::stepIBM_capsules_filaments(class_scsp_D3Q19& lbm, class_capsules_ibm3D& cap, 
+                                                       int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	// This method updates filaments AND capsules
+	// ----------------------------------------------------------
+
+	// ----------------------------------------------------------
+	//  here, the velocity-Verlet algorithm is used to update the 
+	//  bead AND node positions - using a viscous drag force proportional
+	//  to the difference between the bead velocities and the 
+	//  fluid velocities
+	// ----------------------------------------------------------
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// first step of IBM velocity verlet:
+	update_bead_positions_verlet_1(nBlocks,nThreads);
+	cap.update_node_positions_verlet_1(nBlocks,nThreads);
+	
+	// re-build bin lists for filament beads & capsule nodes:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+	cap.reset_bin_lists(nBlocks,nThreads);
+	cap.build_bin_lists(nBlocks,nThreads);
+			
+	// calculate bonded forces within filaments and capsules:
+	compute_bead_forces(nBlocks,nThreads);
+	cap.compute_node_forces_skalak(nBlocks,nThreads);
+	
+	// calculate nonbonded forces for filaments and capsules:
+	nonbonded_bead_interactions(nBlocks,nThreads);
+	nonbonded_bead_node_interactions(cap,nBlocks,nThreads);
+	cap.nonbonded_node_interactions(nBlocks,nThreads);
+	cap.nonbonded_node_bead_interactions(beads,bins,nBlocks,nThreads);	
+	compute_wall_forces(nBlocks,nThreads);
+	enforce_max_bead_force(nBlocks,nThreads);
+	cap.compute_wall_forces(nBlocks,nThreads);	
+	cap.enforce_max_node_force(nBlocks,nThreads);
+	
+	// calculate viscous drag forces:
+	lbm.viscous_force_filaments_IBM_LBM(nBlocks,nThreads,gam,beads,nBeads); 
+	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,cap.nodes,cap.nNodes);
+	
+	// second step of IBM velocity verlet:
+	update_bead_positions_verlet_2(nBlocks,nThreads);
+	cap.update_node_positions_verlet_2(nBlocks,nThreads);
 		
 }
 
@@ -516,6 +605,8 @@ void class_filaments_ibm3D::stepIBM_no_fluid(int nSteps, bool zeroFlag, int nBlo
 	// reset repA to intended value:
 	repA = repA0;
 }
+
+
 
 
 
@@ -660,6 +751,21 @@ void class_filaments_ibm3D::nonbonded_bead_interactions(int nBlocks, int nThread
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
 		nonbonded_bead_interactions_IBM3D
 		<<<nBlocks,nThreads>>> (beads,bins,repA,repD,nBeads,Box,pbcFlag);
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::nonbonded_bead_node_interactions(class_capsules_ibm3D& cap, int nBlocks, int nThreads)
+{
+	if (nFilams > 1) {
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
+		nonbonded_bead_node_interactions_IBM3D
+		<<<nBlocks,nThreads>>> (beads,cap.nodes,cap.bins,repA,repD,nBeads,Box,pbcFlag);
 	}	
 }
 
