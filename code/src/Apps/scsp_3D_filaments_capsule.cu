@@ -64,6 +64,9 @@ scsp_3D_filaments_capsule::scsp_3D_filaments_capsule() : lbm(),ibm(),filams()
 	kb = inputParams("IBM_FILAMS/kb",0.1);
 	fp = inputParams("IBM_FILAMS/fp",0.0);
 	L0 = inputParams("IBM_FILAMS/L0",0.5);
+	Pe = inputParams("IBM_FILAMS/Pe",0.0);
+	PL = inputParams("IBM_FILAMS/PL",1.0);  // non-dimensional persistence length
+	kT = inputParams("IBM_FILAMS/kT",0.0);
 	nBeads = nBeadsPerFilam*nFilams;
 	Lfil = float(nBeadsPerFilam)*L0;
 	
@@ -184,18 +187,20 @@ void scsp_3D_filaments_capsule::initSystem()
 	ibm.set_cells_types(1);
 	ibm.shift_node_positions(0,float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0);
 	
-	float rho = 1.0;
-	float umax = shearVel;
-	float Ks = rho*umax*umax*a/(Ca*Re);
-	float Kb = 0.02*Ks*a*a*0.00287*sqrt(3); 
-	float Kv = inputParams("IBM/kv",0.0001);
-	float C = 2.0;
-	ibm.set_cells_mechanical_props(Ks,Kb,Kv,C,Ca); 
-	
-	
+	//float rho = 1.0;
+	//float umax = shearVel;
+	//float Ks = rho*umax*umax*a/(Ca*Re);
+	//float Kb = Ks*a*a*0.00287*sqrt(3);
+	//Kb *= 0.0005;
+	float Ks = inputParams("IBM/ks",0.0001);
+	float Kb = inputParams("IBM/kb",0.0001);
+	float Kv = inputParams("IBM/kv",0.0000);
+	float C = 0.0;
+	ibm.set_cells_mechanical_props(Ks,Kb,Kv,C,Ca);
+	cout << "Capsule Ks = " << Ks << endl;
+	cout << "Capsule Kb = " << Kb << endl;
 	shearVel = 0.0;
-	
-	
+		
 	// ----------------------------------------------			
 	// initialize filament immersed boundary info: 
 	// ----------------------------------------------
@@ -203,11 +208,19 @@ void scsp_3D_filaments_capsule::initSystem()
 	filams.create_first_filament();
 	filams.duplicate_filaments();
 	filams.assign_filamIDs_to_beads();
+	
+	fp = Pe*kT/Lfil/Lfil;
+	kb = PL*kT;
 	filams.set_ks(ks);
 	filams.set_kb(kb);
 	filams.set_fp(fp);
-	filams.set_filams_radii(1.0);
-		
+	filams.set_filams_radii(0.5);
+	cout << "  " << endl;
+	cout << "Filament kT = " << kT << endl;
+	cout << "Filament ks = " << ks << endl;
+	cout << "Filament kb = " << kb << endl;
+	cout << "Filament fp = " << fp << endl;
+			
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
@@ -233,20 +246,21 @@ void scsp_3D_filaments_capsule::initSystem()
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	srand(time(NULL));
+	//srand(time(NULL));
 	
 	// ----------------------------------------------
 	// randomly disperse filaments: 
 	// ----------------------------------------------
-		
-	//filams.randomize_filaments(Lfil/2.0+1.0);
-	filams.randomize_filaments_inside_sphere(float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,15.0,Lfil/2.0+3.0);
+			
+	filams.randomize_filaments_inside_sphere(float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,25.0,Lfil);
+	//filams.stepIBM_push_into_sphere(20000,float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,15.0,nBlocks,nThreads);	
 	
 	// ----------------------------------------------
 	// calculate rest geometries for membrane: 
 	// ----------------------------------------------
 	
-	ibm.rest_geometries_skalak(nBlocks,nThreads);
+	ibm.rest_geometries(nBlocks,nThreads);
+	ibm.set_edge_rest_angles(0.0,nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// write initial output file:
@@ -262,7 +276,14 @@ void scsp_3D_filaments_capsule::initSystem()
 	
 	ibm.zero_velocities_forces(nBlocks,nThreads);
 	filams.zero_bead_velocities_forces(nBlocks,nThreads);
-		
+	
+	// ----------------------------------------------
+	// initialize cuRand state for the thermal noise
+	// force:
+	// ----------------------------------------------
+	
+	filams.initialize_cuRand(nBlocks,nThreads);
+	
 }
 
 
@@ -295,8 +316,8 @@ void scsp_3D_filaments_capsule::cycleForward(int stepsPerCycle, int currentCycle
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
 			filams.stepIBM_capsules_filaments(lbm,ibm,nBlocks,nThreads);
-			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
-			lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
+			//lbm.stream_collide_save_forcing(nBlocks,nThreads);	
+			//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 			cudaDeviceSynchronize();
 		}
 		cout << " " << endl;
@@ -312,8 +333,8 @@ void scsp_3D_filaments_capsule::cycleForward(int stepsPerCycle, int currentCycle
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
 		filams.stepIBM_capsules_filaments(lbm,ibm,nBlocks,nThreads);	
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);
-		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
+		//lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
 	

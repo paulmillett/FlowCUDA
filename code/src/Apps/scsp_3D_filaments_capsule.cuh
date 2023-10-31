@@ -30,9 +30,11 @@ private:
 	int nVTKOutputs;
 	int iskip,jskip,kskip;
 	int precision;
+	float Pe;
+	float PL;
+	float kT;
 	float Re;
 	float Ca;
-	float tau;
 	float nu;
 	float shearVel;
 	float ks,kb;

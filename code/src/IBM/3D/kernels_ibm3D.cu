@@ -47,9 +47,9 @@ __global__ void update_node_position_verlet_1_IBM3D(
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) {
+	if (i < nNodes) {		
 		nodes[i].r += nodes[i].v*dt + 0.5*dt*dt*(nodes[i].f/m);
-		nodes[i].v += 0.5*dt*(nodes[i].f/m);
+		nodes[i].v += 0.5*dt*(nodes[i].f/m);		
 	}
 }
 
@@ -67,7 +67,7 @@ __global__ void update_node_position_verlet_2_IBM3D(
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) {
+	if (i < nNodes) {		
 		nodes[i].v += 0.5*dt*(nodes[i].f/m);
 	}
 }

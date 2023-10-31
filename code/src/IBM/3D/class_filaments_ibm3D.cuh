@@ -11,6 +11,8 @@
 # include "data_structs/filament_data.h"
 # include "data_structs/neighbor_bins_data.h"
 # include <cuda.h>
+# include <curand.h>
+# include <curand_kernel.h>
 # include <string>
 
 
@@ -29,13 +31,18 @@ class class_filaments_ibm3D {
 	float dt;
 	float repA;
 	float repD;
+	float repA_bn;
+	float repD_bn;
 	float beadFmax;
 	float gam;
 	float L0;
+	float kT;
+	float noisekT;
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;
 	std::string ibmUpdate;
+	std::string forceModel;
 	bindata bins;
 			
 	// host arrays:
@@ -46,7 +53,8 @@ class class_filaments_ibm3D {
 	// device arrays:
 	bead* beads;
 	edgefilam* edges;
-	filament* filams;	
+	filament* filams;
+	curandState* rngState;
 	
 	// methods:
 	class_filaments_ibm3D();
@@ -74,8 +82,11 @@ class class_filaments_ibm3D {
 	void randomize_filaments(float);
 	void randomize_filaments_inside_sphere(float,float,float,float,float);
 	float calc_separation_pbc(float3,float3);
+	void initialize_cuRand(int,int);
 	void update_bead_positions_verlet_1(int,int);
 	void update_bead_positions_verlet_2(int,int);
+	void update_bead_positions_verlet_1_drag(int,int);
+	void update_bead_positions_verlet_2_drag(int,int);
 	void zero_bead_velocities_forces(int,int);
 	void enforce_max_bead_force(int,int);
 	void add_drag_force_to_beads(float,int,int);
@@ -83,16 +94,20 @@ class class_filaments_ibm3D {
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
 	void stepIBM_capsules_filaments(class_scsp_D3Q19&,class_capsules_ibm3D&,int,int); 
-	void stepIBM_no_fluid(int,bool,int,int);
+	void stepIBM_push_into_sphere(int,float,float,float,float,int,int);
+	void compute_bead_forces(int,int);
 	void build_binMap(int,int);
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);
 	void nonbonded_bead_interactions(int,int);
 	void nonbonded_bead_node_interactions(class_capsules_ibm3D&,int,int);
-	void compute_bead_forces(int,int);
+	void compute_bead_forces_spring(int,int);
+	void compute_bead_forces_FENE(int,int);
+	void compute_bead_forces_no_propulsion(int,int);
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
+	void push_beads_inside_sphere(float,float,float,float,int,int);
 	void write_output(std::string,int);
 	void unwrap_bead_coordinates();
 	void output_filament_data();

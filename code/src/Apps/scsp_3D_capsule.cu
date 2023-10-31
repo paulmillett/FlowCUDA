@@ -163,7 +163,7 @@ void scsp_3D_capsule::initSystem()
 	// calculate rest geometries for membrane: 
 	// ----------------------------------------------
 	
-	ibm.rest_geometries(nBlocks,nThreads);
+	ibm.rest_geometries_spring(nBlocks,nThreads);
 	
 }
 
@@ -196,7 +196,7 @@ void scsp_3D_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 		lbm.zero_forces(nBlocks,nThreads);
 		
 		// compute IBM node forces:
-		ibm.compute_node_forces(nBlocks,nThreads);
+		ibm.compute_node_forces_spring(nBlocks,nThreads);
 		
 		// update fluid:
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.nodes,nNodes);

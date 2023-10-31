@@ -1,6 +1,8 @@
 # ifndef KERNELS_FILAMENTS_IBM3D_H
 # define KERNELS_FILAMENTS_IBM3D_H
 # include <cuda.h>
+# include <curand.h>
+# include <curand_kernel.h>
 # include "data_structs/filament_data.h"
 # include "data_structs/membrane_data.h"
 # include "data_structs/neighbor_bins_data.h"
@@ -16,6 +18,22 @@ __global__ void update_bead_position_verlet_1_IBM3D(
 
 __global__ void update_bead_position_verlet_2_IBM3D(
 	bead*,
+	float,
+	float,
+	int);
+	
+	
+__global__ void update_bead_position_verlet_1_drag_IBM3D(
+	bead*,
+	float,
+	float,
+	float,
+	int);
+
+
+__global__ void update_bead_position_verlet_2_drag_IBM3D(
+	bead*,
+	float,
 	float,
 	float,
 	int);
@@ -43,13 +61,21 @@ __global__ void zero_bead_forces_IBM3D(
 	int);
 		
 	
-__global__ void compute_bead_force_IBM3D(
+__global__ void compute_bead_force_spring_IBM3D(
 	bead*,
 	edgefilam*,
 	filament*,
 	int);
 	
-	
+
+__global__ void compute_bead_force_FENE_IBM3D(
+	bead*,
+	edgefilam*,
+	filament*,
+	float delta,
+	int);
+
+
 __global__ void compute_bead_force_bending_IBM3D(
 	bead*,
 	filament*,
@@ -63,9 +89,23 @@ __global__ void compute_propulsion_force_IBM3D(
 	int);
 
 
+__global__ void compute_propulsion_force_2_IBM3D(
+	bead*,
+	filament*,
+	int);
+
+
+__global__ void compute_propulsion_force_3_IBM3D(
+	bead*,
+	filament*,
+	int);
+
+
 __global__ void compute_thermal_force_IBM3D(
 	bead*,
 	filament*,
+	curandState*,
+	float,
 	int);
 
 	
@@ -121,6 +161,15 @@ __global__ void bead_wall_forces_ydir_zdir_IBM3D(
 	float,
 	float,
 	int);
+	
+	
+__global__ void push_beads_into_sphere_IBM3D(
+	bead*,
+	float,
+	float,
+	float,
+	float,
+	int);	
 	
 	
 __global__ void build_binMap_for_beads_IBM3D(
@@ -198,6 +247,12 @@ __device__ inline int bead_voxel_ndx(
 	int,
 	int,
 	int,
+	int);
+
+
+__global__ void init_curand_IBM3D(
+	curandState*,
+	unsigned long,
 	int);
 
 

@@ -44,6 +44,49 @@ __global__ void update_bead_position_verlet_2_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D bead update kernel (here, viscous drag is included
+// in the verlet algorithm)
+// --------------------------------------------------------
+
+__global__ void update_bead_position_verlet_1_drag_IBM3D(
+	bead* beads,
+	float dt,
+	float m,
+	float gam,
+	int nBeads)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		beads[i].r += beads[i].v*dt + 0.5*dt*dt*(beads[i].f/m - gam*beads[i].v);
+		beads[i].v += 0.5*dt*(beads[i].f/m - gam*beads[i].v);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D bead update kernel (here, viscous drag is included
+// in the verlet algorithm)
+// --------------------------------------------------------
+
+__global__ void update_bead_position_verlet_2_drag_IBM3D(
+	bead* beads,
+	float dt,
+	float m,
+	float gam,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		beads[i].v = (beads[i].v + 0.5*dt*beads[i].f/m)/(1.0 + 0.5*dt*gam);
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D zero the bead velocities and forces:
 // --------------------------------------------------------
 
@@ -120,7 +163,7 @@ __global__ void zero_bead_forces_IBM3D(
 // neighbors
 // --------------------------------------------------------
 
-__global__ void compute_bead_force_IBM3D(
+__global__ void compute_bead_force_spring_IBM3D(
 	bead* beads,
 	edgefilam* edges,
 	filament* filams,
@@ -141,6 +184,43 @@ __global__ void compute_bead_force_IBM3D(
 		int fID = beads[B0].filamID;
 		float length0 = edges[i].length0;
 		float ForceMag = filams[fID].ks*(edgeL-length0);
+		r01 /= edgeL;  // normalize vector
+		add_force_to_bead(B0,beads, ForceMag*r01);
+		add_force_to_bead(B1,beads,-ForceMag*r01);		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute force on beads due to bonded
+// neighbors using the FENE model of Peterson et al. 
+// Nature Comm. 12:7247 (2021)
+// --------------------------------------------------------
+
+__global__ void compute_bead_force_FENE_IBM3D(
+	bead* beads,
+	edgefilam* edges,
+	filament* filams,
+	float delta,
+	int nEdges)
+{
+	// define edge:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nEdges) {
+		// calculate edge length:
+		int B0 = edges[i].b0;
+		int B1 = edges[i].b1;
+		float3 r0 = beads[B0].r; 
+		float3 r1 = beads[B1].r;
+		float3 r01 = r1 - r0;
+		float edgeL = length(r01);		
+		// calculate edge stretching force:
+		int fID = beads[B0].filamID;
+		float numer = edgeL - edges[i].length0;
+		float denom = 1.0 - numer*numer/delta/delta;
+		float ForceMag = filams[fID].ks*numer/denom;
 		r01 /= edgeL;  // normalize vector
 		add_force_to_bead(B0,beads, ForceMag*r01);
 		add_force_to_bead(B1,beads,-ForceMag*r01);		
@@ -184,12 +264,12 @@ __global__ void compute_bead_force_bending_IBM3D(
 		if (c < -1.0) c = -1.0;
 		// sine of angle:
 		float s = sqrt(1.0 - c*c);
-		if (s < 0.001) s = 0.001;   // LAMMPS uses varaible 'SMALL'
+		if (s < 0.001) s = 0.001;   // LAMMPS uses variable 'SMALL'
 		s = 1.0/s;
 		// forces:
 		int f = beads[B1].filamID;
 		float kb = filams[f].kb;
-		float dtheta = acos(c) - 3.14159265359;
+		float dtheta = acos(c) - M_PI; //3.14159265359;
 		float a = -2.0*kb*dtheta*s;
 		float a11 = a*c/(r1*r1);
 		float a12 = -a/(r1*r2);
@@ -205,7 +285,10 @@ __global__ void compute_bead_force_bending_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to compute self-propulsion force 
+// IBM3D kernel to compute self-propulsion force
+// Note: here, I am using the model of Duman et al. Soft
+// Matter 14:4483 (2018) which assumes 'fp' is a force
+// per unit length along the filament
 // --------------------------------------------------------
 
 __global__ void compute_propulsion_force_IBM3D(
@@ -218,15 +301,82 @@ __global__ void compute_propulsion_force_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nEdges) {
-		// vector pointing to the lower-index bead
-		// (toward the headBead)
+		// vector pointing to the lower-index bead (toward the headBead)
 		int B0 = edges[i].b0;
 		int B1 = edges[i].b1;
+		float3 r01 = beads[B0].r - beads[B1].r;
+		// calculate propulsion force:
+		int fID = beads[B0].filamID;
+		float ForceMag = filams[fID].fp;
+		add_force_to_bead(B0,beads,ForceMag*r01);
+		//add_force_to_bead(B0,beads,0.5*ForceMag*r01);
+		//add_force_to_bead(B1,beads,0.5*ForceMag*r01);	
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute self-propulsion force 
+// Note: here, I am applying the propulsion forces to nodes
+// and the direction is determined from a forward F.D.
+// --------------------------------------------------------
+
+__global__ void compute_propulsion_force_2_IBM3D(
+	bead* beads,
+	filament* filams,
+	int nBeads)
+{		
+	// define edge:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nBeads) {
+		// get neighboring beads & force direction & 
+		// adjust if this is the last bead on a filament:
+		int B0 = i;
+		int B1 = i+1;
+		if (B1 == nBeads || beads[B0].filamID != beads[B1].filamID) {
+			B0 = i-1;  // change indices to look backward
+			B1 = i;
+		}
 		float3 r01 = normalize(beads[B0].r - beads[B1].r);
 		// calculate propulsion force:
 		int fID = beads[B0].filamID;
 		float ForceMag = filams[fID].fp;
-		add_force_to_bead(B0,beads,ForceMag*r01);	
+		beads[i].f += ForceMag*r01;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute self-propulsion force
+// Note: here, I am applying the propulsion forces to nodes
+// and the direction is determined from a centered F.D.
+// --------------------------------------------------------
+
+__global__ void compute_propulsion_force_3_IBM3D(
+	bead* beads,
+	filament* filams,
+	int nBeads)
+{		
+	// define edge:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nBeads) {
+		// get neighboring beads & force direction & 
+		// adjust if this is the last bead on a filament:
+		int B0 = i-1;
+		int B1 = i;
+		int B2 = i+1;
+		if (B1 == 0 || B1 == nBeads-1) return;
+		if (beads[B0].filamID != beads[B1].filamID) return;  // beads are not bonded
+		if (beads[B2].filamID != beads[B1].filamID) return;  // beads are not bonded
+		float3 r01 = normalize(beads[B0].r - beads[B2].r);
+		// calculate propulsion force:
+		int fID = beads[B0].filamID;
+		float ForceMag = filams[fID].fp;
+		beads[i].f += ForceMag*r01;
 	}
 }
 
@@ -239,14 +389,20 @@ __global__ void compute_propulsion_force_IBM3D(
 __global__ void compute_thermal_force_IBM3D(
 	bead* beads,
 	filament* filams,
+	curandState* state,
+	float pref,
 	int nBeads)
 {		
 	// define edge:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nBeads) {
-		// random vector
-			
+		float r1 = curand_uniform(&state[i]);
+		float r2 = curand_uniform(&state[i]);
+		float r3 = curand_uniform(&state[i]);		
+		beads[i].f.x += pref*(r1-0.5);
+		beads[i].f.y += pref*(r2-0.5);
+		beads[i].f.z += pref*(r3-0.5);
 	}
 }
 
@@ -486,6 +642,33 @@ __global__ void bead_wall_forces_ydir_zdir_IBM3D(
 			const float force = A/pow(bmzi,2) - A/pow(d,2);
 			beads[i].f.z -= force;
 			if (zi > Box.z-1.0001) beads[i].r.z = Box.z-1.0001;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void push_beads_into_sphere_IBM3D(
+	bead* beads,
+	float xs,
+	float ys,
+	float zs,
+	float rs,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		float3 sphere = make_float3(xs,ys,zs);
+		float3 ris = beads[i].r - sphere;
+		float r = length(ris);
+		if (r > (rs-1.5)) {
+			ris /= r;
+			beads[i].f -= 0.0005*ris;
 		}
 	}
 }
@@ -819,9 +1002,9 @@ __device__ inline void add_force_to_bead(
 	bead* b,
 	const float3 g)
 {
-	atomicAdd(&b[i].r.x,g.x);
-	atomicAdd(&b[i].r.y,g.y);
-	atomicAdd(&b[i].r.z,g.z);	
+	atomicAdd(&b[i].f.x,g.x);
+	atomicAdd(&b[i].f.y,g.y);
+	atomicAdd(&b[i].f.z,g.z);	
 }
 
 
@@ -870,7 +1053,20 @@ __device__ inline int bead_voxel_ndx(
 
 
 
+// --------------------------------------------------------
+// IBM3D kernel to initialize curand random num. generator:
+// --------------------------------------------------------
 
+__global__ void init_curand_IBM3D(
+	curandState* state,
+	unsigned long seed,
+	int nBeads)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nBeads) {
+		curand_init(seed,i,0,&state[i]);
+	}    
+}
 
 
 

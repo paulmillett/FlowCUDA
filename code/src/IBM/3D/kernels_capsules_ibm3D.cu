@@ -195,6 +195,10 @@ __global__ void rest_cell_volumes_IBM3D(
 
 
 
+
+
+
+
 // --------------------------------------------------------
 // IBM3D kernel to compute force on nodes based on the 
 // Skalak elastic membrane model.  Here, we follow the details of 
@@ -389,6 +393,10 @@ __global__ void compute_node_force_membrane_skalak_IBM3D(
 
 
 
+
+
+
+
 // --------------------------------------------------------
 // IBM3D kernel to compute force on node based on the 
 // membrane model of Jancigova et al (Int. J. Numer. Meth.
@@ -451,7 +459,6 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 // --------------------------------------------------------
 
 __global__ void compute_node_force_membrane_edge_IBM3D(
-	triangle* faces,
 	node* nodes,
 	edge* edges,
 	float ks,
@@ -475,6 +482,45 @@ __global__ void compute_node_force_membrane_edge_IBM3D(
 		r01 /= edgeL;  // normalize vector
 		add_force_to_vertex(V0,nodes, lengthForceMag*r01);
 		add_force_to_vertex(V1,nodes,-lengthForceMag*r01);		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute force on node based on the 
+// membrane model of Jancigova et al (Int. J. Numer. Meth.
+// Fluids, 92:1368 (2020)):
+// --------------------------------------------------------
+
+__global__ void compute_node_force_membrane_edge_FENE_IBM3D(
+	node* nodes,
+	edge* edges,
+	cell* cells,
+	float delta,
+	int nEdges)
+{
+	// define edge:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nEdges) {
+		// calculate edge length:
+		int V0 = edges[i].v0;
+		int V1 = edges[i].v1;
+		float3 r0 = nodes[V0].r; 
+		float3 r1 = nodes[V1].r;
+		float3 r01 = r1 - r0;
+		float edgeL = length(r01);
+		float length0 = edges[i].length0;
+		// calculate edge stretching force:
+		int cID = nodes[V0].cellID;
+		float ks = cells[cID].ks;
+		float numer = edgeL - length0;
+		float denom = 1.0 - numer*numer/delta/delta;
+		float lengthForceMag = ks*numer/denom;
+		r01 /= edgeL;  // normalize vector
+		add_force_to_vertex(V0,nodes, lengthForceMag*r01);
+		add_force_to_vertex(V1,nodes,-lengthForceMag*r01);					
 	}
 }
 
@@ -529,7 +575,7 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 		add_force_to_vertex(pA,nodes,FA);
 		add_force_to_vertex(pB,nodes,FB);
 		add_force_to_vertex(pC,nodes,FC);
-		add_force_to_vertex(pD,nodes,FD);											
+		add_force_to_vertex(pD,nodes,FD);
 	}	
 }
 
@@ -618,6 +664,9 @@ __global__ void compute_node_force_membrane_globalarea_IBM3D(
 // **********************************************************************************************
 // Miscellaneous kernels and functions
 // **********************************************************************************************
+
+
+
 
 
 
@@ -787,6 +836,21 @@ __global__ void wrap_node_coordinates_IBM3D(
 	if (i < nNodes) {	
 		nodes[i].r = nodes[i].r - floorf(nodes[i].r/Box)*Box*pbcFlag;		
 	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to set the rest edge angle for bending forces:
+// --------------------------------------------------------
+
+__global__ void set_edge_rest_angles_IBM3D(
+	edge* edges,
+	float val,
+	int nEdges)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
+	if (i < nEdges) edges[i].theta0 = val;	
 }
 
 

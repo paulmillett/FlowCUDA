@@ -19,9 +19,14 @@ using namespace std;
 
 
 
+
+
+
 // **********************************************************************************************
 // Constructor, destructor, and array allocations...
 // **********************************************************************************************
+
+
 
 
 
@@ -51,11 +56,16 @@ class_filaments_ibm3D::class_filaments_ibm3D()
 	ks = inputParams("IBM_FILAMS/ks",0.0);
 	kb = inputParams("IBM_FILAMS/kb",0.0);
 	L0 = inputParams("IBM_FILAMS/L0",0.5);
+	kT = inputParams("IBM_FILAMS/kT",0.0);
 	repA = inputParams("IBM_FILAMS/repA",0.0);
 	repD = inputParams("IBM_FILAMS/repD",0.0);
+	repA_bn = inputParams("IBM_FILAMS/repA_bn",0.0);
+	repD_bn = inputParams("IBM_FILAMS/repD_bn",0.0);
 	beadFmax = inputParams("IBM_FILAMS/beadFmax",1000.0);
 	gam = inputParams("IBM_FILAMS/gamma",0.1);
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
+	forceModel = inputParams("IBM_FILAMS/forceModel","spring");
+	noisekT = 6.0*kT*gam/dt;
 	
 	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
@@ -108,6 +118,7 @@ void class_filaments_ibm3D::allocate()
 	cudaMalloc((void **) &beads, nBeads*sizeof(bead));
 	cudaMalloc((void **) &edges, nEdges*sizeof(edgefilam));
 	cudaMalloc((void **) &filams, nFilams*sizeof(filament));
+	cudaMalloc((void **) &rngState, nBeads*sizeof(curandState));
 	if (binsFlag) {		
 		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
 		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
@@ -131,7 +142,8 @@ void class_filaments_ibm3D::deallocate()
 	// free array memory (device):
 	cudaFree(beads);
 	cudaFree(edges);
-	cudaFree(filams);	
+	cudaFree(filams);
+	cudaFree(rngState);
 	if (binsFlag) {		
 		cudaFree(bins.binMembers);
 		cudaFree(bins.binOccupancy);
@@ -401,7 +413,7 @@ void class_filaments_ibm3D::randomize_filaments_inside_sphere(float xs, float ys
 		}
 		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
 	}
-	
+		
 	// copy node positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(bead)*nBeads, cudaMemcpyHostToDevice);	
 }
@@ -445,9 +457,9 @@ void class_filaments_ibm3D::shift_bead_positions(int fID, float xsh, float ysh, 
 void class_filaments_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float ysh, float zsh)
 {
 	// random rotation angles:
-	float a = M_PI*((float)rand()/RAND_MAX - 0.5);  // alpha
-	float b = M_PI*((float)rand()/RAND_MAX - 0.5);  // beta
-	float g = M_PI*((float)rand()/RAND_MAX - 0.5);  // gamma
+	float a = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // alpha
+	float b = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // beta
+	float g = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // gamma
 	
 	// update node positions:
 	int istr = filamsH[fID].indxB0;
@@ -467,7 +479,7 @@ void class_filaments_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, 
 
 
 // --------------------------------------------------------
-// Calculate rest geometries (Skalak model):
+// Calculate wall forces:
 // --------------------------------------------------------
 
 void class_filaments_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
@@ -504,7 +516,7 @@ void class_filaments_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThr
 	build_bin_lists(nBlocks,nThreads);
 			
 	// update IBM:
-	compute_bead_forces(nBlocks,nThreads);
+	compute_bead_forces_spring(nBlocks,nThreads);
 	nonbonded_bead_interactions(nBlocks,nThreads);
 	compute_wall_forces(nBlocks,nThreads);
 	enforce_max_bead_force(nBlocks,nThreads);
@@ -535,11 +547,11 @@ void class_filaments_ibm3D::stepIBM_capsules_filaments(class_scsp_D3Q19& lbm, cl
 	// ----------------------------------------------------------
 	
 	// zero fluid forces:
-	lbm.zero_forces(nBlocks,nThreads);
+	//lbm.zero_forces(nBlocks,nThreads);
 	
 	// first step of IBM velocity verlet:
-	update_bead_positions_verlet_1(nBlocks,nThreads);
-	cap.update_node_positions_verlet_1(nBlocks,nThreads);
+	update_bead_positions_verlet_1_drag(nBlocks,nThreads);
+	//cap.update_node_positions_verlet_1(nBlocks,nThreads);
 	
 	// re-build bin lists for filament beads & capsule nodes:
 	reset_bin_lists(nBlocks,nThreads);
@@ -548,42 +560,43 @@ void class_filaments_ibm3D::stepIBM_capsules_filaments(class_scsp_D3Q19& lbm, cl
 	cap.build_bin_lists(nBlocks,nThreads);
 			
 	// calculate bonded forces within filaments and capsules:
-	compute_bead_forces(nBlocks,nThreads);
-	cap.compute_node_forces_skalak(nBlocks,nThreads);
+	compute_bead_forces(nBlocks,nThreads); 
+	cap.compute_node_forces(nBlocks,nThreads);
 	
 	// calculate nonbonded forces for filaments and capsules:
 	nonbonded_bead_interactions(nBlocks,nThreads);
-	nonbonded_bead_node_interactions(cap,nBlocks,nThreads);
-	cap.nonbonded_node_interactions(nBlocks,nThreads);
-	cap.nonbonded_node_bead_interactions(beads,bins,nBlocks,nThreads);	
+	//nonbonded_bead_node_interactions(cap,nBlocks,nThreads);
+	//cap.nonbonded_node_interactions(nBlocks,nThreads);
+	//cap.nonbonded_node_bead_interactions(beads,bins,nBlocks,nThreads);
+	
+	// calculate wall forces:
 	compute_wall_forces(nBlocks,nThreads);
 	enforce_max_bead_force(nBlocks,nThreads);
 	cap.compute_wall_forces(nBlocks,nThreads);	
 	cap.enforce_max_node_force(nBlocks,nThreads);
 	
 	// calculate viscous drag forces:
-	lbm.viscous_force_filaments_IBM_LBM(nBlocks,nThreads,gam,beads,nBeads); 
-	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,cap.nodes,cap.nNodes);
+	//add_drag_force_to_beads(gam,nBlocks,nThreads);
+	//lbm.viscous_force_filaments_IBM_LBM(nBlocks,nThreads,gam,beads,nBeads); 
+	//lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,cap.nodes,cap.nNodes);
 	
 	// second step of IBM velocity verlet:
-	update_bead_positions_verlet_2(nBlocks,nThreads);
-	cap.update_node_positions_verlet_2(nBlocks,nThreads);
+	update_bead_positions_verlet_2_drag(nBlocks,nThreads);
+	//cap.update_node_positions_verlet_2(nBlocks,nThreads);
 		
 }
 
 
 
 // --------------------------------------------------------
-// Take step forward for IBM w/o fluid:
+// Take step forward for IBM w/o fluid pushing beads
+// into sphere:
 // (note: this uses the velocity-Verlet algorithm)
 // --------------------------------------------------------
 
-void class_filaments_ibm3D::stepIBM_no_fluid(int nSteps, bool zeroFlag, int nBlocks, int nThreads) 
+void class_filaments_ibm3D::stepIBM_push_into_sphere(int nSteps, float xs, float ys, float zs, float rs, 
+                                                     int nBlocks, int nThreads) 
 {		
-	// use distinct (smaller) value of repA:
-	float repA0 = repA;
-	repA = 0.0001;
-	
 	for (int i=0; i<nSteps; i++) {
 		// first step of IBM velocity verlet:
 		update_bead_positions_verlet_1(nBlocks,nThreads);
@@ -593,21 +606,35 @@ void class_filaments_ibm3D::stepIBM_no_fluid(int nSteps, bool zeroFlag, int nBlo
 		build_bin_lists(nBlocks,nThreads);
 		
 		// update IBM:
-		compute_bead_forces(nBlocks,nThreads);
+		compute_bead_forces_no_propulsion(nBlocks,nThreads);
 		nonbonded_bead_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
-		add_drag_force_to_beads(0.001,nBlocks,nThreads);
+		push_beads_inside_sphere(xs,ys,zs,rs,nBlocks,nThreads);
+		add_drag_force_to_beads(gam,nBlocks,nThreads);
 		enforce_max_bead_force(nBlocks,nThreads);
 		update_bead_positions_verlet_2(nBlocks,nThreads);
 	}
-	if (zeroFlag) zero_bead_velocities_forces(nBlocks,nThreads); 
-	
-	// reset repA to intended value:
-	repA = repA0;
+	zero_bead_velocities_forces(nBlocks,nThreads); 
 }
 
 
 
+// --------------------------------------------------------
+// Determine which bead-force model to use:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::compute_bead_forces(int nBlocks, int nThreads) 
+{	
+	if (forceModel == "FENE") {
+		compute_bead_forces_FENE(nBlocks,nThreads);
+	}
+	else if (forceModel == "spring") {
+		compute_bead_forces_spring(nBlocks,nThreads);
+	}
+	else {
+		cout << "valid bead-force model not selected" << endl;
+	}
+}
 
 
 
@@ -630,6 +657,17 @@ void class_filaments_ibm3D::stepIBM_no_fluid(int nSteps, bool zeroFlag, int nBlo
 
 
 
+
+
+// --------------------------------------------------------
+// Call to initialize cuRand state:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::initialize_cuRand(int nBlocks, int nThreads)
+{
+	init_curand_IBM3D
+	<<<nBlocks,nThreads>>> (rngState,1,nBeads);
+}
 
 
 
@@ -656,6 +694,33 @@ void class_filaments_ibm3D::update_bead_positions_verlet_2(int nBlocks, int nThr
 {
 	update_bead_position_verlet_2_IBM3D
 	<<<nBlocks,nThreads>>> (beads,dt,1.0,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_bead_position_verlet_1_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::update_bead_positions_verlet_1_drag(int nBlocks, int nThreads)
+{
+	update_bead_position_verlet_1_drag_IBM3D
+	<<<nBlocks,nThreads>>> (beads,dt,1.0,gam,nBeads);
+	
+	wrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_bead_position_verlet_2_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::update_bead_positions_verlet_2_drag(int nBlocks, int nThreads)
+{
+	update_bead_position_verlet_2_drag_IBM3D
+	<<<nBlocks,nThreads>>> (beads,dt,1.0,gam,nBeads);
 }
 
 
@@ -765,18 +830,18 @@ void class_filaments_ibm3D::nonbonded_bead_node_interactions(class_capsules_ibm3
 	if (nFilams > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
 		nonbonded_bead_node_interactions_IBM3D
-		<<<nBlocks,nThreads>>> (beads,cap.nodes,cap.bins,repA,repD,nBeads,Box,pbcFlag);
+		<<<nBlocks,nThreads>>> (beads,cap.nodes,cap.bins,repA_bn,repD_bn,nBeads,Box,pbcFlag);
 	}	
 }
 
 
 
 // --------------------------------------------------------
-// Calls to kernels that compute forces on nodes based 
-// on the membrane mechanics model (Spring model):
+// Calls to kernels that compute forces on beads based 
+// on the chain-like mechanics model (Spring model):
 // --------------------------------------------------------
 
-void class_filaments_ibm3D::compute_bead_forces(int nBlocks, int nThreads)
+void class_filaments_ibm3D::compute_bead_forces_spring(int nBlocks, int nThreads)
 {
 	// First, zero the bead forces
 	zero_bead_forces_IBM3D
@@ -787,19 +852,90 @@ void class_filaments_ibm3D::compute_bead_forces(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (beads,filams,Box,pbcFlag,nBeads);	
 			
 	// Third, compute the edge extension and bending force for each edge:
-	compute_bead_force_IBM3D
+	compute_bead_force_spring_IBM3D
 	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
+		
+	compute_bead_force_bending_IBM3D
+	<<<nBlocks,nThreads>>> (beads,filams,nBeads);
+	
+	// Forth, compute propulsion and thermal forces:
+	compute_propulsion_force_IBM3D
+	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
+	
+	compute_thermal_force_IBM3D
+	<<<nBlocks,nThreads>>> (beads,filams,rngState,noisekT,nBeads);
+	
+	// Fifth, re-wrap bead coordinates:
+	wrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on beads based 
+// on the chain-like mechanics model (FENE model):
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::compute_bead_forces_FENE(int nBlocks, int nThreads)
+{
+	// First, zero the bead forces
+	zero_bead_forces_IBM3D
+	<<<nBlocks,nThreads>>> (beads,nBeads);
+		
+	// Second, unwrap node coordinates:
+	unwrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,filams,Box,pbcFlag,nBeads);	
+			
+	// Third, compute the edge extension and bending force for each edge:
+	compute_bead_force_FENE_IBM3D
+	<<<nBlocks,nThreads>>> (beads,edges,filams,0.4,nEdges);
 	
 	compute_bead_force_bending_IBM3D
 	<<<nBlocks,nThreads>>> (beads,filams,nBeads);
 	
+	// Forth, compute propulsion and thermal forces:
 	compute_propulsion_force_IBM3D
 	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
 	
+	compute_thermal_force_IBM3D
+	<<<nBlocks,nThreads>>> (beads,filams,rngState,noisekT,nBeads);
+	
+	// Fifth, re-wrap bead coordinates:
+	wrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on nodes based 
+// on the membrane mechanics model (Spring model):
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::compute_bead_forces_no_propulsion(int nBlocks, int nThreads)
+{
+	// First, zero the bead forces
+	zero_bead_forces_IBM3D
+	<<<nBlocks,nThreads>>> (beads,nBeads);
+		
+	// Second, unwrap node coordinates:
+	unwrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,filams,Box,pbcFlag,nBeads);	
+			
+	// Third, compute the edge extension and bending force for each edge:
+	compute_bead_force_spring_IBM3D
+	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
+	
+	//compute_bead_force_FENE_IBM3D
+	//<<<nBlocks,nThreads>>> (beads,edges,filams,0.4,nEdges);
+	
+	compute_bead_force_bending_IBM3D
+	<<<nBlocks,nThreads>>> (beads,filams,nBeads);
+		
 	// Forth, re-wrap bead coordinates:
 	wrap_bead_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);
-			
+	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);			
 }
 
 
@@ -840,6 +976,18 @@ void class_filaments_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 }
 
 
+
+// --------------------------------------------------------
+// Call to kernel that calculates wall forces in y-dir
+// and z-dir:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::push_beads_inside_sphere(float xs, float ys, float zs, float rs, 
+                                                     int nBlocks, int nThreads)
+{
+	push_beads_into_sphere_IBM3D
+	<<<nBlocks,nThreads>>> (beads,xs,ys,zs,rs,nBeads);
+}
 
 
 

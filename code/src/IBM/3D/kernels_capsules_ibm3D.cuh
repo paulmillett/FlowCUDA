@@ -60,11 +60,18 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 	
 	
 __global__ void compute_node_force_membrane_edge_IBM3D(
-	triangle*,
 	node*,
 	edge*,
     float,
     int);
+
+
+__global__ void compute_node_force_membrane_edge_FENE_IBM3D(
+	node*,
+	edge*,
+	cell*,
+	float,
+	int);
 
 
 __global__ void compute_node_force_membrane_bending_IBM3D(
@@ -144,6 +151,12 @@ __global__ void wrap_node_coordinates_IBM3D(
 	node*,	
 	float3,
 	int3,
+	int);
+
+
+__global__ void set_edge_rest_angles_IBM3D(
+	edge*,
+	float,
 	int);
 
 

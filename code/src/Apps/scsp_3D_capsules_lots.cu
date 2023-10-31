@@ -172,7 +172,7 @@ void scsp_3D_capsules_lots::initSystem()
 	// calculate rest geometries for membrane: 
 	// ----------------------------------------------
 	
-	ibm.rest_geometries(nBlocks,nThreads);
+	ibm.rest_geometries_spring(nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
@@ -215,7 +215,7 @@ void scsp_3D_capsules_lots::cycleForward(int stepsPerCycle, int currentCycle)
 		ibm.build_bin_lists(nBlocks,nThreads);
 		
 		// compute IBM node forces:
-		ibm.compute_node_forces(nBlocks,nThreads);
+		ibm.compute_node_forces_spring(nBlocks,nThreads);
 		ibm.nonbonded_node_interactions(nBlocks,nThreads);
 		
 		// update fluid:

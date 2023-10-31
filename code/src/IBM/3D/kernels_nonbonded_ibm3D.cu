@@ -264,6 +264,11 @@ __device__ inline void pairwise_interaction_forces(
 		// linear spring force repulsion
 		float force = repA - (repA/repD)*r;
 		float3 fij = force*(rij/r);
+		// WCA force
+		//float force = 0.01*pow(0.85/r,12)/r;
+		//float3 fij = force*(rij/r);
+		
+		
 		// check if fij is pushing node i away from the c.o.m.
 		// of it's cell...  if so, then set force to zero
 		// because there is likely cell-cell overlap here

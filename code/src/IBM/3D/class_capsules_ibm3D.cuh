@@ -40,6 +40,7 @@ class class_capsules_ibm3D {
 	int3 pbcFlag;
 	bool binsFlag;
 	std::string ibmUpdate;
+	std::string membraneModel;
 	bindata bins;
 			
 	// host arrays:
@@ -89,7 +90,9 @@ class class_capsules_ibm3D {
 	void shift_node_positions(int,float,float,float);
 	void rotate_and_shift_node_positions(int,float,float,float);
 	void rest_geometries(int,int);
+	void rest_geometries_spring(int,int);
 	void rest_geometries_skalak(int,int);
+	void rest_geometries_FENE(int,int);
 	void randomize_cells(float);
 	void shrink_and_randomize_cells(float,float,float);
 	void randomize_cells_above_plane(float,float,float,float);
@@ -104,7 +107,7 @@ class class_capsules_ibm3D {
 	void enforce_max_node_force(int,int);
 	void add_drag_force_to_nodes(float,int,int);
 	void add_xdir_force_to_nodes(int,int,float);
-	void relax_node_positions(int,float,float,int,int);
+	void relax_node_positions_spring(int,float,float,int,int);
 	void relax_node_positions_skalak(int,float,float,int,int);
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
@@ -118,7 +121,9 @@ class class_capsules_ibm3D {
 	void nonbonded_node_interactions(int,int);
 	void nonbonded_node_bead_interactions(bead*,bindata,int,int);	
 	void compute_node_forces(int,int);
+	void compute_node_forces_spring(int,int);
 	void compute_node_forces_skalak(int,int);
+	void compute_node_forces_FENE(float,int,int);
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
@@ -126,6 +131,7 @@ class class_capsules_ibm3D {
 	void scale_equilibrium_cell_size(float,int,int); 
 	void scale_edge_lengths(float,int,int);
 	void unwrap_node_coordinates();
+	void set_edge_rest_angles(float,int,int);
 	void output_capsule_data();
 	void capsule_geometry_analysis(int);
 	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);

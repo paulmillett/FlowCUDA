@@ -62,6 +62,7 @@ class_capsules_ibm3D::class_capsules_ibm3D()
 	nodeFmax = inputParams("IBM/nodeFmax",1000.0);
 	gam = inputParams("IBM/gamma",0.1);
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
+	membraneModel = inputParams("IBM/membraneModel","skalak");
 	
 	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
@@ -823,10 +824,32 @@ void class_capsules_ibm3D::write_output_long(std::string tagname, int tagnum)
 
 
 // --------------------------------------------------------
-// Calculate rest geometries (Spring model):
+// Calculate rest geometries:
 // --------------------------------------------------------
 
 void class_capsules_ibm3D::rest_geometries(int nBlocks, int nThreads)
+{
+	if (membraneModel == "spring") {
+		rest_geometries_spring(nBlocks,nThreads);
+	}
+	else if (membraneModel == "skalak") {
+		rest_geometries_skalak(nBlocks,nThreads);
+	}
+	else if (membraneModel == "FENE") {
+		rest_geometries_FENE(nBlocks,nThreads);
+	}
+	else {
+		cout << "valid membrane model not selected" << endl;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Calculate rest geometries (Spring model):
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::rest_geometries_spring(int nBlocks, int nThreads)
 {
 	// zero the cell reference volume & global area:
 	zero_reference_vol_area_IBM3D
@@ -876,6 +899,32 @@ void class_capsules_ibm3D::rest_geometries_skalak(int nBlocks, int nThreads)
 // Calculate rest geometries (Skalak model):
 // --------------------------------------------------------
 
+void class_capsules_ibm3D::rest_geometries_FENE(int nBlocks, int nThreads)
+{
+	// zero the cell reference volume & global area (note: these
+	// aren't used in the simulation)
+	zero_reference_vol_area_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
+	// rest edge lengths:
+	rest_edge_lengths_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,edges,nEdges);
+	
+	// rest edge angles:
+	rest_edge_angles_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,edges,faces,nEdges);
+	
+	// rest triangle area:
+	rest_triangle_areas_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,faces,cells,nFaces);
+}
+
+
+
+// --------------------------------------------------------
+// Calculate wall forces:
+// --------------------------------------------------------
+
 void class_capsules_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 {
 	if (pbcFlag.y==0 && pbcFlag.z==1) wall_forces_ydir(nBlocks,nThreads);
@@ -891,7 +940,7 @@ void class_capsules_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 // to allow them to readjust to their regular volume):
 // --------------------------------------------------------
 
-void class_capsules_ibm3D::relax_node_positions(int nIts, float scale, float M, int nBlocks, int nThreads) 
+void class_capsules_ibm3D::relax_node_positions_spring(int nIts, float scale, float M, int nBlocks, int nThreads) 
 {
 	// per iteraction scale factor:
 	float power = 1.0/float(nIts);
@@ -909,7 +958,7 @@ void class_capsules_ibm3D::relax_node_positions(int nIts, float scale, float M, 
 		scale_equilibrium_cell_size(scalePerIter,nBlocks,nThreads);		
 		reset_bin_lists(nBlocks,nThreads);		
 		build_bin_lists(nBlocks,nThreads);		
-		compute_node_forces(nBlocks,nThreads);		
+		compute_node_forces_spring(nBlocks,nThreads);		
 		nonbonded_node_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		update_node_positions_vacuum(M,nBlocks,nThreads);		
@@ -1305,11 +1354,33 @@ void class_capsules_ibm3D::nonbonded_node_bead_interactions(bead* beads, bindata
 
 
 // --------------------------------------------------------
+// Calculate rest geometries:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::compute_node_forces(int nBlocks, int nThreads)
+{
+	if (membraneModel == "spring") {
+		compute_node_forces_spring(nBlocks,nThreads);
+	}
+	else if (membraneModel == "skalak") {
+		compute_node_forces_skalak(nBlocks,nThreads);
+	}
+	else if (membraneModel == "FENE") {
+		compute_node_forces_FENE(1.0,nBlocks,nThreads);
+	}
+	else {
+		cout << "valid membrane model not selected" << endl;
+	}
+}
+
+
+
+// --------------------------------------------------------
 // Calls to kernels that compute forces on nodes based 
 // on the membrane mechanics model (Spring model):
 // --------------------------------------------------------
 
-void class_capsules_ibm3D::compute_node_forces(int nBlocks, int nThreads)
+void class_capsules_ibm3D::compute_node_forces_spring(int nBlocks, int nThreads)
 {
 	// First, zero the node forces and the cell volumes:
 	zero_node_forces_IBM3D
@@ -1328,7 +1399,7 @@ void class_capsules_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 		
 	// Forth, compute the edge extension and bending force for each edge:
 	compute_node_force_membrane_edge_IBM3D
-	<<<nBlocks,nThreads>>> (faces,nodes,edges,ks,nEdges);
+	<<<nBlocks,nThreads>>> (nodes,edges,ks,nEdges);
 	
 	compute_node_force_membrane_bending_IBM3D
 	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);
@@ -1380,6 +1451,40 @@ void class_capsules_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
 					
 	// Sixth, re-wrap node coordinates:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);
+			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on nodes based 
+// on the membrane mechanics model (FENE model):
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::compute_node_forces_FENE(float delta, int nBlocks, int nThreads)
+{
+	// First, zero the node forces:
+	zero_node_forces_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
+		
+	// Second, unwrap node coordinates:
+	unwrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,cells,Box,pbcFlag,nNodes);	
+					
+	// Third, compute the FENE forces for each edge:
+	compute_node_force_membrane_area_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,0.0,nFaces);	
+	
+	compute_node_force_membrane_edge_FENE_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,edges,cells,delta,nEdges);
+	
+	// Fourth, compute the bending force for each edge:		
+	compute_node_force_membrane_bending_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);
+					
+	// Fifth, re-wrap node coordinates:
 	wrap_node_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);
 			
@@ -1466,6 +1571,16 @@ void class_capsules_ibm3D::scale_edge_lengths(float scale, int nBlocks, int nThr
 }
 
 
+
+// --------------------------------------------------------
+// Call to kernel that scales the default edge lengths:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::set_edge_rest_angles(float val, int nBlocks, int nThreads)
+{
+	set_edge_rest_angles_IBM3D
+	<<<nBlocks,nThreads>>> (edges,val,nEdges);
+}
 
 
 
@@ -1919,14 +2034,12 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 	// -----------------------------------------
 	// Assign 'intrain' to 'cellType':
 	// -----------------------------------------
-	
-	/*
+		
 	for (int c=0; c<nCells; c++) {
 		if (cellsH[c].intrain == false) cellsH[c].cellType = 0;
 		if (cellsH[c].intrain == true)  cellsH[c].cellType = 1;
 	}
-	*/
-	
+		
 	// -----------------------------------------
 	// Print results:
 	// -----------------------------------------
