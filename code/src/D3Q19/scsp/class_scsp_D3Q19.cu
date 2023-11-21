@@ -858,6 +858,22 @@ void class_scsp_D3Q19::viscous_force_filaments_IBM_LBM(int nBlocks, int nThreads
 
 
 // --------------------------------------------------------
+// Call to "viscous_force_velocity_difference_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::hydrodynamic_forces_filaments_IBM_LBM(int nBlocks, int nThreads, float gam,
+	                                                         bead* beads, int nBeads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	hydrodynamic_force_bead_fluid_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Fx,Fy,Fz,u,v,w,gam,Nx,Ny,Nz,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_zero_forces_D3Q19" kernel:
 // --------------------------------------------------------
 

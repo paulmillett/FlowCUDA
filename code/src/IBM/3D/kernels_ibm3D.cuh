@@ -30,6 +30,22 @@ __global__ void update_node_position_verlet_2_IBM3D(
 	int);
 
 
+__global__ void update_node_position_verlet_1_drag_IBM3D(
+	node*,
+	float,
+	float,
+	float,
+	int);
+
+
+__global__ void update_node_position_verlet_2_drag_IBM3D(
+	node*,
+	float,
+	float,
+	float,
+	int);
+
+
 __global__ void update_node_position_vacuum_IBM3D(
 	node*,
 	float,	

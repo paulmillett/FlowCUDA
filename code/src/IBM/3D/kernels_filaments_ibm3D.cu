@@ -8,6 +8,26 @@
 // IBM3D bead update kernel:
 // --------------------------------------------------------
 
+__global__ void update_bead_position_euler_IBM3D(
+	bead* beads,
+	float dt,
+	float m,	
+	int nBeads)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		beads[i].v += dt*beads[i].f/m;
+		beads[i].r += dt*beads[i].v;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D bead update kernel:
+// --------------------------------------------------------
+
 __global__ void update_bead_position_verlet_1_IBM3D(
 	bead* beads,
 	float dt,
@@ -58,8 +78,8 @@ __global__ void update_bead_position_verlet_1_drag_IBM3D(
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
-		beads[i].r += beads[i].v*dt + 0.5*dt*dt*(beads[i].f/m - gam*beads[i].v);
-		beads[i].v += 0.5*dt*(beads[i].f/m - gam*beads[i].v);
+		beads[i].r += beads[i].v*dt + 0.5*dt*dt*(beads[i].f/m - gam*beads[i].v/m);
+		beads[i].v += 0.5*dt*(beads[i].f/m - gam*beads[i].v/m);
 	}
 }
 
@@ -80,7 +100,7 @@ __global__ void update_bead_position_verlet_2_drag_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
-		beads[i].v = (beads[i].v + 0.5*dt*beads[i].f/m)/(1.0 + 0.5*dt*gam);
+		beads[i].v = (beads[i].v + 0.5*dt*beads[i].f/m)/(1.0 + 0.5*dt*gam/m);
 	}
 }
 
@@ -186,7 +206,7 @@ __global__ void compute_bead_force_spring_IBM3D(
 		float ForceMag = filams[fID].ks*(edgeL-length0);
 		r01 /= edgeL;  // normalize vector
 		add_force_to_bead(B0,beads, ForceMag*r01);
-		add_force_to_bead(B1,beads,-ForceMag*r01);		
+		add_force_to_bead(B1,beads,-ForceMag*r01);	
 	}
 }
 
@@ -310,7 +330,7 @@ __global__ void compute_propulsion_force_IBM3D(
 		float ForceMag = filams[fID].fp;
 		add_force_to_bead(B0,beads,ForceMag*r01);
 		//add_force_to_bead(B0,beads,0.5*ForceMag*r01);
-		//add_force_to_bead(B1,beads,0.5*ForceMag*r01);	
+		//add_force_to_bead(B1,beads,0.5*ForceMag*r01);		
 	}
 }
 
@@ -478,6 +498,101 @@ __global__ void viscous_force_velocity_difference_bead_IBM3D(
 		beads[i].f.x += vfx;
 		beads[i].f.y += vfy;
 		beads[i].f.z += vfz;
+				
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate hydrodynamic force between
+// IBM bead and LBM fluid
+// --------------------------------------------------------
+
+__global__ void hydrodynamic_force_bead_fluid_IBM3D(
+	bead* beads,
+	float* fxLBM,
+	float* fyLBM,
+	float* fzLBM,
+	float* uLBM,
+	float* vLBM,
+	float* wLBM,
+	float gam,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nBeads) {
+				
+		// --------------------------------------
+		// find nearest LBM voxel (rounded down)
+		// --------------------------------------
+		
+		int i0 = int(floor(beads[i].r.x));
+		int j0 = int(floor(beads[i].r.y));
+		int k0 = int(floor(beads[i].r.z));
+		
+		// --------------------------------------
+		// loop over footprint to get 
+		// interpolated LBM velocity:
+		// --------------------------------------
+				
+		float vxLBMi = 0.0;
+		float vyLBMi = 0.0;
+		float vzLBMi = 0.0;		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = bead_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = beads[i].r.x - float(ii);
+					float ry = beads[i].r.y - float(jj);
+					float rz = beads[i].r.z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					vxLBMi += del*uLBM[ndx];
+					vyLBMi += del*vLBM[ndx];
+					vzLBMi += del*wLBM[ndx];				
+				}
+			}
+		}
+		
+		// --------------------------------------
+		// calculate drag forces & add them
+		// to IBM bead forces:
+		// --------------------------------------
+		
+		float vfx = gam*(vxLBMi - beads[i].v.x);
+		float vfy = gam*(vyLBMi - beads[i].v.y);
+		float vfz = gam*(vzLBMi - beads[i].v.z);
+		beads[i].f.x += vfx;
+		beads[i].f.y += vfy;
+		beads[i].f.z += vfz;
+		
+		// --------------------------------------
+		// distribute the !negative! of the 
+		// hydrodynamic bead force to the LBM
+		// fluid (it is assumed that the thermal and
+		// the propulsion forces have already been 
+		// calculated):
+		// --------------------------------------
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = bead_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = beads[i].r.x - float(ii);
+					float ry = beads[i].r.y - float(jj);
+					float rz = beads[i].r.z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],-del*beads[i].f.x);
+					atomicAdd(&fyLBM[ndx],-del*beads[i].f.y);
+					atomicAdd(&fzLBM[ndx],-del*beads[i].f.z);				
+				}
+			}
+		}
 				
 	}	
 }
@@ -817,13 +932,16 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 				
 		int offst = binID*bins.binMax;
 		int occup = bins.binOccupancy[binID];
-		if (occup > bins.binMax) occup = bins.binMax;
+		if (occup > bins.binMax) {
+			printf("occup = %i \n", occup);
+			occup = bins.binMax;
+		}
 								
 		for (int k=offst; k<offst+occup; k++) {
 			int j = bins.binMembers[k];
 			if (i==j) continue;
 			if (beads[i].filamID == beads[j].filamID) continue;
-			pairwise_bead_interaction_forces(i,j,repA,repD,beads,Box,pbcFlag);			
+			pairwise_bead_interaction_forces_WCA(i,j,repA,repD,beads,Box,pbcFlag);			
 		}
 		
 		// -------------------------------
@@ -840,7 +958,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 			for (int k=offst; k<offst+occup; k++) {
 				int j = bins.binMembers[k];
 				if (beads[i].filamID == beads[j].filamID) continue;				
-				pairwise_bead_interaction_forces(i,j,repA,repD,beads,Box,pbcFlag);			
+				pairwise_bead_interaction_forces_WCA(i,j,repA,repD,beads,Box,pbcFlag);			
 			}
 		}
 				
@@ -887,7 +1005,7 @@ __global__ void nonbonded_bead_node_interactions_IBM3D(
 								
 		for (int k=offst; k<offst+occup; k++) {
 			int j = bins.binMembers[k];
-			pairwise_bead_node_interaction_forces(i,j,repA,repD,beads,nodes,Box,pbcFlag);			
+			pairwise_bead_node_interaction_forces_WCA(i,j,repA,repD,beads,nodes,Box,pbcFlag);			
 		}
 		
 		// -------------------------------
@@ -903,7 +1021,7 @@ __global__ void nonbonded_bead_node_interactions_IBM3D(
 			// loop over nodes in this bin:
 			for (int k=offst; k<offst+occup; k++) {
 				int j = bins.binMembers[k];
-				pairwise_bead_node_interaction_forces(i,j,repA,repD,beads,nodes,Box,pbcFlag);		
+				pairwise_bead_node_interaction_forces_WCA(i,j,repA,repD,beads,nodes,Box,pbcFlag);		
 			}
 		}
 				
@@ -956,10 +1074,40 @@ __device__ inline void pairwise_bead_interaction_forces(
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);
 	if (r < repD) {
-		// linear spring force repulsion
+		// linear force repulsion
 		float force = repA - (repA/repD)*r;
 		float3 fij = force*(rij/r);
 		beads[i].f += fij;
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j force:
+// Weeks-Chandler-Anderson potential
+// --------------------------------------------------------
+
+__device__ inline void pairwise_bead_interaction_forces_WCA(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	bead* beads,
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = beads[i].r - beads[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	if (r < repD) {
+		float sig = 0.8909*repD;  // this ensures F=0 is at cutoff
+		float eps = 0.001;
+		float sigor = sig/r;
+		float sigor6 = sigor*sigor*sigor*sigor*sigor*sigor;
+		float sigor12 = sigor6*sigor6;
+		float force = 24.0*eps*(2*sigor12 - sigor6)/r/r;
+		beads[i].f += force*rij;
 	} 	
 }
 
@@ -984,10 +1132,43 @@ __device__ inline void pairwise_bead_node_interaction_forces(
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);
 	if (r < repD) {
-		// linear spring force repulsion
+		// linear force repulsion
 		float force = repA - (repA/repD)*r;
 		float3 fij = force*(rij/r);
 		beads[i].f += fij;
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j force:
+// NOTE: here 'i' is a bead and 'j' is a node
+// --------------------------------------------------------
+
+__device__ inline void pairwise_bead_node_interaction_forces_WCA(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	bead* beads,
+	node* nodes,
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = beads[i].r - nodes[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	if (r < repD) {
+		float delta = 1.0;
+		float sig = 0.8909*(repD - delta);  // this ensures F=0 is at cutoff
+		float eps = 0.001;
+		float rmd = r - delta;
+		float sigor = sig/rmd;
+		float sigor6 = sigor*sigor*sigor*sigor*sigor*sigor;
+		float sigor12 = sigor6*sigor6;
+		float force = 24.0*eps*(2*sigor12 - sigor6)/rmd/rmd;
+		beads[i].f += force*rij;
 	} 	
 }
 

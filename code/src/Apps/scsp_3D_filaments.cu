@@ -34,9 +34,14 @@ scsp_3D_filaments::scsp_3D_filaments() : lbm(),filams()
 	// GPU parameters:
 	// ----------------------------------------------
 	
+	int sizeFIL = filams.get_max_array_size();	
+	int sizeMAX = max(nVoxels,sizeFIL);	
 	nThreads = inputParams("GPU/nThreads",512);
-	nBlocks = (nVoxels+(nThreads-1))/nThreads;  // integer division
+	nBlocks = (sizeMAX+(nThreads-1))/nThreads;  // integer division
 	
+	cout << "largest array size = " << sizeMAX << endl;
+	cout << "nBlocks = " << nBlocks << ", nThreads = " << nThreads << endl;
+		
 	// ----------------------------------------------
 	// time parameters:
 	// ----------------------------------------------
@@ -52,6 +57,7 @@ scsp_3D_filaments::scsp_3D_filaments() : lbm(),filams()
 	shearVel = inputParams("LBM/shearVel",0.0);
 	float Re = inputParams("LBM/Re",2.0);
 	shearVel = 2.0*Re*nu/float(Nz);
+	shearVel = 0.0;
 	
 	// ----------------------------------------------
 	// Filaments Immersed-Boundary parameters:
@@ -63,6 +69,9 @@ scsp_3D_filaments::scsp_3D_filaments() : lbm(),filams()
 	kb = inputParams("IBM_FILAMS/kb",0.1);
 	fp = inputParams("IBM_FILAMS/fp",0.0);
 	L0 = inputParams("IBM_FILAMS/L0",0.5);
+	Pe = inputParams("IBM_FILAMS/Pe",0.0);
+	PL = inputParams("IBM_FILAMS/PL",1.0);  // non-dimensional persistence length
+	kT = inputParams("IBM_FILAMS/kT",0.0);
 	nBeads = nBeadsPerFilam*nFilams;
 	Lfil = float(nBeadsPerFilam)*L0;
 	
@@ -95,8 +104,6 @@ scsp_3D_filaments::scsp_3D_filaments() : lbm(),filams()
 	lbm.allocate();
 	lbm.allocate_forces();
 	filams.allocate();	
-	
-	cout << "Finished Constructor" << endl;
 	
 }
 
@@ -158,11 +165,19 @@ void scsp_3D_filaments::initSystem()
 	filams.create_first_filament();
 	filams.duplicate_filaments();
 	filams.assign_filamIDs_to_beads();
+	
+	fp = Pe*kT/Lfil/Lfil;
+	kb = PL*kT;
 	filams.set_ks(ks);
 	filams.set_kb(kb);
 	filams.set_fp(fp);
-	filams.set_filams_radii(1.0);
-		
+	filams.set_filams_radii(0.5);
+	cout << "  " << endl;
+	cout << "Filament kT = " << kT << endl;
+	cout << "Filament ks = " << ks << endl;
+	cout << "Filament kb = " << kb << endl;
+	cout << "Filament fp = " << fp << endl;
+			
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
@@ -186,7 +201,7 @@ void scsp_3D_filaments::initSystem()
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	srand(time(NULL));
+	//srand(time(NULL));
 	
 	// ----------------------------------------------
 	// randomly disperse filaments: 
@@ -206,6 +221,13 @@ void scsp_3D_filaments::initSystem()
 	// ----------------------------------------------
 	
 	filams.zero_bead_velocities_forces(nBlocks,nThreads);
+	
+	// ----------------------------------------------
+	// initialize cuRand state for the thermal noise
+	// force:
+	// ----------------------------------------------
+	
+	filams.initialize_cuRand(nBlocks,nThreads);
 		
 }
 
@@ -238,7 +260,8 @@ void scsp_3D_filaments::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			filams.stepIBM(lbm,nBlocks,nThreads);
+			//filams.stepIBM(lbm,nBlocks,nThreads);
+			filams.stepIBM_Euler(lbm,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 			cudaDeviceSynchronize();
@@ -255,7 +278,8 @@ void scsp_3D_filaments::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		filams.stepIBM(lbm,nBlocks,nThreads);		
+		//filams.stepIBM(lbm,nBlocks,nThreads);
+		filams.stepIBM_Euler(lbm,nBlocks,nThreads);	
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		cudaDeviceSynchronize();

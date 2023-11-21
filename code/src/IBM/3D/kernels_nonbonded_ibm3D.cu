@@ -218,7 +218,7 @@ __global__ void nonbonded_node_bead_interactions_IBM3D(
 								
 		for (int k=offst; k<offst+occup; k++) {
 			int j = bins.binMembers[k];
-			pairwise_node_bead_interaction_forces(i,j,repA,repD,nodes,beads,Box,pbcFlag);
+			pairwise_node_bead_interaction_forces_WCA(i,j,repA,repD,nodes,beads,Box,pbcFlag);
 		}
 		
 		// -------------------------------
@@ -234,7 +234,7 @@ __global__ void nonbonded_node_bead_interactions_IBM3D(
 			// loop over nodes in this bin:
 			for (int k=offst; k<offst+occup; k++) {
 				int j = bins.binMembers[k];
-				pairwise_node_bead_interaction_forces(i,j,repA,repD,nodes,beads,Box,pbcFlag);	
+				pairwise_node_bead_interaction_forces_WCA(i,j,repA,repD,nodes,beads,Box,pbcFlag);	
 			}
 		}
 				
@@ -307,6 +307,39 @@ __device__ inline void pairwise_node_bead_interaction_forces(
 		float force = repA - (repA/repD)*r;
 		float3 fij = force*(rij/r);
 		nodes[i].f += fij;
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j force:
+// NOTE: here 'i' is a node and 'j' is a bead
+// --------------------------------------------------------
+
+__device__ inline void pairwise_node_bead_interaction_forces_WCA(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	node* nodes,
+	bead* beads,	
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = nodes[i].r - beads[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	if (r < repD) {
+		float delta = 1.0;
+		float sig = 0.8909*(repD - delta);  // this ensures F=0 is at cutoff
+		float eps = 0.001;
+		float rmd = r - delta;
+		float sigor = sig/rmd;
+		float sigor6 = sigor*sigor*sigor*sigor*sigor*sigor;
+		float sigor12 = sigor6*sigor6;
+		float force = 24.0*eps*(2*sigor12 - sigor6)/rmd/rmd;
+		nodes[i].f += force*rij;
 	} 	
 }
 

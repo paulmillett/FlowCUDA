@@ -103,6 +103,8 @@ class class_capsules_ibm3D {
 	void update_node_positions_dt(int,int);
 	void update_node_positions_verlet_1(int,int);
 	void update_node_positions_verlet_2(int,int);
+	void update_node_positions_verlet_1_drag(int,int);
+	void update_node_positions_verlet_2_drag(int,int);
 	void zero_velocities_forces(int,int);
 	void enforce_max_node_force(int,int);
 	void add_drag_force_to_nodes(float,int,int);

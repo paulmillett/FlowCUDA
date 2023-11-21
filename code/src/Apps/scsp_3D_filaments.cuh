@@ -30,6 +30,9 @@ private:
 	int precision;
 	float tau;
 	float nu;
+	float Pe;
+	float PL;
+	float kT;
 	float shearVel;
 	float ks,kb;
 	float fp;

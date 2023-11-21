@@ -35,6 +35,7 @@ private:
 	float kT;
 	float Re;
 	float Ca;
+	float La;
 	float nu;
 	float shearVel;
 	float ks,kb;
@@ -42,6 +43,7 @@ private:
 	float L0;
 	float Lfil;
 	float a;
+	float C;
 	float gam;
 	bool initRandom;
 	std::string ibmFile;

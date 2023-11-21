@@ -143,6 +143,7 @@ public:
 	void extrapolate_forces_from_IBM(int,int,node*,int);
 	void viscous_force_IBM_LBM(int,int,float,node*,int);
 	void viscous_force_filaments_IBM_LBM(int,int,float,bead*,int);
+	void hydrodynamic_forces_filaments_IBM_LBM(int,int,float,bead*,int);
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);
 	void calculate_relative_viscosity(std::string,float,int);

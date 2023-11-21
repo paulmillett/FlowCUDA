@@ -9,6 +9,13 @@
 # include "../../Utils/helper_math.h"
 
 
+__global__ void update_bead_position_euler_IBM3D(
+	bead*,
+	float,
+	float,	
+	int);
+		
+
 __global__ void update_bead_position_verlet_1_IBM3D(
 	bead*,
 	float,
@@ -123,7 +130,22 @@ __global__ void viscous_force_velocity_difference_bead_IBM3D(
 	int,
 	int);
 			
-	
+
+__global__ void hydrodynamic_force_bead_fluid_IBM3D(
+	bead*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float,
+	int,
+	int,
+	int,
+	int);
+			
+
 __global__ void unwrap_bead_coordinates_IBM3D(
 	bead*,
 	filament*,
@@ -217,7 +239,28 @@ __device__ inline void pairwise_bead_interaction_forces(
 	int3);
 
 
+__device__ inline void pairwise_bead_interaction_forces_WCA(
+	const int, 
+	const int,
+	const float,
+	const float,
+	bead*,
+	float3,
+	int3);
+
+
 __device__ inline void pairwise_bead_node_interaction_forces(
+	const int, 
+	const int,
+	const float,
+	const float,
+	bead*,
+	node*,
+	float3,
+	int3);
+
+
+__device__ inline void pairwise_bead_node_interaction_forces_WCA(
 	const int, 
 	const int,
 	const float,

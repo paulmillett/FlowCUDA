@@ -64,6 +64,17 @@ __device__ inline void pairwise_node_bead_interaction_forces(
 	bead*,	
 	float3,
 	int3);
+	
+	
+__device__ inline void pairwise_node_bead_interaction_forces_WCA(
+	const int, 
+	const int,
+	const float,
+	const float,
+	node*,
+	bead*,	
+	float3,
+	int3);
 
 
 __global__ void wall_forces_ydir_IBM3D(

@@ -75,6 +75,47 @@ __global__ void update_node_position_verlet_2_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D node update kernel:
+// --------------------------------------------------------
+
+__global__ void update_node_position_verlet_1_drag_IBM3D(
+	node* nodes,
+	float dt,
+	float m,
+	float gam,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {		
+		nodes[i].r += nodes[i].v*dt + 0.5*dt*dt*(nodes[i].f - gam*nodes[i].v)/m;
+		nodes[i].v += 0.5*dt*(nodes[i].f - gam*nodes[i].v)/m;		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D node update kernel:
+// --------------------------------------------------------
+
+__global__ void update_node_position_verlet_2_drag_IBM3D(
+	node* nodes,
+	float dt,
+	float m,
+	float gam,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {		
+		nodes[i].v = (nodes[i].v + 0.5*dt*nodes[i].f/m)/(1.0 + 0.5*dt*gam/m);
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D node update kernel (this uses force and a mobility
 // constant, instead of velocity):
 // --------------------------------------------------------

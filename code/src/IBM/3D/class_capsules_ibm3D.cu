@@ -372,8 +372,13 @@ void class_capsules_ibm3D::set_cell_type(int cID, int val)
 int class_capsules_ibm3D::get_max_array_size()
 {
 	// return the maximum array size:
-	return max(max(nCells,nNodes),max(nFaces,nEdges));
+	int maxSize = max(max(nCells,nNodes),max(nFaces,nEdges));
+	if (binsFlag) {
+		if (bins.nBins > maxSize) maxSize = bins.nBins;
+	}
+	return maxSize;
 }
+
 
 
 // --------------------------------------------------------
@@ -1194,6 +1199,33 @@ void class_capsules_ibm3D::update_node_positions_verlet_2(int nBlocks, int nThre
 {
 	update_node_position_verlet_2_IBM3D
 	<<<nBlocks,nThreads>>> (nodes,dt,1.0,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_node_position_verlet_1_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::update_node_positions_verlet_1_drag(int nBlocks, int nThreads)
+{
+	update_node_position_verlet_1_drag_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,dt,1.0,gam,nNodes);
+	
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_node_position_verlet_2_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::update_node_positions_verlet_2_drag(int nBlocks, int nThreads)
+{
+	update_node_position_verlet_2_drag_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,dt,1.0,gam,nNodes);
 }
 
 
