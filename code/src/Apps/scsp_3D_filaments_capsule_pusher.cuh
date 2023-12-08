@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_FILAMENTS_H
-# define SCSP_3D_FILAMENTS_H
+# ifndef SCSP_3D_FILAMENTS_CAPSULE_PUSHER_H
+# define SCSP_3D_FILAMENTS_CAPSULE_PUSHER_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_filaments : public FlowBase {
+class scsp_3D_filaments_capsule_pusher : public FlowBase {
 	
 private:
 
@@ -24,36 +24,45 @@ private:
 	int nEdges;
 	int nSteps;
 	int nFilams;
+	int nCells;
+	int nNodes;
 	int nStepsEquilibrate;
 	int nVTKOutputs;
 	int iskip,jskip,kskip;
 	int precision;
-	float tau;
-	float nu;
 	float Pe;
 	float PL;
 	float kT;
+	float Re;
+	float Ca;
+	float La;
+	float nu;
 	float shearVel;
 	float ks,kb;
 	float fp;
 	float up;
 	float L0;
-	float gam;
 	float Lfil;
+	float a;
+	float C;
+	float gam;
 	bool initRandom;
+	std::string ibmFile;
+	std::string ibmUpdate;
 	
 	// objects:
 	class_scsp_D3Q19 lbm;
+	class_capsules_ibm3D ibm;
 	class_filaments_ibm3D filams;
 		
 public:
 
-	scsp_3D_filaments();
-	~scsp_3D_filaments();
+	scsp_3D_filaments_capsule_pusher();
+	~scsp_3D_filaments_capsule_pusher();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	
 };
 
-# endif  // SCSP_3D_FILAMENTS_H
+# endif  // SCSP_3D_FILAMENTS_CAPSULE_PUSHER_H

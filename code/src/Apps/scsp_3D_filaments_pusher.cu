@@ -1,5 +1,5 @@
 
-# include "scsp_3D_filaments.cuh"
+# include "scsp_3D_filaments_pusher.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_filaments::scsp_3D_filaments() : lbm(),filams()
+scsp_3D_filaments_pusher::scsp_3D_filaments_pusher() : lbm(),filams()
 {		
 	
 	// ----------------------------------------------
@@ -114,7 +114,7 @@ scsp_3D_filaments::scsp_3D_filaments() : lbm(),filams()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_filaments::~scsp_3D_filaments()
+scsp_3D_filaments_pusher::~scsp_3D_filaments_pusher()
 {
 	lbm.deallocate();
 	filams.deallocate();
@@ -126,7 +126,7 @@ scsp_3D_filaments::~scsp_3D_filaments()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_filaments::initSystem()
+void scsp_3D_filaments_pusher::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -243,7 +243,7 @@ void scsp_3D_filaments::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_filaments::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_filaments_pusher::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -264,8 +264,7 @@ void scsp_3D_filaments::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			filams.stepIBM_Verlet_no_fluid(nBlocks,nThreads);
-			//filams.stepIBM_Euler_no_fluid(nBlocks,nThreads);
+			filams.stepIBM_Euler_pusher_no_fluid(nBlocks,nThreads);
 			//lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 			cudaDeviceSynchronize();
@@ -281,9 +280,8 @@ void scsp_3D_filaments::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 		
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;
-		filams.stepIBM_Verlet_no_fluid(nBlocks,nThreads);
-		//filams.stepIBM_Euler_no_fluid(nBlocks,nThreads);
+		cummulativeSteps++;		
+		filams.stepIBM_Euler_pusher_no_fluid(nBlocks,nThreads);
 		//lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		cudaDeviceSynchronize();
@@ -312,7 +310,7 @@ void scsp_3D_filaments::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_filaments::writeOutput(std::string tagname, int step)
+void scsp_3D_filaments_pusher::writeOutput(std::string tagname, int step)
 {				
 	
 	if (step == 0) {

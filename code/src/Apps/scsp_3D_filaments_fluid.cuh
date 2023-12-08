@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_FILAMENTS_H
-# define SCSP_3D_FILAMENTS_H
+# ifndef SCSP_3D_FILAMENTS_FLUID_H
+# define SCSP_3D_FILAMENTS_FLUID_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_filaments : public FlowBase {
+class scsp_3D_filaments_fluid : public FlowBase {
 	
 private:
 
@@ -48,12 +48,12 @@ private:
 		
 public:
 
-	scsp_3D_filaments();
-	~scsp_3D_filaments();
+	scsp_3D_filaments_fluid();
+	~scsp_3D_filaments_fluid();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	
 };
 
-# endif  // SCSP_3D_FILAMENTS_H
+# endif  // SCSP_3D_FILAMENTS_FLUID_H

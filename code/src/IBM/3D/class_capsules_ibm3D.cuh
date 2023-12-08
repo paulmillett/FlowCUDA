@@ -11,6 +11,8 @@
 # include "kernels_nonbonded_ibm3D.cuh"
 # include "data_structs/membrane_data.h"
 # include "data_structs/neighbor_bins_data.h"
+# include "data_structs/filament_data.h"
+# include "data_structs/rod_data.h"
 # include <cuda.h>
 # include <string>
 
@@ -121,7 +123,8 @@ class class_capsules_ibm3D {
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);
 	void nonbonded_node_interactions(int,int);
-	void nonbonded_node_bead_interactions(bead*,bindata,int,int);	
+	void nonbonded_node_bead_interactions(bead*,bindata,int,int);
+	void nonbonded_node_bead_rod_interactions(beadrod*,bindata,int,int);
 	void compute_node_forces(int,int);
 	void compute_node_forces_spring(int,int);
 	void compute_node_forces_skalak(int,int);

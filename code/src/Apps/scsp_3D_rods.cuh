@@ -1,14 +1,14 @@
 
-# ifndef SCSP_3D_FILAMENTS_H
-# define SCSP_3D_FILAMENTS_H
+# ifndef SCSP_3D_RODS_H
+# define SCSP_3D_RODS_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
-# include "../IBM/3D/class_filaments_ibm3D.cuh"
+# include "../IBM/3D/class_rods_ibm3D.cuh"
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_filaments : public FlowBase {
+class scsp_3D_rods : public FlowBase {
 	
 private:
 
@@ -21,9 +21,8 @@ private:
 	int Nx,Ny,Nz;
 	int numIolets;
 	int nBeads;
-	int nEdges;
 	int nSteps;
-	int nFilams;
+	int nRods;
 	int nStepsEquilibrate;
 	int nVTKOutputs;
 	int iskip,jskip,kskip;
@@ -31,29 +30,27 @@ private:
 	float tau;
 	float nu;
 	float Pe;
-	float PL;
 	float kT;
 	float shearVel;
-	float ks,kb;
 	float fp;
 	float up;
 	float L0;
 	float gam;
-	float Lfil;
+	float Lrod;
 	bool initRandom;
 	
 	// objects:
 	class_scsp_D3Q19 lbm;
-	class_filaments_ibm3D filams;
+	class_rods_ibm3D rods;
 		
 public:
 
-	scsp_3D_filaments();
-	~scsp_3D_filaments();
+	scsp_3D_rods();
+	~scsp_3D_rods();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	
 };
 
-# endif  // SCSP_3D_FILAMENTS_H
+# endif  // SCSP_3D_RODS_H

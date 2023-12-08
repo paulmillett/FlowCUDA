@@ -63,6 +63,7 @@ class_filaments_ibm3D::class_filaments_ibm3D()
 	repD_bn = inputParams("IBM_FILAMS/repD_bn",0.0);
 	beadFmax = inputParams("IBM_FILAMS/beadFmax",1000.0);
 	gam = inputParams("IBM_FILAMS/gamma",0.1);
+	Mob = inputParams("IBM_FILAMS/Mob",0.5);
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	forceModel = inputParams("IBM_FILAMS/forceModel","spring");
 	noisekT = 6.0*kT*gam/dt;
@@ -261,6 +262,11 @@ void class_filaments_ibm3D::set_kb(float val)
 void class_filaments_ibm3D::set_fp(float val)
 {
 	for (int f=0; f<nFilams; f++) filamsH[f].fp = val;
+}
+
+void class_filaments_ibm3D::set_up(float val)
+{
+	for (int f=0; f<nFilams; f++) filamsH[f].up = val;
 }
 
 void class_filaments_ibm3D::set_filams_mechanical_props(float ks, float kb)
@@ -499,21 +505,16 @@ void class_filaments_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 // Take step forward for IBM using LBM object:
 // --------------------------------------------------------
 
-void class_filaments_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
+void class_filaments_ibm3D::stepIBM_Verlet_no_fluid(int nBlocks, int nThreads) 
 {
 		
 	// ----------------------------------------------------------
 	//  here, the velocity-Verlet algorithm is used to update the 
 	//  bead positions - using a viscous drag force proportional
-	//  to the difference between the bead velocities and the 
-	//  fluid velocities
+	//  to the bead velocity.
 	// ----------------------------------------------------------
-	
-	// zero fluid forces:
-	lbm.zero_forces(nBlocks,nThreads);
-	
+		
 	// first step of IBM velocity verlet:
-	//update_bead_positions_verlet_1(nBlocks,nThreads);
 	update_bead_positions_verlet_1_drag(nBlocks,nThreads);
 	
 	// re-build bin lists for filament beads:
@@ -525,9 +526,64 @@ void class_filaments_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThr
 	nonbonded_bead_interactions(nBlocks,nThreads);
 	compute_wall_forces(nBlocks,nThreads);
 	enforce_max_bead_force(nBlocks,nThreads);
-	//lbm.viscous_force_filaments_IBM_LBM(nBlocks,nThreads,gam,beads,nBeads);
-	//update_bead_positions_verlet_2(nBlocks,nThreads);
 	update_bead_positions_verlet_2_drag(nBlocks,nThreads);
+		
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::stepIBM_Euler_no_fluid(int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  bead positions - using a viscous drag force proportional
+	//  to the bead velocity.
+	// ----------------------------------------------------------
+		
+	// re-build bin lists for filament beads:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+			
+	// update IBM:
+	compute_bead_forces(nBlocks,nThreads);
+	add_drag_force_to_beads(nBlocks,nThreads);
+	nonbonded_bead_interactions(nBlocks,nThreads);
+	compute_wall_forces(nBlocks,nThreads);
+	enforce_max_bead_force(nBlocks,nThreads);
+	update_bead_positions_euler(nBlocks,nThreads);
+		
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::stepIBM_Euler_pusher_no_fluid(int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  bead positions.  Each bead is assigned an active VELOCITY
+	//  (rather than an active force) as well as conservative forces
+	// ----------------------------------------------------------
+		
+	// re-build bin lists for filament beads:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+		
+	// update IBM:
+	compute_bead_forces_spring_overdamped(nBlocks,nThreads);	
+	nonbonded_bead_interactions(nBlocks,nThreads);
+	compute_wall_forces(nBlocks,nThreads);
+	enforce_max_bead_force(nBlocks,nThreads);
+	update_bead_positions_euler_overdamped(nBlocks,nThreads); 
 		
 }
 
@@ -554,26 +610,17 @@ void class_filaments_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, in
 	reset_bin_lists(nBlocks,nThreads);
 	build_bin_lists(nBlocks,nThreads);
 	
-	// calculate hydrodynamic forces:	
-	zero_bead_forces(nBlocks,nThreads);
-	compute_bead_thermal_force(nBlocks,nThreads);
-	//unwrap_bead_coordinates(nBlocks,nThreads);
-	//compute_bead_propulsion_force(nBlocks,nThreads);
-	//wrap_bead_coordinates(nBlocks,nThreads);
-	lbm.hydrodynamic_forces_filaments_IBM_LBM(nBlocks,nThreads,gam,beads,nBeads);
-	
-	// calculate conservative filament forces:
-	unwrap_bead_coordinates(nBlocks,nThreads);
-	compute_bead_propulsion_force(nBlocks,nThreads);
-	compute_bead_bond_force_spring(nBlocks,nThreads);
-	compute_bead_bending_force(nBlocks,nThreads);
-	wrap_bead_coordinates(nBlocks,nThreads);
+	// calculate bead forces:
+	compute_bead_forces(nBlocks,nThreads);
 	nonbonded_bead_interactions(nBlocks,nThreads);
-	compute_wall_forces(nBlocks,nThreads);
+	compute_wall_forces(nBlocks,nThreads);	
+	
+	// calculate viscous drag forces:
+	lbm.viscous_force_filaments_IBM_LBM(nBlocks,nThreads,gam,beads,nBeads); 
 	enforce_max_bead_force(nBlocks,nThreads);
 	
-	// update bead positions (Euler):
-	//update_bead_positions_euler(nBlocks,nThreads);
+	// update beads:
+	update_bead_positions_euler(nBlocks,nThreads);
 	
 }
 
@@ -692,6 +739,59 @@ void class_filaments_ibm3D::stepIBM_capsules_filaments_no_fluid(class_capsules_i
 
 
 // --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::stepIBM_capsules_filaments_pusher_no_fluid(class_capsules_ibm3D& cap, 
+                                                                       int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	// This method updates filaments AND capsules.  Here,
+	// the filaments are considered pushers with a prescribed 
+	// active velocity (rather than active force)
+	// ----------------------------------------------------------
+
+	// ----------------------------------------------------------
+	//  here, the velocity-Verlet algorithm is used to update the
+	//  node positions, and the Euler method is used to update the
+	//  bead positions 
+	// ----------------------------------------------------------
+		
+	// first step of IBM velocity verlet:
+	cap.update_node_positions_verlet_1_drag(nBlocks,nThreads);
+	
+	// re-build bin lists for filament beads & capsule nodes:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+	cap.reset_bin_lists(nBlocks,nThreads);
+	cap.build_bin_lists(nBlocks,nThreads);
+			
+	// calculate bonded forces within filaments and capsules:
+	compute_bead_forces_spring_overdamped(nBlocks,nThreads); 
+	cap.compute_node_forces(nBlocks,nThreads);
+	
+	// calculate nonbonded forces for filaments and capsules:
+	nonbonded_bead_interactions(nBlocks,nThreads);
+	nonbonded_bead_node_interactions(cap,nBlocks,nThreads);
+	//cap.nonbonded_node_interactions(nBlocks,nThreads);
+	cap.nonbonded_node_bead_interactions(beads,bins,nBlocks,nThreads);
+	
+	// calculate wall forces:
+	compute_wall_forces(nBlocks,nThreads);
+	enforce_max_bead_force(nBlocks,nThreads);
+	cap.compute_wall_forces(nBlocks,nThreads);	
+	cap.enforce_max_node_force(nBlocks,nThreads);
+		
+	// second step of IBM velocity verlet:
+	update_bead_positions_euler_overdamped(nBlocks,nThreads);
+	cap.update_node_positions_verlet_2_drag(nBlocks,nThreads);
+		
+}
+
+
+
+// --------------------------------------------------------
 // Take step forward for IBM w/o fluid pushing beads
 // into sphere:
 // (note: this uses the velocity-Verlet algorithm)
@@ -781,6 +881,21 @@ void class_filaments_ibm3D::update_bead_positions_euler(int nBlocks, int nThread
 {
 	update_bead_position_euler_IBM3D
 	<<<nBlocks,nThreads>>> (beads,dt,1.0,nBeads);
+	
+	wrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_bead_position_euler_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::update_bead_positions_euler_overdamped(int nBlocks, int nThreads)
+{
+	update_bead_position_euler_overdamped_IBM3D
+	<<<nBlocks,nThreads>>> (beads,dt,Mob,nBeads);
 	
 	wrap_bead_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);	
@@ -882,10 +997,10 @@ void class_filaments_ibm3D::enforce_max_bead_force(int nBlocks, int nThreads)
 // Call to "add_drag_force_to_node_IBM3D" kernel:
 // --------------------------------------------------------
 
-void class_filaments_ibm3D::add_drag_force_to_beads(float dragcoeff, int nBlocks, int nThreads)
+void class_filaments_ibm3D::add_drag_force_to_beads(int nBlocks, int nThreads)
 {
 	add_drag_force_to_bead_IBM3D
-	<<<nBlocks,nThreads>>> (beads,dragcoeff,nBeads);
+	<<<nBlocks,nThreads>>> (beads,gam,nBeads);
 }
 
 
@@ -897,7 +1012,7 @@ void class_filaments_ibm3D::add_drag_force_to_beads(float dragcoeff, int nBlocks
 void class_filaments_ibm3D::compute_bead_thermal_force(int nBlocks, int nThreads)
 {
 	compute_thermal_force_IBM3D
-	<<<nBlocks,nThreads>>> (beads,filams,rngState,noisekT,nBeads);
+	<<<nBlocks,nThreads>>> (beads,rngState,noisekT,nBeads);
 }
 
 
@@ -934,6 +1049,18 @@ void class_filaments_ibm3D::compute_bead_propulsion_force(int nBlocks, int nThre
 {
 	compute_propulsion_force_IBM3D
 	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "compute_propulsion_velocity_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::compute_bead_propulsion_velocity(int nBlocks, int nThreads)
+{
+	compute_propulsion_velocity_IBM3D
+	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges); 
 }
 
 
@@ -1055,7 +1182,7 @@ void class_filaments_ibm3D::compute_bead_forces_spring(int nBlocks, int nThreads
 	// Third, compute the edge extension and bending force for each edge:
 	compute_bead_force_spring_IBM3D
 	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
-		
+	
 	compute_bead_force_bending_IBM3D
 	<<<nBlocks,nThreads>>> (beads,filams,nBeads);
 	
@@ -1064,11 +1191,31 @@ void class_filaments_ibm3D::compute_bead_forces_spring(int nBlocks, int nThreads
 	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
 	
 	compute_thermal_force_IBM3D
-	<<<nBlocks,nThreads>>> (beads,filams,rngState,noisekT,nBeads);
+	<<<nBlocks,nThreads>>> (beads,rngState,noisekT,nBeads);
 	
 	// Fifth, re-wrap bead coordinates:
 	wrap_bead_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on beads based 
+// on the chain-like mechanics model (Spring model).
+// Here, a propulsion VELOCITY is applied rather than
+// a propulsion force.
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::compute_bead_forces_spring_overdamped(int nBlocks, int nThreads)
+{
+	zero_bead_velocities_forces(nBlocks,nThreads);	
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	compute_bead_propulsion_velocity(nBlocks,nThreads);
+	compute_bead_bond_force_spring(nBlocks,nThreads);
+	compute_bead_bending_force(nBlocks,nThreads);
+	compute_bead_thermal_force(nBlocks,nThreads);
+	wrap_bead_coordinates(nBlocks,nThreads);	
 }
 
 
@@ -1100,7 +1247,7 @@ void class_filaments_ibm3D::compute_bead_forces_FENE(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
 	
 	compute_thermal_force_IBM3D
-	<<<nBlocks,nThreads>>> (beads,filams,rngState,noisekT,nBeads);
+	<<<nBlocks,nThreads>>> (beads,rngState,noisekT,nBeads);
 	
 	// Fifth, re-wrap bead coordinates:
 	wrap_bead_coordinates_IBM3D

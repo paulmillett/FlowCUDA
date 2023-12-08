@@ -11,6 +11,7 @@ struct bead {
 	float3 r;
 	float3 v;
 	float3 f;
+	float3 fdip;
 	int filamID;
 };
 
@@ -28,7 +29,7 @@ struct edgefilam {
 
 
 // --------------------------------------------------------
-// struct that defines a vertex in an IBM mesh:
+// struct that defines a flexible filament in an IBM mesh:
 // --------------------------------------------------------
 
 struct filament {
@@ -42,9 +43,11 @@ struct filament {
 	float ks;
 	float kb;
 	float fp;
+	float up;    // sometimes 'up' is used
 	float3 com;
 	float3 vel;
 };
+
 
 # endif  // FILAMENT_DATA_H
 

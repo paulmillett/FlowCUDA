@@ -38,6 +38,7 @@ class class_filaments_ibm3D {
 	float L0;
 	float kT;
 	float noisekT;
+	float Mob;
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;
@@ -68,6 +69,7 @@ class class_filaments_ibm3D {
 	void set_ks(float);
 	void set_kb(float);
 	void set_fp(float);
+	void set_up(float);
 	void set_filams_mechanical_props(float,float);
 	void set_filam_mechanical_props(int,float,float);
 	void set_filams_radii(float);
@@ -84,6 +86,7 @@ class class_filaments_ibm3D {
 	float calc_separation_pbc(float3,float3);
 	void initialize_cuRand(int,int);
 	void update_bead_positions_euler(int,int);
+	void update_bead_positions_euler_overdamped(int,int);
 	void update_bead_positions_verlet_1(int,int);
 	void update_bead_positions_verlet_2(int,int);
 	void update_bead_positions_verlet_1_drag(int,int);
@@ -91,19 +94,23 @@ class class_filaments_ibm3D {
 	void zero_bead_forces(int,int);
 	void zero_bead_velocities_forces(int,int);
 	void enforce_max_bead_force(int,int);
-	void add_drag_force_to_beads(float,int,int);
+	void add_drag_force_to_beads(int,int);
 	void compute_bead_thermal_force(int,int);
 	void compute_bead_bond_force_spring(int,int);
 	void compute_bead_bending_force(int,int);
 	void compute_bead_propulsion_force(int,int);
+	void compute_bead_propulsion_velocity(int,int);
 	void unwrap_bead_coordinates(int,int);
 	void wrap_bead_coordinates(int,int);	
 	void add_xdir_force_to_beads(int,int,float);
 	void compute_wall_forces(int,int);
-	void stepIBM(class_scsp_D3Q19&,int,int);
+	void stepIBM_Verlet_no_fluid(int,int);
+	void stepIBM_Euler_no_fluid(int,int);
+	void stepIBM_Euler_pusher_no_fluid(int,int);
 	void stepIBM_Euler(class_scsp_D3Q19&,int,int);
 	void stepIBM_capsules_filaments(class_scsp_D3Q19&,class_capsules_ibm3D&,int,int); 
 	void stepIBM_capsules_filaments_no_fluid(class_capsules_ibm3D&,int,int); 
+	void stepIBM_capsules_filaments_pusher_no_fluid(class_capsules_ibm3D&,int,int); 
 	void stepIBM_push_into_sphere(int,float,float,float,float,int,int);
 	void compute_bead_forces(int,int);
 	void build_binMap(int,int);
@@ -111,6 +118,7 @@ class class_filaments_ibm3D {
 	void build_bin_lists(int,int);
 	void nonbonded_bead_interactions(int,int);
 	void nonbonded_bead_node_interactions(class_capsules_ibm3D&,int,int);
+	void compute_bead_forces_spring_overdamped(int,int);
 	void compute_bead_forces_spring(int,int);
 	void compute_bead_forces_FENE(int,int);
 	void compute_bead_forces_no_propulsion(int,int);

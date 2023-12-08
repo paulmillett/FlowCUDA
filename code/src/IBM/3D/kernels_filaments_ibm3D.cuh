@@ -14,7 +14,14 @@ __global__ void update_bead_position_euler_IBM3D(
 	float,
 	float,	
 	int);
-		
+
+
+__global__ void update_bead_position_euler_overdamped_IBM3D(
+	bead*,
+	float,
+	float,	
+	int);
+			
 
 __global__ void update_bead_position_verlet_1_IBM3D(
 	bead*,
@@ -96,21 +103,15 @@ __global__ void compute_propulsion_force_IBM3D(
 	int);
 
 
-__global__ void compute_propulsion_force_2_IBM3D(
+__global__ void compute_propulsion_velocity_IBM3D(
 	bead*,
+	edgefilam*,
 	filament*,
 	int);
-
-
-__global__ void compute_propulsion_force_3_IBM3D(
-	bead*,
-	filament*,
-	int);
-
+		
 
 __global__ void compute_thermal_force_IBM3D(
 	bead*,
-	filament*,
 	curandState*,
 	float,
 	int);
@@ -275,7 +276,19 @@ __device__ inline void add_force_to_bead(
 	int,
 	bead*,
 	const float3);
-	
+
+
+__device__ inline void add_force_dipole_to_bead(
+	int,
+	bead*,
+	const float3);
+
+
+__device__ inline void add_velocity_to_bead(
+	int,
+	bead*,
+	const float3);
+			
 	
 __device__ inline int bin_index_for_beads(
 	int, 

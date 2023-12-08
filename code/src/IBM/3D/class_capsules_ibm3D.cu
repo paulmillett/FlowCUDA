@@ -1386,6 +1386,23 @@ void class_capsules_ibm3D::nonbonded_node_bead_interactions(bead* beads, bindata
 
 
 // --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::nonbonded_node_bead_rod_interactions(beadrod* beads, bindata binsRod, 
+                                                                int nBlocks, int nThreads)
+{
+	if (binsFlag) {	
+		nonbonded_node_bead_rod_interactions_IBM3D
+		<<<nBlocks,nThreads>>> (nodes,beads,binsRod,repA,repD,nNodes,Box,pbcFlag);
+	} else {
+		cout << "IBM bin arrays have not been initialized" << endl;
+	}
+}
+
+
+
+// --------------------------------------------------------
 // Calculate rest geometries:
 // --------------------------------------------------------
 
