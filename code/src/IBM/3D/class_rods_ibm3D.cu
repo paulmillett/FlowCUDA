@@ -58,9 +58,12 @@ class_rods_ibm3D::class_rods_ibm3D()
 	repA_bn = inputParams("IBM_RODS/repA_bn",0.0);
 	repD_bn = inputParams("IBM_RODS/repD_bn",0.0);
 	beadFmax = inputParams("IBM_RODS/beadFmax",1000.0);
+	rodFmax = inputParams("IBM_RODS/rodFmax",1000.0);
+	rodTmax = inputParams("IBM_RODS/rodTmax",1000.0);
 	gam = inputParams("IBM_RODS/gamma",0.1);
 	noisekT = 6.0*kT*gam/dt;
-	noisekT *= 0.1;
+	noisekTforce = 6.0*kT*gam/dt;
+	noisekTtorque = 6.0*kT*gam/dt;
 	
 	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
@@ -312,7 +315,6 @@ void class_rods_ibm3D::duplicate_rods()
 			}
 		}
 	}
-	
 }
 
 
@@ -460,17 +462,20 @@ void class_rods_ibm3D::stepIBM_Euler_no_fluid(int nBlocks, int nThreads)
 	// re-build bin lists for rod beads:
 	reset_bin_lists(nBlocks,nThreads);
 	build_bin_lists(nBlocks,nThreads);
-			
+		
 	// update IBM:
-	compute_bead_forces(nBlocks,nThreads);
-	nonbonded_bead_interactions(nBlocks,nThreads);
-	compute_wall_forces(nBlocks,nThreads);	
-	enforce_max_bead_force(nBlocks,nThreads);	
+	zero_bead_forces(nBlocks,nThreads);
+	zero_rod_forces_torques_moments(nBlocks,nThreads);
+	nonbonded_bead_interactions(nBlocks,nThreads);	
+	compute_wall_forces(nBlocks,nThreads);		
 	unwrap_bead_coordinates(nBlocks,nThreads);
-	sum_rod_forces_torques_moments(nBlocks,nThreads);		
+	sum_rod_forces_torques_moments(nBlocks,nThreads);
+	compute_thermal_force_torque_rod(nBlocks,nThreads);
+	compute_rod_propulsion_force(nBlocks,nThreads);
+	enforce_max_rod_force_torque(nBlocks,nThreads);
 	update_rod_position_orientation(nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
-	wrap_bead_coordinates(nBlocks,nThreads);	
+	wrap_bead_coordinates(nBlocks,nThreads);
 		
 }
 
@@ -497,17 +502,18 @@ void class_rods_ibm3D::stepIBM_capsules_rods_no_fluid(class_capsules_ibm3D& cap,
 	// first step of capsule velocity verlet:
 	cap.update_node_positions_verlet_1_drag(nBlocks,nThreads);
 	
-	// re-build bin lists for filament beads & capsule nodes:
+	// re-build bin lists for rod beads & capsule nodes:
 	reset_bin_lists(nBlocks,nThreads);
 	build_bin_lists(nBlocks,nThreads);
 	cap.reset_bin_lists(nBlocks,nThreads);
 	cap.build_bin_lists(nBlocks,nThreads);
 			
-	// calculate bonded forces within filaments and capsules:
-	compute_bead_forces(nBlocks,nThreads); 
+	// calculate bonded forces within rods and capsules:
+	zero_bead_forces(nBlocks,nThreads);
+	zero_rod_forces_torques_moments(nBlocks,nThreads);	
 	cap.compute_node_forces(nBlocks,nThreads);
 	
-	// calculate nonbonded forces for filaments and capsules:
+	// calculate nonbonded forces for rods and capsules:
 	nonbonded_bead_interactions(nBlocks,nThreads);
 	nonbonded_bead_node_interactions(cap,nBlocks,nThreads);
 	//cap.nonbonded_node_interactions(nBlocks,nThreads);
@@ -515,13 +521,15 @@ void class_rods_ibm3D::stepIBM_capsules_rods_no_fluid(class_capsules_ibm3D& cap,
 	
 	// calculate wall forces:
 	compute_wall_forces(nBlocks,nThreads);
-	enforce_max_bead_force(nBlocks,nThreads);
 	cap.compute_wall_forces(nBlocks,nThreads);	
 	cap.enforce_max_node_force(nBlocks,nThreads);
 		
 	// update IBM:
 	unwrap_bead_coordinates(nBlocks,nThreads);
-	sum_rod_forces_torques_moments(nBlocks,nThreads);		
+	sum_rod_forces_torques_moments(nBlocks,nThreads);
+	compute_thermal_force_torque_rod(nBlocks,nThreads);
+	compute_rod_propulsion_force(nBlocks,nThreads);
+	enforce_max_rod_force_torque(nBlocks,nThreads);		
 	update_rod_position_orientation(nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	wrap_bead_coordinates(nBlocks,nThreads);
@@ -551,28 +559,16 @@ void class_rods_ibm3D::stepIBM_push_into_sphere(int nSteps, float xs, float ys, 
 		nonbonded_bead_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);	
 		push_beads_inside_sphere(xs,ys,zs,rs,nBlocks,nThreads);
-		enforce_max_bead_force(nBlocks,nThreads);	
 		unwrap_bead_coordinates(nBlocks,nThreads);
-		sum_rod_forces_torques_moments(nBlocks,nThreads);		
-		update_rod_position_orientation_no_propulsion(nBlocks,nThreads);
+		sum_rod_forces_torques_moments(nBlocks,nThreads);
+		enforce_max_rod_force_torque(nBlocks,nThreads);		
+		update_rod_position_orientation(nBlocks,nThreads);
 		update_bead_position_rods(nBlocks,nThreads);
 		wrap_bead_coordinates(nBlocks,nThreads);	
 	}
 	zero_bead_forces(nBlocks,nThreads); 
 }
 
-
-
-// --------------------------------------------------------
-// Calculate all the bead forces on each rod:
-// --------------------------------------------------------
-
-void class_rods_ibm3D::compute_bead_forces(int nBlocks, int nThreads) 
-{	
-	zero_bead_forces(nBlocks,nThreads);
-	zero_rod_forces_torques_moments(nBlocks,nThreads);	
-	compute_bead_thermal_force(nBlocks,nThreads);	
-}
 
 
 
@@ -608,8 +604,8 @@ void class_rods_ibm3D::compute_bead_forces(int nBlocks, int nThreads)
 
 void class_rods_ibm3D::initialize_cuRand(int nBlocks, int nThreads)
 {
-	init_curand_IBM3D
-	<<<nBlocks,nThreads>>> (rngState,1,nBeads);
+	init_curand_rods_IBM3D
+	<<<nBlocks,nThreads>>> (rngState,1,nRods);
 }
 
 
@@ -669,21 +665,6 @@ void class_rods_ibm3D::update_rod_position_orientation(int nBlocks, int nThreads
 
 
 // --------------------------------------------------------
-// Call to "update_rod_position_orientation_no_propulsion_IBM3D" kernel:
-// --------------------------------------------------------
-
-void class_rods_ibm3D::update_rod_position_orientation_no_propulsion(int nBlocks, int nThreads)
-{
-	update_rod_position_orientation_no_propulsion_IBM3D
-	<<<nBlocks,nThreads>>> (rods,dt,gam,nRods);
-	
-	wrap_rod_coordinates_IBM3D
-	<<<nBlocks,nThreads>>> (rods,Box,pbcFlag,nRods);	
-}
-
-
-
-// --------------------------------------------------------
 // Call to "zero_bead_forces_IBM3D" kernel:
 // --------------------------------------------------------
 
@@ -708,6 +689,18 @@ void class_rods_ibm3D::enforce_max_bead_force(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "enforce_max_rod_force_torque_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::enforce_max_rod_force_torque(int nBlocks, int nThreads)
+{
+	enforce_max_rod_force_torque_IBM3D
+	<<<nBlocks,nThreads>>> (rods,rodFmax,rodTmax,nRods);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "compute_thermal_force_IBM3D" kernel:
 // --------------------------------------------------------
 
@@ -715,6 +708,18 @@ void class_rods_ibm3D::compute_bead_thermal_force(int nBlocks, int nThreads)
 {
 	compute_thermal_force_IBM3D
 	<<<nBlocks,nThreads>>> (beads,rngState,noisekT,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "compute_thermal_force_torque_rod_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::compute_thermal_force_torque_rod(int nBlocks, int nThreads)
+{
+	compute_thermal_force_torque_rod_IBM3D
+	<<<nBlocks,nThreads>>> (rods,rngState,noisekTforce,noisekTtorque,nRods);
 }
 
 

@@ -90,6 +90,28 @@ __global__ void enforce_max_bead_force_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D enforce a maximum bead force:
+// --------------------------------------------------------
+
+__global__ void enforce_max_rod_force_torque_IBM3D(
+	rod* rods,
+	float fmax,
+	float tmax,
+	int nRods)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nRods) {
+		float fi = length(rods[i].f);
+		float ti = length(rods[i].t);
+		if (fi > fmax) rods[i].f *= (fmax/fi);
+		if (ti > tmax) rods[i].t *= (tmax/ti);
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D bead update kernel:
 // --------------------------------------------------------
 
@@ -115,27 +137,6 @@ __global__ void update_bead_positions_rods_IBM3D(
 // --------------------------------------------------------
 
 __global__ void update_rod_position_orientation_IBM3D(
-	rod* rods,
-	float dt,
-	float gam,	
-	int nRods)
-{
-	// define bead:
-	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nRods) {
-		rods[i].r += dt*(rods[i].up*rods[i].p + rods[i].f/gam);
-		rods[i].p += dt*(cross(rods[i].t,rods[i].p));
-		rods[i].p = normalize(rods[i].p);
-	}
-}
-
-
-
-// --------------------------------------------------------
-// IBM3D bead update kernel:
-// --------------------------------------------------------
-
-__global__ void update_rod_position_orientation_no_propulsion_IBM3D(
 	rod* rods,
 	float dt,
 	float gam,	
@@ -189,6 +190,38 @@ __global__ void compute_thermal_force_IBM3D(
 		beads[i].f.x += pref*(r1-0.5);
 		beads[i].f.y += pref*(r2-0.5);
 		beads[i].f.z += pref*(r3-0.5);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to compute thermal force 
+// --------------------------------------------------------
+
+__global__ void compute_thermal_force_torque_rod_IBM3D(
+	rod* rods,
+	curandState* state,
+	float prefT,
+	float prefR,
+	int nRods)
+{		
+	// define edge:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nRods) {
+		float r1 = curand_uniform(&state[i]);
+		float r2 = curand_uniform(&state[i]);
+		float r3 = curand_uniform(&state[i]);		
+		rods[i].f.x += prefT*(r1-0.5);
+		rods[i].f.y += prefT*(r2-0.5);
+		rods[i].f.z += prefT*(r3-0.5);
+		float r4 = curand_uniform(&state[i]);
+		float r5 = curand_uniform(&state[i]);
+		float r6 = curand_uniform(&state[i]);
+		rods[i].t.x += prefR*(r4-0.5);
+		rods[i].t.y += prefR*(r5-0.5);
+		rods[i].t.z += prefR*(r6-0.5);
 	}
 }
 
@@ -789,7 +822,20 @@ __device__ inline float determinantOfMatrix(float mat[3][3])
  
 
  
+// --------------------------------------------------------
+// IBM3D kernel to initialize curand random num. generator:
+// --------------------------------------------------------
 
+__global__ void init_curand_rods_IBM3D(
+	curandState* state,
+	unsigned long seed,
+	int nRods)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nRods) {
+		curand_init(seed,i,0,&state[i]);
+	}    
+}
 
 
 

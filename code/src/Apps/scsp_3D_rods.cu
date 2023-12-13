@@ -60,7 +60,7 @@ scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
 	shearVel = 0.0;
 	
 	// ----------------------------------------------
-	// Filaments Immersed-Boundary parameters:
+	// Rods Immersed-Boundary parameters:
 	// ----------------------------------------------
 		
 	int nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);

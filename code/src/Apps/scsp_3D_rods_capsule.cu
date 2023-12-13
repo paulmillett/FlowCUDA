@@ -1,5 +1,5 @@
 
-# include "scsp_3D_filaments_capsule.cuh"
+# include "scsp_3D_rods_capsule.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_filaments_capsule::scsp_3D_filaments_capsule() : lbm(),ibm(),filams()
+scsp_3D_rods_capsule::scsp_3D_rods_capsule() : lbm(),rods(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -35,14 +35,14 @@ scsp_3D_filaments_capsule::scsp_3D_filaments_capsule() : lbm(),ibm(),filams()
 	// ----------------------------------------------
 	
 	int sizeIBM = ibm.get_max_array_size();
-	int sizeFIL = filams.get_max_array_size();	
-	int sizeMAX = max(nVoxels,max(sizeIBM,sizeFIL));
+	int sizeROD = rods.get_max_array_size();	
+	int sizeMAX = max(nVoxels,max(sizeIBM,sizeROD));	
 	nThreads = inputParams("GPU/nThreads",512);
 	nBlocks = (sizeMAX+(nThreads-1))/nThreads;  // integer division
 	
 	cout << "largest array size = " << sizeMAX << endl;
 	cout << "nBlocks = " << nBlocks << ", nThreads = " << nThreads << endl;
-	
+		
 	// ----------------------------------------------
 	// time parameters:
 	// ----------------------------------------------
@@ -53,29 +53,26 @@ scsp_3D_filaments_capsule::scsp_3D_filaments_capsule() : lbm(),ibm(),filams()
 	// ----------------------------------------------
 	// Lattice Boltzmann parameters:
 	// ----------------------------------------------
-		
+	
 	nu = inputParams("LBM/nu",0.1666666);
 	shearVel = inputParams("LBM/shearVel",0.0);
-	Re = inputParams("LBM/Re",2.0);
-	float h = float(Nz)/2.0;
-	shearVel = Re*nu/h;
+	float Re = inputParams("LBM/Re",2.0);
+	shearVel = 2.0*Re*nu/float(Nz);
 	shearVel = 0.0;
-		
+	
 	// ----------------------------------------------
-	// Filaments Immersed-Boundary parameters:
+	// Rods Immersed-Boundary parameters:
 	// ----------------------------------------------
 		
-	int nBeadsPerFilam = inputParams("IBM_FILAMS/nBeadsPerFilam",0);
-	nFilams = inputParams("IBM_FILAMS/nFilams",1);
-	ks = inputParams("IBM_FILAMS/ks",0.1);
-	kb = inputParams("IBM_FILAMS/kb",0.1);
-	fp = inputParams("IBM_FILAMS/fp",0.0);
-	L0 = inputParams("IBM_FILAMS/L0",0.5);
-	Pe = inputParams("IBM_FILAMS/Pe",0.0);
-	PL = inputParams("IBM_FILAMS/PL",1.0);  // non-dimensional persistence length
-	kT = inputParams("IBM_FILAMS/kT",0.0);
-	nBeads = nBeadsPerFilam*nFilams;
-	Lfil = float(nBeadsPerFilam)*L0;
+	int nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);
+	nRods = inputParams("IBM_RODS/nRods",1);
+	fp = inputParams("IBM_RODS/fp",0.0);
+	L0 = inputParams("IBM_RODS/L0",0.5);
+	Pe = inputParams("IBM_RODS/Pe",0.0);
+	kT = inputParams("IBM_RODS/kT",0.0);
+	gam = inputParams("IBM_RODS/gamma",0.1);
+	nBeads = nBeadsPerRod*nRods;
+	Lrod = float(nBeadsPerRod)*L0;
 	
 	// ----------------------------------------------
 	// Capsules Immersed-Boundary parameters:
@@ -90,14 +87,14 @@ scsp_3D_filaments_capsule::scsp_3D_filaments_capsule() : lbm(),ibm(),filams()
 	La = inputParams("IBM/La",1.0);
 	gam = inputParams("IBM/gamma",0.1);
 	ibmFile = inputParams("IBM/ibmFile","sphere.dat");
-	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
+	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");	
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	ibm.set_pbcFlag(1,1,1);
-	filams.set_pbcFlag(1,1,1);
+	ibm.set_pbcFlag(1,1,0);
+	rods.set_pbcFlag(1,1,0);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -120,9 +117,9 @@ scsp_3D_filaments_capsule::scsp_3D_filaments_capsule() : lbm(),ibm(),filams()
 	// ----------------------------------------------
 	
 	ibm.allocate();
-	//lbm.allocate();
-	//lbm.allocate_forces();
-	filams.allocate();	
+	lbm.allocate();
+	lbm.allocate_forces();
+	rods.allocate();	
 	
 	// ----------------------------------------------
 	// even though there is only one capsule, 
@@ -130,7 +127,7 @@ scsp_3D_filaments_capsule::scsp_3D_filaments_capsule() : lbm(),ibm(),filams()
 	// ----------------------------------------------
 	
 	ibm.initialize_bins();
-		
+	
 }
 
 
@@ -139,11 +136,11 @@ scsp_3D_filaments_capsule::scsp_3D_filaments_capsule() : lbm(),ibm(),filams()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_filaments_capsule::~scsp_3D_filaments_capsule()
+scsp_3D_rods_capsule::~scsp_3D_rods_capsule()
 {
 	ibm.deallocate();
-	//lbm.deallocate();
-	filams.deallocate();
+	lbm.deallocate();
+	rods.deallocate();
 }
 
 
@@ -152,7 +149,7 @@ scsp_3D_filaments_capsule::~scsp_3D_filaments_capsule()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_filaments_capsule::initSystem()
+void scsp_3D_rods_capsule::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -166,26 +163,24 @@ void scsp_3D_filaments_capsule::initSystem()
 	// create the lattice assuming shear flow.
 	// ----------------------------------------------	
 	
-	//lbm.create_lattice_box_shear();
+	lbm.create_lattice_box_shear();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
 	// ----------------------------------------------
 		
-	//lbm.stream_index_pull();
+	lbm.stream_index_pull();
 			
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------
 	
-	/*
 	for (int i=0; i<nVoxels; i++) {
 		lbm.setU(i,0.0);
 		lbm.setV(i,0.0);
 		lbm.setW(i,0.0);
 		lbm.setR(i,1.0);		
 	}
-	*/
 	
 	// ----------------------------------------------			
 	// initialize immersed boundary info: 
@@ -205,47 +200,45 @@ void scsp_3D_filaments_capsule::initSystem()
 	ibm.set_cells_mechanical_props(Ks,Kb,Kv,C,Ca);
 	cout << "Capsule Ks = " << Ks << endl;
 	cout << "Capsule Kb = " << Kb << endl;
-		
+	
 	// ----------------------------------------------			
-	// initialize filament immersed boundary info: 
+	// initialize rod immersed boundary info: 
 	// ----------------------------------------------
 	
-	filams.create_first_filament();
-	filams.duplicate_filaments();
-	filams.assign_filamIDs_to_beads();
+	rods.create_first_rod();
+	rods.duplicate_rods();
+	rods.assign_rodIDs_to_beads();
 	
-	fp = Pe*kT/Lfil/Lfil;
-	kb = PL*kT;
-	filams.set_ks(ks);
-	filams.set_kb(kb);
-	filams.set_fp(fp);
-	filams.set_filams_radii(0.5);
+	fp = Pe*kT/Lrod;
+	up = fp/gam;
+	rods.set_fp(fp);
+	rods.set_up(up);
+	rods.set_rods_radii(0.5);
 	cout << "  " << endl;
-	cout << "Filament kT = " << kT << endl;
-	cout << "Filament ks = " << ks << endl;
-	cout << "Filament kb = " << kb << endl;
-	cout << "Filament fp = " << fp << endl;
-			
+	cout << "Rod kT = " << kT << endl;
+	cout << "Rod fp = " << fp << endl;
+	cout << "Rod up = " << up << endl;
+				
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
 	
 	ibm.build_binMap(nBlocks,nThreads);
-	filams.build_binMap(nBlocks,nThreads);
+	rods.build_binMap(nBlocks,nThreads);
 		
 	// ----------------------------------------------		
 	// copy arrays from host to device: 
 	// ----------------------------------------------
 	
 	ibm.memcopy_host_to_device();
-	//lbm.memcopy_host_to_device();
-	filams.memcopy_host_to_device();
+	lbm.memcopy_host_to_device();
+	rods.memcopy_host_to_device();
 		
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
-	//lbm.initial_equilibrium(nBlocks,nThreads);	
+	lbm.initial_equilibrium(nBlocks,nThreads);	
 		
 	// ----------------------------------------------
 	// set the random number seed: 
@@ -256,23 +249,23 @@ void scsp_3D_filaments_capsule::initSystem()
 	// ----------------------------------------------
 	// randomly disperse filaments: 
 	// ----------------------------------------------
-			
-	filams.randomize_filaments_inside_sphere(float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,11.0,Lfil);
-	filams.stepIBM_push_into_sphere(20000,float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,6.0,nBlocks,nThreads);	
 	
+	rods.randomize_rods_inside_sphere(float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,11.0,Lrod);
+	rods.set_rod_position_orientation(nBlocks,nThreads);
+	rods.stepIBM_push_into_sphere(30000,float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,6.0,nBlocks,nThreads);	
+		
 	// ----------------------------------------------
-	// calculate rest geometries for membrane: 
+	// calculate rest geometries for capsule: 
 	// ----------------------------------------------
 	
 	ibm.rest_geometries(nBlocks,nThreads);
-	//ibm.set_edge_rest_angles(0.0,nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
 	
 	ibm.memcopy_device_to_host();
-	filams.memcopy_device_to_host();
+	rods.memcopy_device_to_host();
 	writeOutput("macros",0);
 	
 	// ----------------------------------------------
@@ -280,15 +273,15 @@ void scsp_3D_filaments_capsule::initSystem()
 	// ----------------------------------------------
 	
 	ibm.zero_velocities_forces(nBlocks,nThreads);
-	filams.zero_bead_velocities_forces(nBlocks,nThreads);
+	rods.zero_bead_forces(nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// initialize cuRand state for the thermal noise
 	// force:
 	// ----------------------------------------------
 	
-	filams.initialize_cuRand(nBlocks,nThreads);
-	
+	rods.initialize_cuRand(nBlocks,nThreads);
+		
 }
 
 
@@ -299,7 +292,7 @@ void scsp_3D_filaments_capsule::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_filaments_capsule::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_rods_capsule::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -320,8 +313,7 @@ void scsp_3D_filaments_capsule::cycleForward(int stepsPerCycle, int currentCycle
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			filams.stepIBM_capsules_filaments_no_fluid(ibm,nBlocks,nThreads);
-			//filams.stepIBM_capsules_filaments(lbm,ibm,nBlocks,nThreads);
+			rods.stepIBM_capsules_rods_no_fluid(ibm,nBlocks,nThreads);
 			//lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 			cudaDeviceSynchronize();
@@ -338,8 +330,7 @@ void scsp_3D_filaments_capsule::cycleForward(int stepsPerCycle, int currentCycle
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		filams.stepIBM_capsules_filaments_no_fluid(ibm,nBlocks,nThreads);
-		//filams.stepIBM_capsules_filaments(lbm,ibm,nBlocks,nThreads);	
+		rods.stepIBM_capsules_rods_no_fluid(ibm,nBlocks,nThreads);
 		//lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		cudaDeviceSynchronize();
@@ -352,8 +343,8 @@ void scsp_3D_filaments_capsule::cycleForward(int stepsPerCycle, int currentCycle
 	// ----------------------------------------------
 	
 	ibm.memcopy_device_to_host();
-	//lbm.memcopy_device_to_host();
-	filams.memcopy_device_to_host();    
+	lbm.memcopy_device_to_host();
+	rods.memcopy_device_to_host();    
 	
 	// ----------------------------------------------
 	// write output from this cycle:
@@ -369,14 +360,14 @@ void scsp_3D_filaments_capsule::cycleForward(int stepsPerCycle, int currentCycle
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_filaments_capsule::writeOutput(std::string tagname, int step)
+void scsp_3D_rods_capsule::writeOutput(std::string tagname, int step)
 {				
 	
 	if (step == 0) {
 		// only print out vtk files
 		ibm.write_output("ibm",step);
-		//lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
-		filams.write_output("filaments",step);
+		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
+		rods.write_output("rods",step);
 	}
 	
 	if (step > 0) { 					
@@ -385,8 +376,8 @@ void scsp_3D_filaments_capsule::writeOutput(std::string tagname, int step)
 		if (nVTKOutputs == 0) intervalVTK = nSteps;
 		if (step%intervalVTK == 0) {
 			ibm.write_output("ibm",step);
-			//lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
-			filams.write_output("filaments",step);
+			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
+			rods.write_output("rods",step);
 		}
 	}	
 }

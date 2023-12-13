@@ -30,7 +30,14 @@ __global__ void enforce_max_bead_force_IBM3D(
 	float,
 	int);
 		
-		
+
+__global__ void enforce_max_rod_force_torque_IBM3D(
+	rod*,
+	float,
+	float,
+	int);
+
+	
 __global__ void update_bead_positions_rods_IBM3D(
 	beadrod*,
 	rod*,
@@ -44,13 +51,6 @@ __global__ void update_rod_position_orientation_IBM3D(
 	float,	
 	int);
 	
-
-__global__ void update_rod_position_orientation_no_propulsion_IBM3D(
-	rod*,
-	float,
-	float,	
-	int);
-		
 		
 __global__ void compute_propulsion_force_rods_IBM3D(
 	rod*,
@@ -63,6 +63,14 @@ __global__ void compute_thermal_force_IBM3D(
 	float,
 	int);
 
+
+__global__ void compute_thermal_force_torque_rod_IBM3D(
+	rod*,
+	curandState*,
+	float,
+	float,
+	int);
+		
 
 __global__ void sum_rod_forces_torques_moments_IBM3D(
 	beadrod*,
@@ -187,5 +195,11 @@ __device__ inline float3 solve_angular_acceleration(
 __device__ inline float determinantOfMatrix(
 	float[3][3]);
 		
+
+__global__ void init_curand_rods_IBM3D(
+	curandState*,
+	unsigned long,
+	int);
+
 
 # endif  // KERNELS_RODS_IBM3D_H
