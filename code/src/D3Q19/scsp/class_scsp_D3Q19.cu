@@ -874,6 +874,37 @@ void class_scsp_D3Q19::hydrodynamic_forces_filaments_IBM_LBM(int nBlocks, int nT
 
 
 // --------------------------------------------------------
+// Call to "interpolate_gradient_of_velocity_rod_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::interpolate_gradient_of_velocity_rod(int nBlocks, int nThreads,
+	                                                        rod* rods, int nRods)
+{
+	interpolate_gradient_of_velocity_rod_IBM3D
+	<<<nBlocks,nThreads>>> (rods,u,v,w,Nx,Ny,Nz,nRods);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "extrapolate_rod_pusher_force_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::extrapolate_rod_pusher_force(int nBlocks, int nThreads,
+	                                                rod* rods, beadrod* beads, int nRods)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	extrapolate_rod_pusher_force_IBM3D
+	<<<nBlocks,nThreads>>> (rods,beads,Fx,Fy,Fz,Nx,Ny,Nz,nRods);	
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_zero_forces_D3Q19" kernel:
 // --------------------------------------------------------
 

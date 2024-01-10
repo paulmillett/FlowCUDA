@@ -52,7 +52,7 @@ void write_vtk_polydata(std::string,int,int,int*,int*,int*,float*,
 void write_vtk_immersed_boundary_3D_filaments(std::string,int,int,int,
                                               bead*,edgefilam*);
 
-void write_vtk_immersed_boundary_3D_rods(std::string,int,int,beadrod*);
+void write_vtk_immersed_boundary_3D_rods(std::string,int,int,int,beadrod*);
 
 void write_vtk_unstructured_grid(std::string,int,int,int*,int*,int*);
 

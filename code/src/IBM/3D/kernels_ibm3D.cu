@@ -39,6 +39,46 @@ __global__ void update_node_position_dt_IBM3D(
 // IBM3D node update kernel:
 // --------------------------------------------------------
 
+__global__ void update_node_position_include_force_IBM3D(
+	node* nodes,
+	float dt,
+	float m,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		nodes[i].r += nodes[i].v*dt + 0.5*dt*dt*(nodes[i].f/m);
+		nodes[i].v += dt*(nodes[i].f/m);
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D node update kernel:
+// --------------------------------------------------------
+
+__global__ void update_node_position_overdamped_IBM3D(
+	node* nodes,
+	float dt,
+	float fric,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		nodes[i].v = nodes[i].f/fric;
+		nodes[i].r += dt*nodes[i].v;
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D node update kernel:
+// --------------------------------------------------------
+
 __global__ void update_node_position_verlet_1_IBM3D(
 	node* nodes,
 	float dt,

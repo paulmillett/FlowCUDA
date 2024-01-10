@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_RODS_CAPSULE_H
-# define SCSP_3D_RODS_CAPSULE_H
+# ifndef SCSP_3D_RODS_CAPSULE_FLUID_H
+# define SCSP_3D_RODS_CAPSULE_FLUID_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_rods_capsule : public FlowBase {
+class scsp_3D_rods_capsule_fluid : public FlowBase {
 	
 private:
 
@@ -57,12 +57,12 @@ private:
 		
 public:
 
-	scsp_3D_rods_capsule();
-	~scsp_3D_rods_capsule();
+	scsp_3D_rods_capsule_fluid();
+	~scsp_3D_rods_capsule_fluid();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	
 };
 
-# endif  // SCSP_3D_RODS_CAPSULE_H
+# endif  // SCSP_3D_RODS_CAPSULE_FLUID_H

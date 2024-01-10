@@ -38,6 +38,7 @@ class class_filaments_ibm3D {
 	float L0;
 	float kT;
 	float noisekT;
+	float fricBead;
 	float Mob;
 	float3 Box;
 	int3 pbcFlag;
@@ -111,6 +112,7 @@ class class_filaments_ibm3D {
 	void stepIBM_capsules_filaments(class_scsp_D3Q19&,class_capsules_ibm3D&,int,int); 
 	void stepIBM_capsules_filaments_no_fluid(class_capsules_ibm3D&,int,int); 
 	void stepIBM_capsules_filaments_pusher_no_fluid(class_capsules_ibm3D&,int,int); 
+	void stepIBM_capsules_filaments_overdamp_no_fluid(class_capsules_ibm3D&,int,int); 
 	void stepIBM_push_into_sphere(int,float,float,float,float,int,int);
 	void compute_bead_forces(int,int);
 	void build_binMap(int,int);

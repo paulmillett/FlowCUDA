@@ -1162,6 +1162,36 @@ void class_capsules_ibm3D::update_node_positions(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "update_node_position_include_force_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::update_node_positions_include_force(int nBlocks, int nThreads)
+{
+	update_node_position_include_force_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,dt,1.0,nNodes);
+	
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_node_position_overdamped_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::update_node_positions_euler_overdamped(float fric, int nBlocks, int nThreads)
+{
+	update_node_position_overdamped_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,dt,fric,nNodes);
+	
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
 // Call to "update_node_position_dt_IBM3D" kernel:
 // --------------------------------------------------------
 

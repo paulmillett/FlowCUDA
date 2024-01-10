@@ -11,8 +11,10 @@
 # include "../../IO/read_lattice_geometry.cuh"
 # include "../../IBM/3D/kernels_ibm3D.cuh"
 # include "../../IBM/3D/kernels_filaments_ibm3D.cuh"
+# include "../../IBM/3D/kernels_rods_ibm3D.cuh"
 # include "../../IBM/3D/data_structs/membrane_data.h"
 # include "../../IBM/3D/data_structs/filament_data.h"
+# include "../../IBM/3D/data_structs/rod_data.h"
 # include "kernels_scsp_D3Q19.cuh"
 # include <cuda.h>
 # include <string>
@@ -144,6 +146,8 @@ public:
 	void viscous_force_IBM_LBM(int,int,float,node*,int);
 	void viscous_force_filaments_IBM_LBM(int,int,float,bead*,int);
 	void hydrodynamic_forces_filaments_IBM_LBM(int,int,float,bead*,int);
+	void interpolate_gradient_of_velocity_rod(int,int,rod*,int);
+	void extrapolate_rod_pusher_force(int,int,rod*,beadrod*,int);
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);
 	void calculate_relative_viscosity(std::string,float,int);

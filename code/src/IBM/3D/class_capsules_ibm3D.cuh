@@ -103,6 +103,8 @@ class class_capsules_ibm3D {
 	void write_output_long(std::string,int);
 	void update_node_positions(int,int);
 	void update_node_positions_dt(int,int);
+	void update_node_positions_include_force(int,int);
+	void update_node_positions_euler_overdamped(float,int,int);
 	void update_node_positions_verlet_1(int,int);
 	void update_node_positions_verlet_2(int,int);
 	void update_node_positions_verlet_1_drag(int,int);

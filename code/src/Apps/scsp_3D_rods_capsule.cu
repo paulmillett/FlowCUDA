@@ -71,6 +71,7 @@ scsp_3D_rods_capsule::scsp_3D_rods_capsule() : lbm(),rods(),ibm()
 	Pe = inputParams("IBM_RODS/Pe",0.0);
 	kT = inputParams("IBM_RODS/kT",0.0);
 	gam = inputParams("IBM_RODS/gamma",0.1);
+	Drod = inputParams("IBM_RODS/diam",1.0);
 	nBeads = nBeadsPerRod*nRods;
 	Lrod = float(nBeadsPerRod)*L0;
 	
@@ -163,8 +164,8 @@ void scsp_3D_rods_capsule::initSystem()
 	// create the lattice assuming shear flow.
 	// ----------------------------------------------	
 	
-	lbm.create_lattice_box_shear();
-	
+	lbm.create_lattice_box_slit();
+		
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
 	// ----------------------------------------------
@@ -213,11 +214,43 @@ void scsp_3D_rods_capsule::initSystem()
 	up = fp/gam;
 	rods.set_fp(fp);
 	rods.set_up(up);
-	rods.set_rods_radii(0.5);
+	rods.set_rods_radii(Drod/2.0);
 	cout << "  " << endl;
 	cout << "Rod kT = " << kT << endl;
 	cout << "Rod fp = " << fp << endl;
 	cout << "Rod up = " << up << endl;
+	
+	// ----------------------------------------------			
+	// drag friction coefficients using Broersma's
+	// relations.  See Tsay et al. J. Amer. Chem. Soc.
+	// 128:1639(2006)
+	// ----------------------------------------------
+	
+	// translational:
+	float delt = log(2*Lrod/Drod);  // this is natural log
+	float g1 = 0.807 + 0.15/delt + 13.5/delt/delt - 37.0/delt/delt/delt + 22.0/delt/delt/delt/delt;
+	float g2 = -0.193 + 0.15/delt + 8.1/delt/delt - 18.0/delt/delt/delt + 9.0/delt/delt/delt/delt;
+	float pref = delt - 0.5*(g1 + g2);
+	if (pref < 1.0) pref = 1.0;
+	float DT = pref*kT/(3.0*M_PI*nu*Lrod);  // diffusivity (assume fluid density = 1)
+	float fricT = kT/DT;
+	float noiseT = sqrt(2.0*fricT*kT);
+	rods.set_friction_coefficient_translational(fricT);
+	rods.set_noise_strength_translational(noiseT);
+	cout << "Rod fricT = " << fricT << endl;
+	cout << "Rod noiseT = " << noiseT << endl;	
+	
+	// rotational:
+	g1 = 1.14 + 0.2/delt + 16.0/delt/delt - 63.0/delt/delt/delt + 62.0/delt/delt/delt/delt;
+	pref = delt - g1;
+	if (pref < 0.5) pref = 0.5;
+	float DR = pref*3.0*kT/(M_PI*nu*Lrod*Lrod*Lrod);  // rotational diffusivity
+	float fricR = kT/DR;
+	float noiseR = sqrt(2.0*fricR*kT);
+	rods.set_friction_coefficient_rotational(fricR);
+	rods.set_noise_strength_rotational(noiseR);
+	cout << "Rod fricR = " << fricR << endl;
+	cout << "Rod noiseR = " << noiseR << endl;	
 				
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 

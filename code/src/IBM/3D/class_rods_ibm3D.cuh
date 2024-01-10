@@ -35,6 +35,8 @@ class class_rods_ibm3D {
 	float rodFmax;
 	float rodTmax;
 	float gam;
+	float fricT;
+	float fricR;
 	float L0;
 	float kT;
 	float noisekT;
@@ -69,6 +71,10 @@ class class_rods_ibm3D {
 	void set_rod_radius(int,float);
 	void set_rods_types(int);
 	void set_rod_type(int,int);
+	void set_friction_coefficient_translational(float);
+	void set_friction_coefficient_rotational(float);
+	void set_noise_strength_translational(float);
+	void set_noise_strength_rotational(float);
 	int get_max_array_size();
 	void assign_rodIDs_to_beads();
 	void duplicate_rods();	
@@ -78,13 +84,16 @@ class class_rods_ibm3D {
 	void randomize_rods_inside_sphere(float,float,float,float,float);
 	float calc_separation_pbc(float3,float3);
 	void stepIBM_Euler_no_fluid(int,int);
-	void stepIBM_capsules_rods_no_fluid(class_capsules_ibm3D&,int,int); 
+	void stepIBM_Euler(class_scsp_D3Q19&,int,int);
+	void stepIBM_capsules_rods_no_fluid(class_capsules_ibm3D&,int,int);
+	void stepIBM_capsules_rods(class_capsules_ibm3D&,class_scsp_D3Q19&,int,int);
 	void stepIBM_push_into_sphere(int,float,float,float,float,int,int);
 	void initialize_cuRand(int,int);
 	void zero_rod_forces_torques_moments(int,int);
 	void set_rod_position_orientation(int,int);
 	void update_bead_position_rods(int,int);
 	void update_rod_position_orientation(int,int);
+	void update_rod_position_orientation_fluid(int,int);
 	void zero_bead_forces(int,int);
 	void enforce_max_bead_force(int,int);
 	void enforce_max_rod_force_torque(int,int);

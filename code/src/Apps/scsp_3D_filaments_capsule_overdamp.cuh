@@ -1,14 +1,14 @@
 
-# ifndef SCSP_3D_RODS_CAPSULE_H
-# define SCSP_3D_RODS_CAPSULE_H
+# ifndef SCSP_3D_FILAMENTS_CAPSULE_OVERDAMP_H
+# define SCSP_3D_FILAMENTS_CAPSULE_OVERDAMP_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
-# include "../IBM/3D/class_rods_ibm3D.cuh"
+# include "../IBM/3D/class_filaments_ibm3D.cuh"
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_rods_capsule : public FlowBase {
+class scsp_3D_filaments_capsule_overdamp : public FlowBase {
 	
 private:
 
@@ -21,48 +21,47 @@ private:
 	int Nx,Ny,Nz;
 	int numIolets;
 	int nBeads;
-	int nNodes;
 	int nEdges;
+	int nSteps;
+	int nFilams;
 	int nCells;
-	int nRods;
-	int nSteps;	
+	int nNodes;
 	int nStepsEquilibrate;
 	int nVTKOutputs;
 	int iskip,jskip,kskip;
 	int precision;
-	float tau;
-	float nu;
 	float Pe;
+	float PL;
 	float kT;
 	float Re;
 	float Ca;
 	float La;
+	float nu;
 	float shearVel;
+	float ks,kb;
 	float fp;
-	float up;
 	float L0;
-	float gam;
-	float Lrod;
-	float Drod;
+	float Lfil;
 	float a;
 	float C;
+	float gam;
 	bool initRandom;
 	std::string ibmFile;
 	std::string ibmUpdate;
 	
 	// objects:
 	class_scsp_D3Q19 lbm;
-	class_rods_ibm3D rods;
 	class_capsules_ibm3D ibm;
+	class_filaments_ibm3D filams;
 		
 public:
 
-	scsp_3D_rods_capsule();
-	~scsp_3D_rods_capsule();
+	scsp_3D_filaments_capsule_overdamp();
+	~scsp_3D_filaments_capsule_overdamp();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	
 };
 
-# endif  // SCSP_3D_RODS_CAPSULE_H
+# endif  // SCSP_3D_FILAMENTS_CAPSULE_OVERDAMP_H

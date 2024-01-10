@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_RODS_CAPSULE_H
-# define SCSP_3D_RODS_CAPSULE_H
+# ifndef SCSP_3D_RODS_FLUID_H
+# define SCSP_3D_RODS_FLUID_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_rods_capsule : public FlowBase {
+class scsp_3D_rods_fluid : public FlowBase {
 	
 private:
 
@@ -21,11 +21,8 @@ private:
 	int Nx,Ny,Nz;
 	int numIolets;
 	int nBeads;
-	int nNodes;
-	int nEdges;
-	int nCells;
+	int nSteps;
 	int nRods;
-	int nSteps;	
 	int nStepsEquilibrate;
 	int nVTKOutputs;
 	int iskip,jskip,kskip;
@@ -34,9 +31,6 @@ private:
 	float nu;
 	float Pe;
 	float kT;
-	float Re;
-	float Ca;
-	float La;
 	float shearVel;
 	float fp;
 	float up;
@@ -44,25 +38,20 @@ private:
 	float gam;
 	float Lrod;
 	float Drod;
-	float a;
-	float C;
 	bool initRandom;
-	std::string ibmFile;
-	std::string ibmUpdate;
 	
 	// objects:
 	class_scsp_D3Q19 lbm;
 	class_rods_ibm3D rods;
-	class_capsules_ibm3D ibm;
 		
 public:
 
-	scsp_3D_rods_capsule();
-	~scsp_3D_rods_capsule();
+	scsp_3D_rods_fluid();
+	~scsp_3D_rods_fluid();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	
 };
 
-# endif  // SCSP_3D_RODS_CAPSULE_H
+# endif  // SCSP_3D_RODS_FLUID_H

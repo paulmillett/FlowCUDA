@@ -48,9 +48,18 @@ __global__ void update_bead_positions_rods_IBM3D(
 __global__ void update_rod_position_orientation_IBM3D(
 	rod*,
 	float,
-	float,	
+	float,
+	float,
 	int);
 	
+
+__global__ void update_rod_position_orientation_fluid_IBM3D(
+	rod*,
+	float,
+	float,
+	float,
+	int);
+
 		
 __global__ void compute_propulsion_force_rods_IBM3D(
 	rod*,
@@ -132,7 +141,30 @@ __global__ void push_beads_into_sphere_IBM3D(
 	float,
 	float,
 	int);
+
+
+__global__ void interpolate_gradient_of_velocity_rod_IBM3D(
+	rod*,
+	float*,
+	float*,
+	float*,
+	int,
+	int,
+	int,
+	int);
 		
+	
+__global__ void extrapolate_rod_pusher_force_IBM3D(
+	rod*,
+	beadrod*,
+	float*,
+	float*,
+	float*,
+	int,
+	int,
+	int,
+	int);
+	
 		
 __global__ void build_bin_lists_for_beads_IBM3D(
 	beadrod*,
@@ -180,7 +212,51 @@ __device__ inline void pairwise_bead_node_interaction_forces_WCA(
 	node*,
 	float3,
 	int3);
-			
+
+
+__device__ inline float x_deriv(
+	const int,
+	const int,
+	const int,  
+	const int,
+	const int,
+	const int,
+	float*);
+		
+
+__device__ inline float y_deriv(
+	const int,
+	const int,
+	const int,  
+	const int,
+	const int,
+	const int,
+	float*);
+		
+		
+__device__ inline float z_deriv(
+	const int,
+	const int,
+	const int,  
+	const int,
+	const int,
+	const int,
+	float*);	
+
+
+__device__ inline int rod_voxel_ndx(
+	int,
+	int,
+	int,
+	int,
+	int,
+	int);
+							
+
+__device__ inline float3 fluid_torque(
+	const int,
+	rod*);
+
 
 __device__ inline float3 solve_angular_acceleration(
 	const float,

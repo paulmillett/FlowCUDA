@@ -66,7 +66,8 @@ class_filaments_ibm3D::class_filaments_ibm3D()
 	Mob = inputParams("IBM_FILAMS/Mob",0.5);
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	forceModel = inputParams("IBM_FILAMS/forceModel","spring");
-	noisekT = 6.0*kT*gam/dt;
+	fricBead = 6.0*M_PI*(1.0/6.0)*repD;  // friction coefficient per bead (assume visc=1/6)
+	noisekT = sqrt(2.0*kT*gam/dt);       // thernal noise strength
 	
 	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
@@ -742,6 +743,53 @@ void class_filaments_ibm3D::stepIBM_capsules_filaments_no_fluid(class_capsules_i
 // Take step forward for IBM using LBM object:
 // --------------------------------------------------------
 
+void class_filaments_ibm3D::stepIBM_capsules_filaments_overdamp_no_fluid(class_capsules_ibm3D& cap, 
+                                                                         int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	// This method updates filaments AND capsules
+	// ----------------------------------------------------------
+
+	// ----------------------------------------------------------
+	//  here, the overdamped Euler algorithm is used to update the 
+	//  bead AND node positions 
+	// ----------------------------------------------------------
+		
+	// re-build bin lists for filament beads & capsule nodes:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+	cap.reset_bin_lists(nBlocks,nThreads);
+	cap.build_bin_lists(nBlocks,nThreads);
+			
+	// calculate bonded forces within filaments and capsules:
+	compute_bead_forces(nBlocks,nThreads); 
+	cap.compute_node_forces(nBlocks,nThreads);
+	
+	// calculate nonbonded forces for filaments and capsules:
+	nonbonded_bead_interactions(nBlocks,nThreads);
+	nonbonded_bead_node_interactions(cap,nBlocks,nThreads);
+	//cap.nonbonded_node_interactions(nBlocks,nThreads);
+	cap.nonbonded_node_bead_interactions(beads,bins,nBlocks,nThreads);
+	
+	// calculate wall forces:
+	compute_wall_forces(nBlocks,nThreads);
+	enforce_max_bead_force(nBlocks,nThreads);
+	cap.compute_wall_forces(nBlocks,nThreads);	
+	cap.enforce_max_node_force(nBlocks,nThreads);
+		
+	// second step of IBM velocity verlet:
+	update_bead_positions_euler_overdamped(nBlocks,nThreads);
+	cap.update_node_positions_euler_overdamped(fricBead,nBlocks,nThreads);
+		
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
 void class_filaments_ibm3D::stepIBM_capsules_filaments_pusher_no_fluid(class_capsules_ibm3D& cap, 
                                                                        int nBlocks, int nThreads) 
 {
@@ -895,7 +943,7 @@ void class_filaments_ibm3D::update_bead_positions_euler(int nBlocks, int nThread
 void class_filaments_ibm3D::update_bead_positions_euler_overdamped(int nBlocks, int nThreads)
 {
 	update_bead_position_euler_overdamped_IBM3D
-	<<<nBlocks,nThreads>>> (beads,dt,Mob,nBeads);
+	<<<nBlocks,nThreads>>> (beads,dt,fricBead,nBeads);
 	
 	wrap_bead_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);	

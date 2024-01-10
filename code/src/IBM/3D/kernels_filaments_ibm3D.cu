@@ -32,13 +32,13 @@ __global__ void update_bead_position_euler_IBM3D(
 __global__ void update_bead_position_euler_overdamped_IBM3D(
 	bead* beads,
 	float dt,
-	float Mob,	
+	float fric,	
 	int nBeads)
 {
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
-		beads[i].v += Mob*beads[i].f;
+		beads[i].v = beads[i].f/fric;
 		beads[i].r += dt*beads[i].v;
 	}
 }

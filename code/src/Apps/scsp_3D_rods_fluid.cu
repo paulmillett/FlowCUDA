@@ -1,5 +1,5 @@
 
-# include "scsp_3D_rods.cuh"
+# include "scsp_3D_rods_fluid.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
+scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
 {		
 	
 	// ----------------------------------------------
@@ -57,7 +57,6 @@ scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
 	shearVel = inputParams("LBM/shearVel",0.0);
 	float Re = inputParams("LBM/Re",2.0);
 	shearVel = 2.0*Re*nu/float(Nz);
-	shearVel = 0.0;
 	
 	// ----------------------------------------------
 	// Rods Immersed-Boundary parameters:
@@ -112,7 +111,7 @@ scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_rods::~scsp_3D_rods()
+scsp_3D_rods_fluid::~scsp_3D_rods_fluid()
 {
 	lbm.deallocate();
 	rods.deallocate();
@@ -124,7 +123,7 @@ scsp_3D_rods::~scsp_3D_rods()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_rods::initSystem()
+void scsp_3D_rods_fluid::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -138,7 +137,7 @@ void scsp_3D_rods::initSystem()
 	// create the lattice assuming shear flow.
 	// ----------------------------------------------	
 	
-	lbm.create_lattice_box_shear();
+	lbm.create_lattice_box_slit();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -211,8 +210,11 @@ void scsp_3D_rods::initSystem()
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
 	
-	rods.build_binMap(nBlocks,nThreads);
-		
+	rods.build_binMap(nBlocks,nThreads);	
+	//rods.shift_bead_positions(0,32.0,30.0,41.5);
+	//rods.shift_bead_positions(1,32.0,35.0,41.5);	
+	
+	
 	// ----------------------------------------------		
 	// copy arrays from host to device: 
 	// ----------------------------------------------
@@ -269,7 +271,7 @@ void scsp_3D_rods::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_rods_fluid::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -290,9 +292,9 @@ void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler_no_fluid(nBlocks,nThreads);
-			//lbm.stream_collide_save_forcing(nBlocks,nThreads);	
-			//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
+			rods.stepIBM_Euler(lbm,nBlocks,nThreads);
+			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
+			lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 			cudaDeviceSynchronize();
 		}
 		cout << " " << endl;
@@ -307,9 +309,9 @@ void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		rods.stepIBM_Euler_no_fluid(nBlocks,nThreads);
-		//lbm.stream_collide_save_forcing(nBlocks,nThreads);
-		//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
+		rods.stepIBM_Euler(lbm,nBlocks,nThreads);
+		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
 	
@@ -336,7 +338,7 @@ void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_rods::writeOutput(std::string tagname, int step)
+void scsp_3D_rods_fluid::writeOutput(std::string tagname, int step)
 {				
 	
 	if (step == 0) {

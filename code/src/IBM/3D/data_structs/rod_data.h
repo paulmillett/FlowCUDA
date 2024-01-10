@@ -1,6 +1,8 @@
 # ifndef ROD_DATA_H
 # define ROD_DATA_H
 
+# include "tensor.h"
+
 
 
 // --------------------------------------------------------
@@ -34,6 +36,8 @@ struct rod {
 	float3 f;     // force	
 	float3 t;     // torque
 	float3 p;     // orientation vector
+	float3 uf;    // fluid velocity at rod position
+	tensor gradu;       // gradient of fluid u
 	float Ixx,Iyy,Izz;  // moments of inertia
 	float Ixy,Ixz,Iyz;  // products of inertia
 };

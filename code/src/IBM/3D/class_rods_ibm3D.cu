@@ -217,7 +217,8 @@ void class_rods_ibm3D::create_first_rod()
 		rodsH[f].nBeads = nBeadsPerRod;
 		rodsH[f].indxB0 = f*nBeadsPerRod;      // start index for beads
 		rodsH[f].headBead = f*nBeadsPerRod;    // head bead (first bead)
-		rodsH[f].centerBead = f*nBeadsPerRod + nBeadsPerRod/2 + 1;  // center-of-mass, assuming nBeadsPerRod is odd
+		rodsH[f].tailBead = f*nBeadsPerRod + nBeadsPerRod - 1;  // tail bead (last bead)
+		rodsH[f].centerBead = f*nBeadsPerRod + nBeadsPerRod/2;  // center-of-mass, assuming nBeadsPerRod is odd		
 	}
 }
 
@@ -264,6 +265,26 @@ void class_rods_ibm3D::set_rod_type(int rID, int val)
 {
 	// set rodType for ONE rod:
 	rodsH[rID].rodType = val;
+}
+
+void class_rods_ibm3D::set_friction_coefficient_translational(float val)
+{
+	fricT = val;
+}
+
+void class_rods_ibm3D::set_friction_coefficient_rotational(float val)
+{
+	fricR = val;
+}
+
+void class_rods_ibm3D::set_noise_strength_translational(float val)
+{
+	noisekTforce = val;
+}
+
+void class_rods_ibm3D::set_noise_strength_rotational(float val)
+{
+	noisekTtorque = val;
 }
 
 int class_rods_ibm3D::get_max_array_size()
@@ -463,7 +484,7 @@ void class_rods_ibm3D::stepIBM_Euler_no_fluid(int nBlocks, int nThreads)
 	reset_bin_lists(nBlocks,nThreads);
 	build_bin_lists(nBlocks,nThreads);
 		
-	// update IBM:
+	// calculate IBM forces:
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	nonbonded_bead_interactions(nBlocks,nThreads);	
@@ -472,8 +493,52 @@ void class_rods_ibm3D::stepIBM_Euler_no_fluid(int nBlocks, int nThreads)
 	sum_rod_forces_torques_moments(nBlocks,nThreads);
 	compute_thermal_force_torque_rod(nBlocks,nThreads);
 	compute_rod_propulsion_force(nBlocks,nThreads);
+	
+	// update IBM positions:
 	enforce_max_rod_force_torque(nBlocks,nThreads);
 	update_rod_position_orientation(nBlocks,nThreads);
+	update_bead_position_rods(nBlocks,nThreads);
+	wrap_bead_coordinates(nBlocks,nThreads);
+		
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  bead positions - using a viscous drag force proportional
+	//  to the bead velocity.
+	// ----------------------------------------------------------
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// re-build bin lists for rod beads:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+		
+	// calculate IBM forces:
+	zero_bead_forces(nBlocks,nThreads);
+	zero_rod_forces_torques_moments(nBlocks,nThreads);
+	nonbonded_bead_interactions(nBlocks,nThreads);	
+	compute_wall_forces(nBlocks,nThreads);		
+	lbm.extrapolate_rod_pusher_force(nBlocks,nThreads,rods,beads,nRods);
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	sum_rod_forces_torques_moments(nBlocks,nThreads);
+	//compute_thermal_force_torque_rod(nBlocks,nThreads);
+	compute_rod_propulsion_force(nBlocks,nThreads);
+	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,rods,nRods);
+		
+	// update IBM positions:
+	enforce_max_rod_force_torque(nBlocks,nThreads);
+	update_rod_position_orientation_fluid(nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	wrap_bead_coordinates(nBlocks,nThreads);
 		
@@ -534,6 +599,78 @@ void class_rods_ibm3D::stepIBM_capsules_rods_no_fluid(class_capsules_ibm3D& cap,
 	update_bead_position_rods(nBlocks,nThreads);
 	wrap_bead_coordinates(nBlocks,nThreads);
 	cap.update_node_positions_verlet_2_drag(nBlocks,nThreads);
+		
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods & capsules IBM:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_capsules_rods(class_capsules_ibm3D& cap,
+                                             class_scsp_D3Q19& lbm,
+                                             int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	// This method updates rods AND capsules AND fluid
+	// ----------------------------------------------------------
+
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  beads, and the velocity-Verlet algorithm is used to 
+	//  update the node positions 
+	// ----------------------------------------------------------
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// first step of capsule velocity verlet:
+	//cap.update_node_positions_verlet_1(nBlocks,nThreads);
+	
+	// re-build bin lists for rod beads & capsule nodes:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+	cap.reset_bin_lists(nBlocks,nThreads);
+	cap.build_bin_lists(nBlocks,nThreads);
+			
+	// calculate bonded forces within rods and capsules:
+	zero_bead_forces(nBlocks,nThreads);
+	zero_rod_forces_torques_moments(nBlocks,nThreads);	
+	cap.compute_node_forces(nBlocks,nThreads);
+	
+	// calculate nonbonded forces for rods and capsules:
+	nonbonded_bead_interactions(nBlocks,nThreads);
+	nonbonded_bead_node_interactions(cap,nBlocks,nThreads);
+	//cap.nonbonded_node_interactions(nBlocks,nThreads);
+	cap.nonbonded_node_bead_rod_interactions(beads,bins,nBlocks,nThreads);
+	
+	// calculate wall forces:
+	compute_wall_forces(nBlocks,nThreads);
+	cap.compute_wall_forces(nBlocks,nThreads);	
+	cap.enforce_max_node_force(nBlocks,nThreads);
+	
+	// add rod pusher forces to fluid:
+	lbm.extrapolate_rod_pusher_force(nBlocks,nThreads,rods,beads,nRods);
+	
+	// add capsule forces to fluid & interpolate velocity to nodes:
+	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,cap.nodes,cap.nNodes);
+	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,cap.nodes,cap.nNodes);
+	//lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,cap.nodes,cap.nNodes);
+	
+	// update IBM:
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	sum_rod_forces_torques_moments(nBlocks,nThreads);
+	compute_thermal_force_torque_rod(nBlocks,nThreads);
+	compute_rod_propulsion_force(nBlocks,nThreads);
+	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,rods,nRods);
+	enforce_max_rod_force_torque(nBlocks,nThreads);	
+	update_rod_position_orientation_fluid(nBlocks,nThreads); 
+	update_bead_position_rods(nBlocks,nThreads);
+	wrap_bead_coordinates(nBlocks,nThreads);
+	cap.update_node_positions_include_force(nBlocks,nThreads);
+	//cap.update_node_positions_verlet_2(nBlocks,nThreads);
 		
 }
 
@@ -656,7 +793,22 @@ void class_rods_ibm3D::update_bead_position_rods(int nBlocks, int nThreads)
 void class_rods_ibm3D::update_rod_position_orientation(int nBlocks, int nThreads)
 {
 	update_rod_position_orientation_IBM3D
-	<<<nBlocks,nThreads>>> (rods,dt,gam,nRods);
+	<<<nBlocks,nThreads>>> (rods,dt,fricT,fricR,nRods);
+	
+	wrap_rod_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (rods,Box,pbcFlag,nRods);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_rod_position_orientation_fluid_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::update_rod_position_orientation_fluid(int nBlocks, int nThreads)
+{
+	update_rod_position_orientation_fluid_IBM3D
+	<<<nBlocks,nThreads>>> (rods,dt,fricT,fricR,nRods);
 	
 	wrap_rod_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (rods,Box,pbcFlag,nRods);	
@@ -928,7 +1080,7 @@ void class_rods_ibm3D::push_beads_inside_sphere(float xs, float ys, float zs, fl
 void class_rods_ibm3D::write_output(std::string tagname, int tagnum)
 {
 	write_vtk_immersed_boundary_3D_rods(tagname,tagnum,
-	nBeads,beadsH);
+	nBeads,nBeadsPerRod,beadsH);
 }
 
 

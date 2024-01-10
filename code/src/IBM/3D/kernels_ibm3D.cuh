@@ -15,6 +15,20 @@ __global__ void update_node_position_dt_IBM3D(
 	float,
 	int);
 	
+
+__global__ void update_node_position_include_force_IBM3D(
+	node*,
+	float,
+	float,
+	int);
+
+
+__global__ void update_node_position_overdamped_IBM3D(
+	node*,
+	float,
+	float,
+	int);
+		
 	
 __global__ void update_node_position_verlet_1_IBM3D(
 	node*,

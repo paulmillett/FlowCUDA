@@ -37,6 +37,7 @@ private:
 	float L0;
 	float gam;
 	float Lrod;
+	float Drod;
 	bool initRandom;
 	
 	// objects:

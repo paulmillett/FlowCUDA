@@ -1,5 +1,5 @@
 
-# include "scsp_3D_rods.cuh"
+# include "scsp_3D_filaments_capsule_overdamp.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
+scsp_3D_filaments_capsule_overdamp::scsp_3D_filaments_capsule_overdamp() : lbm(),ibm(),filams()
 {		
 	
 	// ----------------------------------------------
@@ -34,14 +34,15 @@ scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
 	// GPU parameters:
 	// ----------------------------------------------
 	
-	int sizeROD = rods.get_max_array_size();	
-	int sizeMAX = max(nVoxels,sizeROD);	
+	int sizeIBM = ibm.get_max_array_size();
+	int sizeFIL = filams.get_max_array_size();	
+	int sizeMAX = max(nVoxels,max(sizeIBM,sizeFIL));
 	nThreads = inputParams("GPU/nThreads",512);
 	nBlocks = (sizeMAX+(nThreads-1))/nThreads;  // integer division
 	
 	cout << "largest array size = " << sizeMAX << endl;
 	cout << "nBlocks = " << nBlocks << ", nThreads = " << nThreads << endl;
-		
+	
 	// ----------------------------------------------
 	// time parameters:
 	// ----------------------------------------------
@@ -52,33 +53,51 @@ scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
 	// ----------------------------------------------
 	// Lattice Boltzmann parameters:
 	// ----------------------------------------------
-	
+		
 	nu = inputParams("LBM/nu",0.1666666);
 	shearVel = inputParams("LBM/shearVel",0.0);
-	float Re = inputParams("LBM/Re",2.0);
-	shearVel = 2.0*Re*nu/float(Nz);
+	Re = inputParams("LBM/Re",2.0);
+	float h = float(Nz)/2.0;
+	shearVel = Re*nu/h;
 	shearVel = 0.0;
-	
+		
 	// ----------------------------------------------
-	// Rods Immersed-Boundary parameters:
+	// Filaments Immersed-Boundary parameters:
 	// ----------------------------------------------
 		
-	int nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);
-	nRods = inputParams("IBM_RODS/nRods",1);
-	fp = inputParams("IBM_RODS/fp",0.0);
-	L0 = inputParams("IBM_RODS/L0",0.5);
-	Pe = inputParams("IBM_RODS/Pe",0.0);
-	kT = inputParams("IBM_RODS/kT",0.0);
-	gam = inputParams("IBM_RODS/gamma",0.1);
-	Drod = inputParams("IBM_RODS/diam",1.0);
-	nBeads = nBeadsPerRod*nRods;
-	Lrod = float(nBeadsPerRod)*L0;
+	int nBeadsPerFilam = inputParams("IBM_FILAMS/nBeadsPerFilam",0);
+	nFilams = inputParams("IBM_FILAMS/nFilams",1);
+	ks = inputParams("IBM_FILAMS/ks",0.1);
+	kb = inputParams("IBM_FILAMS/kb",0.1);
+	fp = inputParams("IBM_FILAMS/fp",0.0);
+	L0 = inputParams("IBM_FILAMS/L0",0.5);
+	Pe = inputParams("IBM_FILAMS/Pe",0.0);
+	PL = inputParams("IBM_FILAMS/PL",1.0);  // non-dimensional persistence length
+	kT = inputParams("IBM_FILAMS/kT",0.0);
+	nBeads = nBeadsPerFilam*nFilams;
+	Lfil = float(nBeadsPerFilam)*L0;
+	
+	// ----------------------------------------------
+	// Capsules Immersed-Boundary parameters:
+	// ----------------------------------------------
+		
+	int nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
+	nCells = inputParams("IBM/nCells",1);
+	nNodes = nNodesPerCell*nCells;
+	a = inputParams("IBM/a",6.0);
+	C = inputParams("IBM/C",1.0);
+	Ca = inputParams("IBM/Ca",1.0);
+	La = inputParams("IBM/La",1.0);
+	gam = inputParams("IBM/gamma",0.1);
+	ibmFile = inputParams("IBM/ibmFile","sphere.dat");
+	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	rods.set_pbcFlag(1,1,0);
+	ibm.set_pbcFlag(1,1,1);
+	filams.set_pbcFlag(1,1,1);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -100,10 +119,18 @@ scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
 	// allocate array memory (host & device):
 	// ----------------------------------------------
 	
-	lbm.allocate();
-	lbm.allocate_forces();
-	rods.allocate();	
+	ibm.allocate();
+	//lbm.allocate();
+	//lbm.allocate_forces();
+	filams.allocate();	
 	
+	// ----------------------------------------------
+	// even though there is only one capsule, 
+	// set up bins for it:
+	// ----------------------------------------------
+	
+	ibm.initialize_bins();
+		
 }
 
 
@@ -112,10 +139,11 @@ scsp_3D_rods::scsp_3D_rods() : lbm(),rods()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_rods::~scsp_3D_rods()
+scsp_3D_filaments_capsule_overdamp::~scsp_3D_filaments_capsule_overdamp()
 {
-	lbm.deallocate();
-	rods.deallocate();
+	ibm.deallocate();
+	//lbm.deallocate();
+	filams.deallocate();
 }
 
 
@@ -124,7 +152,7 @@ scsp_3D_rods::~scsp_3D_rods()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_rods::initSystem()
+void scsp_3D_filaments_capsule_overdamp::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -138,93 +166,86 @@ void scsp_3D_rods::initSystem()
 	// create the lattice assuming shear flow.
 	// ----------------------------------------------	
 	
-	lbm.create_lattice_box_shear();
+	//lbm.create_lattice_box_shear();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
 	// ----------------------------------------------
 		
-	lbm.stream_index_pull();
+	//lbm.stream_index_pull();
 			
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------
 	
+	/*
 	for (int i=0; i<nVoxels; i++) {
 		lbm.setU(i,0.0);
 		lbm.setV(i,0.0);
 		lbm.setW(i,0.0);
 		lbm.setR(i,1.0);		
 	}
+	*/
 	
 	// ----------------------------------------------			
-	// initialize rod immersed boundary info: 
+	// initialize immersed boundary info: 
 	// ----------------------------------------------
 	
-	rods.create_first_rod();
-	rods.duplicate_rods();
-	rods.assign_rodIDs_to_beads();
+	ibm.read_ibm_information(ibmFile);
+	ibm.duplicate_cells();
+	ibm.assign_cellIDs_to_nodes();
+	ibm.assign_refNode_to_cells();
+	ibm.set_cells_types(1);
+	ibm.shift_node_positions(0,float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0);
+		
+	float rho = 1.0;
+	float Ks = La*rho*nu*nu/a;
+	float Kb = Ks*a*a*0.003;
+	float Kv = inputParams("IBM/kv",0.0000);
+	ibm.set_cells_mechanical_props(Ks,Kb,Kv,C,Ca);
+	cout << "Capsule Ks = " << Ks << endl;
+	cout << "Capsule Kb = " << Kb << endl;
+		
+	// ----------------------------------------------			
+	// initialize filament immersed boundary info: 
+	// ----------------------------------------------
 	
-	fp = Pe*kT/Lrod;
-	up = fp/gam;
-	rods.set_fp(fp);
-	rods.set_up(up);
-	rods.set_rods_radii(Drod/2.0);
+	filams.create_first_filament();
+	filams.duplicate_filaments();
+	filams.assign_filamIDs_to_beads();
+	
+	fp = Pe*kT/Lfil/Lfil;
+	kb = PL*kT;
+	filams.set_ks(ks);
+	filams.set_kb(kb);
+	filams.set_fp(fp);
+	filams.set_filams_radii(0.5);
 	cout << "  " << endl;
-	cout << "Rod kT = " << kT << endl;
-	cout << "Rod fp = " << fp << endl;
-	cout << "Rod up = " << up << endl;
-	
-	// ----------------------------------------------			
-	// drag friction coefficients using Broersma's
-	// relations.  See Tsay et al. J. Amer. Chem. Soc.
-	// 128:1639(2006)
-	// ----------------------------------------------
-	
-	// translational:
-	float delt = log(2*Lrod/Drod);  // this is natural log
-	float g1 = 0.807 + 0.15/delt + 13.5/delt/delt - 37.0/delt/delt/delt + 22.0/delt/delt/delt/delt;
-	float g2 = -0.193 + 0.15/delt + 8.1/delt/delt - 18.0/delt/delt/delt + 9.0/delt/delt/delt/delt;
-	float pref = delt - 0.5*(g1 + g2);
-	if (pref < 1.0) pref = 1.0;
-	float DT = pref*kT/(3.0*M_PI*nu*Lrod);  // diffusivity (assume fluid density = 1)
-	float fricT = kT/DT;
-	float noiseT = sqrt(2.0*fricT*kT);
-	rods.set_friction_coefficient_translational(fricT);
-	rods.set_noise_strength_translational(noiseT);
-	cout << "Rod fricT = " << fricT << endl;
-	cout << "Rod noiseT = " << noiseT << endl;	
-	
-	// rotational:
-	g1 = 1.14 + 0.2/delt + 16.0/delt/delt - 63.0/delt/delt/delt + 62.0/delt/delt/delt/delt;
-	pref = delt - g1;
-	if (pref < 0.5) pref = 0.5;
-	float DR = pref*3.0*kT/(M_PI*nu*Lrod*Lrod*Lrod);  // rotational diffusivity
-	float fricR = kT/DR;
-	float noiseR = sqrt(2.0*fricR*kT);
-	rods.set_friction_coefficient_rotational(fricR);
-	rods.set_noise_strength_rotational(noiseR);
-	cout << "Rod fricR = " << fricR << endl;
-	cout << "Rod noiseR = " << noiseR << endl;	
-	
+	cout << "Filament kT = " << kT << endl;
+	cout << "Filament ks = " << ks << endl;
+	cout << "Filament kb = " << kb << endl;
+	cout << "Filament fp = " << fp << endl;
+			
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
 	
-	rods.build_binMap(nBlocks,nThreads);
+	ibm.build_binMap(nBlocks,nThreads);
+	filams.build_binMap(nBlocks,nThreads);
 		
 	// ----------------------------------------------		
 	// copy arrays from host to device: 
 	// ----------------------------------------------
 	
-	lbm.memcopy_host_to_device();
-	rods.memcopy_host_to_device();
+	ibm.memcopy_host_to_device();
+	//lbm.memcopy_host_to_device();
+	filams.memcopy_host_to_device();
 		
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
-	lbm.initial_equilibrium(nBlocks,nThreads);	
+	//lbm.initial_equilibrium(nBlocks,nThreads);	
 		
 	// ----------------------------------------------
 	// set the random number seed: 
@@ -235,30 +256,39 @@ void scsp_3D_rods::initSystem()
 	// ----------------------------------------------
 	// randomly disperse filaments: 
 	// ----------------------------------------------
-		
-	rods.randomize_rods(Lrod+2.0);
-	rods.set_rod_position_orientation(nBlocks,nThreads);
-		
+			
+	filams.randomize_filaments_inside_sphere(float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,11.0,Lfil);
+	filams.stepIBM_push_into_sphere(20000,float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0,6.0,nBlocks,nThreads);	
+	
+	// ----------------------------------------------
+	// calculate rest geometries for membrane: 
+	// ----------------------------------------------
+	
+	ibm.rest_geometries(nBlocks,nThreads);
+	//ibm.set_edge_rest_angles(0.0,nBlocks,nThreads);
+	
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
 	
-	rods.memcopy_device_to_host();
+	ibm.memcopy_device_to_host();
+	filams.memcopy_device_to_host();
 	writeOutput("macros",0);
 	
 	// ----------------------------------------------
 	// set IBM velocities & forces to zero: 
 	// ----------------------------------------------
 	
-	rods.zero_bead_forces(nBlocks,nThreads);
+	ibm.zero_velocities_forces(nBlocks,nThreads);
+	filams.zero_bead_velocities_forces(nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// initialize cuRand state for the thermal noise
 	// force:
 	// ----------------------------------------------
 	
-	rods.initialize_cuRand(nBlocks,nThreads);
-		
+	filams.initialize_cuRand(nBlocks,nThreads);
+	
 }
 
 
@@ -269,7 +299,7 @@ void scsp_3D_rods::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_filaments_capsule_overdamp::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -290,7 +320,7 @@ void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler_no_fluid(nBlocks,nThreads);
+			filams.stepIBM_capsules_filaments_overdamp_no_fluid(ibm,nBlocks,nThreads);
 			//lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 			cudaDeviceSynchronize();
@@ -307,7 +337,7 @@ void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		rods.stepIBM_Euler_no_fluid(nBlocks,nThreads);
+		filams.stepIBM_capsules_filaments_overdamp_no_fluid(ibm,nBlocks,nThreads);
 		//lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		//lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		cudaDeviceSynchronize();
@@ -319,8 +349,9 @@ void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
 	// copy arrays from device to host:
 	// ----------------------------------------------
 	
-	lbm.memcopy_device_to_host();
-	rods.memcopy_device_to_host();    
+	ibm.memcopy_device_to_host();
+	//lbm.memcopy_device_to_host();
+	filams.memcopy_device_to_host();    
 	
 	// ----------------------------------------------
 	// write output from this cycle:
@@ -336,13 +367,14 @@ void scsp_3D_rods::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_rods::writeOutput(std::string tagname, int step)
+void scsp_3D_filaments_capsule_overdamp::writeOutput(std::string tagname, int step)
 {				
 	
 	if (step == 0) {
 		// only print out vtk files
-		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
-		rods.write_output("rods",step);
+		ibm.write_output("ibm",step);
+		//lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
+		filams.write_output("filaments",step);
 	}
 	
 	if (step > 0) { 					
@@ -350,8 +382,9 @@ void scsp_3D_rods::writeOutput(std::string tagname, int step)
 		int intervalVTK = nSteps/nVTKOutputs;
 		if (nVTKOutputs == 0) intervalVTK = nSteps;
 		if (step%intervalVTK == 0) {
-			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
-			rods.write_output("rods",step);
+			ibm.write_output("ibm",step);
+			//lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
+			filams.write_output("filaments",step);
 		}
 	}	
 }

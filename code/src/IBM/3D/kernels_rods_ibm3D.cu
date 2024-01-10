@@ -139,15 +139,46 @@ __global__ void update_bead_positions_rods_IBM3D(
 __global__ void update_rod_position_orientation_IBM3D(
 	rod* rods,
 	float dt,
-	float gam,	
+	float fricT,
+	float fricR,
 	int nRods)
 {
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {
-		rods[i].r += dt*(rods[i].f/gam);
-		rods[i].p += dt*(cross(rods[i].t,rods[i].p));
+		rods[i].r += dt*(rods[i].f)/fricT;
+		rods[i].p += dt*(cross(rods[i].t,rods[i].p))/fricR;
 		rods[i].p = normalize(rods[i].p);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D bead update kernel:
+// --------------------------------------------------------
+
+__global__ void update_rod_position_orientation_fluid_IBM3D(
+	rod* rods,
+	float dt,
+	float fricT,
+	float fricR,
+	int nRods)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nRods) {		
+		rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
+		tensor E = 0.5*(rods[i].gradu + transpose(rods[i].gradu));
+		tensor W = 0.5*(rods[i].gradu - transpose(rods[i].gradu));
+		float3 fltor = (identity() - dyadic(rods[i].p))*(0.88*E + W)*rods[i].p;
+		rods[i].p += dt*(fltor + cross(rods[i].t,rods[i].p)/fricR);
+		rods[i].p = normalize(rods[i].p);		
+		/*
+		rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
+		rods[i].p += dt*(fluid_torque(i,rods) + cross(rods[i].t,rods[i].p)/fricR);
+		rods[i].p = normalize(rods[i].p);
+		*/		
 	}
 }
 
@@ -184,12 +215,20 @@ __global__ void compute_thermal_force_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nBeads) {
+		/*
 		float r1 = curand_uniform(&state[i]);
 		float r2 = curand_uniform(&state[i]);
 		float r3 = curand_uniform(&state[i]);		
 		beads[i].f.x += pref*(r1-0.5);
 		beads[i].f.y += pref*(r2-0.5);
 		beads[i].f.z += pref*(r3-0.5);
+		*/
+		float r1 = curand_normal(&state[i]);
+		float r2 = curand_normal(&state[i]);
+		float r3 = curand_normal(&state[i]);		
+		beads[i].f.x += pref*(r1);
+		beads[i].f.y += pref*(r2);
+		beads[i].f.z += pref*(r3);
 	}
 }
 
@@ -210,6 +249,7 @@ __global__ void compute_thermal_force_torque_rod_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nRods) {
+		
 		float r1 = curand_uniform(&state[i]);
 		float r2 = curand_uniform(&state[i]);
 		float r3 = curand_uniform(&state[i]);		
@@ -222,6 +262,21 @@ __global__ void compute_thermal_force_torque_rod_IBM3D(
 		rods[i].t.x += prefR*(r4-0.5);
 		rods[i].t.y += prefR*(r5-0.5);
 		rods[i].t.z += prefR*(r6-0.5);
+		
+		/*
+		float r1 = curand_normal(&state[i]);
+		float r2 = curand_normal(&state[i]);
+		float r3 = curand_normal(&state[i]);		
+		rods[i].f.x += prefT*(r1);
+		rods[i].f.y += prefT*(r2);
+		rods[i].f.z += prefT*(r3);
+		float r4 = curand_normal(&state[i]);
+		float r5 = curand_normal(&state[i]);
+		float r6 = curand_normal(&state[i]);
+		rods[i].t.x += prefR*(r4);
+		rods[i].t.y += prefR*(r5);
+		rods[i].t.z += prefR*(r6); 
+		*/
 	}
 }
 
@@ -472,6 +527,178 @@ __global__ void push_beads_into_sphere_IBM3D(
 			beads[i].f -= 0.0005*ris;
 		}
 	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to interpolate the gradient of the velocity
+// field at the rod position. 
+// --------------------------------------------------------
+
+__global__ void interpolate_gradient_of_velocity_rod_IBM3D(
+	rod* rods,
+	float* uLBM,
+	float* vLBM,
+	float* wLBM,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nRods)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nRods) {
+				
+		// --------------------------------------
+		// find nearest LBM voxel (rounded down)
+		// --------------------------------------
+		
+		int i0 = int(floor(rods[i].r.x));
+		int j0 = int(floor(rods[i].r.y));
+		int k0 = int(floor(rods[i].r.z));
+		
+		// --------------------------------------
+		// loop over footprint to get 
+		// interpolated LBM velocity:
+		// --------------------------------------
+				
+		float dudx = 0.0;
+		float dudy = 0.0;
+		float dudz = 0.0;
+		float dvdx = 0.0;
+		float dvdy = 0.0;
+		float dvdz = 0.0;
+		float dwdx = 0.0;
+		float dwdy = 0.0;
+		float dwdz = 0.0;
+		float uLBMi = 0.0;
+		float vLBMi = 0.0;
+		float wLBMi = 0.0;
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					float rx = rods[i].r.x - float(ii);
+					float ry = rods[i].r.y - float(jj);
+					float rz = rods[i].r.z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));								
+					dudx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
+					dudy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
+					dudz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
+					dvdx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
+					dvdy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
+					dvdz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
+					dwdx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
+					dwdy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
+					dwdz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);	
+					uLBMi += del*uLBM[ndx];
+					vLBMi += del*vLBM[ndx];
+					wLBMi += del*wLBM[ndx];					
+				}
+			}
+		}
+		
+		// --------------------------------------
+		// assign grad(u) to rod
+		// --------------------------------------
+				
+		rods[i].uf.x = uLBMi;
+		rods[i].uf.y = vLBMi;
+		rods[i].uf.z = wLBMi;
+		rods[i].gradu.xx = dudx;
+		rods[i].gradu.xy = dudy;
+		rods[i].gradu.xz = dudz;
+		rods[i].gradu.yx = dvdx;
+		rods[i].gradu.yy = dvdy;
+		rods[i].gradu.yz = dvdz;
+		rods[i].gradu.zx = dwdx;
+		rods[i].gradu.zy = dwdy;
+		rods[i].gradu.zz = dwdz;
+						
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to extrapolate IBM node force to LBM lattice
+// --------------------------------------------------------
+
+__global__ void extrapolate_rod_pusher_force_IBM3D(
+	rod* rods,
+	beadrod* beads,
+	float* fxLBM,
+	float* fyLBM,
+	float* fzLBM,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nRods)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nRods) {
+						
+		// --------------------------------------
+		// loop over footprint for "headBead"
+		// --------------------------------------
+		
+		int bID = rods[i].headBead;
+		float brx = beads[bID].r.x;
+		float bry = beads[bID].r.y;
+		float brz = beads[bID].r.z;			
+		int i0 = int(floor(brx));
+		int j0 = int(floor(bry));
+		int k0 = int(floor(brz));
+		float3 force = rods[i].fp*rods[i].p;
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = brx - float(ii);
+					float ry = bry - float(jj);
+					float rz = brz - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*force.x);
+					atomicAdd(&fyLBM[ndx],del*force.y);
+					atomicAdd(&fzLBM[ndx],del*force.z);
+				}
+			}		
+		}
+		
+		// --------------------------------------
+		// loop over footprint for "tailBead"
+		// --------------------------------------
+		
+		bID = rods[i].tailBead;
+		brx = beads[bID].r.x;
+		bry = beads[bID].r.y;
+		brz = beads[bID].r.z;			
+		i0 = int(floor(brx));
+		j0 = int(floor(bry));
+		k0 = int(floor(brz));
+		force = -rods[i].fp*rods[i].p;
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = brx - float(ii);
+					float ry = bry - float(jj);
+					float rz = brz - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*force.x);
+					atomicAdd(&fyLBM[ndx],del*force.y);
+					atomicAdd(&fzLBM[ndx],del*force.z);
+				}
+			}		
+		}		
+	}	
 }
 
 
@@ -728,6 +955,136 @@ __device__ inline void pairwise_bead_node_interaction_forces_WCA(
 		float force = 24.0*eps*(2*sigor12 - sigor6)/rmd/rmd;
 		beads[i].f += force*rij;
 	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to x-derivative of velocity field
+// --------------------------------------------------------
+
+__device__ inline float x_deriv(
+	const int i,
+	const int j,
+	const int k,  
+	const int Nx,
+	const int Ny,
+	const int Nz,
+	float* u)
+{
+	int ndx_plus = rod_voxel_ndx(i+1,j,k,Nx,Ny,Nz);
+	int ndx_down = rod_voxel_ndx(i-1,j,k,Nx,Ny,Nz);
+	return (u[ndx_plus] - u[ndx_down])/2.0;  // assume dx=1
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to y-derivative of velocity field
+// --------------------------------------------------------
+
+__device__ inline float y_deriv(
+	const int i,
+	const int j,
+	const int k,  
+	const int Nx,
+	const int Ny,
+	const int Nz,
+	float* u)
+{
+	int ndx_plus = rod_voxel_ndx(i,j+1,k,Nx,Ny,Nz);
+	int ndx_down = rod_voxel_ndx(i,j-1,k,Nx,Ny,Nz);
+	return (u[ndx_plus] - u[ndx_down])/2.0;  // assume dx=1
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to z-derivative of velocity field
+// --------------------------------------------------------
+
+__device__ inline float z_deriv(
+	const int i,
+	const int j,
+	const int k,  
+	const int Nx,
+	const int Ny,
+	const int Nz,
+	float* u)
+{
+	int ndx_plus = rod_voxel_ndx(i,j,k+1,Nx,Ny,Nz);
+	int ndx_down = rod_voxel_ndx(i,j,k-1,Nx,Ny,Nz);
+	return (u[ndx_plus] - u[ndx_down])/2.0;  // assume dx=1
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to determine 1D index from 3D indices:
+// --------------------------------------------------------
+
+__device__ inline int rod_voxel_ndx(
+	int i,
+	int j,
+	int k,
+	int Nx,
+	int Ny,
+	int Nz)
+{
+    if (i < 0) i += Nx;
+    if (i >= Nx) i -= Nx;
+    if (j < 0) j += Ny;
+    if (j >= Ny) j -= Ny;
+    if (k < 0) k += Nz;
+    if (k >= Nz) k -= Nz;
+    return k*Nx*Ny + j*Nx + i;	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to solve for the torque on a rod due to 
+// the flow field.  This is solved according to:
+// (I - p*p^T)*grad(u)*p
+// --------------------------------------------------------
+
+__device__ inline float3 fluid_torque(
+	const int i,
+	rod* rods)
+{
+    // gradient of the flow field:
+	float gradu[3][3] = {
+    	{ rods[i].gradu.xx, rods[i].gradu.xy, rods[i].gradu.xz },
+		{ rods[i].gradu.yx, rods[i].gradu.yy, rods[i].gradu.yz },
+		{ rods[i].gradu.zx, rods[i].gradu.zy, rods[i].gradu.zz }
+    };	
+	// orientation I - p*p^T:
+	float pxx = rods[i].p.x*rods[i].p.x;
+	float pxy = rods[i].p.x*rods[i].p.y;
+	float pxz = rods[i].p.x*rods[i].p.z;
+	float pyy = rods[i].p.y*rods[i].p.y;
+	float pyz = rods[i].p.y*rods[i].p.z;
+	float pzz = rods[i].p.z*rods[i].p.z;
+	float orient[3][3] = {
+    	{ 1.0f - pxx, 0.0f - pxy, 0.0f - pxz },
+		{ 0.0f - pxy, 1.0f - pyy, 0.0f - pyz },
+		{ 0.0f - pxz, 0.0f - pyz, 1.0f - pzz }
+    };
+	// matrix multiplication:
+	float ogu[3][3] = { {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+	for(int i = 0; i < 3; i++){
+		for(int j = 0; j < 3; j++){
+			for(int k = 0; k < 3; k++){
+				ogu[i][j] += orient[i][k] * gradu[k][j];
+			}
+		}
+	}
+	// final torque:
+	float3 torque = make_float3(0.0f,0.0f,0.0f);
+	torque.x = ogu[0][0]*rods[i].p.x + ogu[0][1]*rods[i].p.y + ogu[0][2]*rods[i].p.z;
+	torque.y = ogu[1][0]*rods[i].p.x + ogu[1][1]*rods[i].p.y + ogu[1][2]*rods[i].p.z;
+	torque.z = ogu[2][0]*rods[i].p.x + ogu[2][1]*rods[i].p.y + ogu[2][2]*rods[i].p.z;	
+	return torque;
 }
 
 
