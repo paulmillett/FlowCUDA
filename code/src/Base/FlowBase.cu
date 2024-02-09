@@ -23,6 +23,7 @@
 # include "../Apps/mcmp_2D_drag_dip.cuh"
 # include "../Apps/mcmp_2D_drag_bb.cuh"
 # include "../Apps/scsp_2D_obstacle.cuh"
+# include "../Apps/scsp_2D_active.cuh"
 # include "../Apps/scsp_2D_expand.cuh"
 # include "../Apps/scsp_2D_expand_2.cuh"
 # include "../Apps/scsp_3D_iolets.cuh"
@@ -41,6 +42,7 @@
 # include "../Apps/scsp_3D_capsules_channel.cuh"
 # include "../Apps/scsp_3D_capsules_slit.cuh"
 # include "../Apps/scsp_3D_capsules_slit_trains.cuh"
+# include "../Apps/scsp_3D_capsules_slit_Janus.cuh"
 # include "../Apps/scsp_3D_capsules_slit_membrane.cuh"
 # include "../Apps/scsp_3D_capsules_duct_margination.cuh"
 # include "../Apps/scsp_3D_filaments.cuh"
@@ -51,6 +53,7 @@
 # include "../Apps/scsp_3D_filaments_capsule_overdamp.cuh"
 # include "../Apps/scsp_3D_rods.cuh"
 # include "../Apps/scsp_3D_rods_fluid.cuh"
+# include "../Apps/scsp_3D_rods_fluid_spinners.cuh"
 # include "../Apps/scsp_3D_rods_capsule.cuh"
 # include "../Apps/scsp_3D_rods_capsule_fluid.cuh"
 # include "../Apps/scsp_3D_duct_channel.cuh"
@@ -97,6 +100,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "mcmp_2D_drag_dip") return new mcmp_2D_drag_dip();
 	if (specifier == "mcmp_2D_drag_bb") return new mcmp_2D_drag_bb();
 	if (specifier == "scsp_2D_obstacle") return new scsp_2D_obstacle();
+	if (specifier == "scsp_2D_active") return new scsp_2D_active();
 	if (specifier == "scsp_2D_expand") return new scsp_2D_expand();
 	if (specifier == "scsp_2D_expand_2") return new scsp_2D_expand_2();
 	if (specifier == "scsp_3D_iolets") return new scsp_3D_iolets();
@@ -114,6 +118,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_capsules_constriction") return new scsp_3D_capsules_constriction();
 	if (specifier == "scsp_3D_capsules_channel") return new scsp_3D_capsules_channel();
 	if (specifier == "scsp_3D_capsules_slit") return new scsp_3D_capsules_slit();
+	if (specifier == "scsp_3D_capsules_slit_Janus") return new scsp_3D_capsules_slit_Janus();
 	if (specifier == "scsp_3D_capsules_slit_trains") return new scsp_3D_capsules_slit_trains();
 	if (specifier == "scsp_3D_capsules_slit_membrane") return new scsp_3D_capsules_slit_membrane();
 	if (specifier == "scsp_3D_capsules_duct_margination") return new scsp_3D_capsules_duct_margination();
@@ -125,6 +130,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_filaments_capsule_overdamp") return new scsp_3D_filaments_capsule_overdamp();
 	if (specifier == "scsp_3D_rods") return new scsp_3D_rods();
 	if (specifier == "scsp_3D_rods_fluid") return new scsp_3D_rods_fluid();
+	if (specifier == "scsp_3D_rods_fluid_spinners") return new scsp_3D_rods_fluid_spinners();
 	if (specifier == "scsp_3D_rods_capsule") return new scsp_3D_rods_capsule();
 	if (specifier == "scsp_3D_rods_capsule_fluid") return new scsp_3D_rods_capsule_fluid();
 	if (specifier == "scsp_3D_duct_channel") return new scsp_3D_duct_channel();

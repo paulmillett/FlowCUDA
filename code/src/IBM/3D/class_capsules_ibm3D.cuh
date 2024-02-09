@@ -98,6 +98,7 @@ class class_capsules_ibm3D {
 	void randomize_cells(float);
 	void shrink_and_randomize_cells(float,float,float);
 	void randomize_cells_above_plane(float,float,float,float);
+	void define_Janus_capsule_geometry(float,float);
 	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);
 	void write_output_long(std::string,int);
@@ -130,6 +131,7 @@ class class_capsules_ibm3D {
 	void compute_node_forces(int,int);
 	void compute_node_forces_spring(int,int);
 	void compute_node_forces_skalak(int,int);
+	void compute_node_forces_skalak_Janus(float,float,int,int);
 	void compute_node_forces_FENE(float,int,int);
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);

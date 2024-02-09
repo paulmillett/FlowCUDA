@@ -744,6 +744,28 @@ void class_capsules_ibm3D::randomize_cells_above_plane(float shrinkFactor, float
 
 
 // --------------------------------------------------------
+// For Janus capsules, define the geometry by assigning
+// the faceType variable in the facesH[] array:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::define_Janus_capsule_geometry(float a, float psi)
+{
+	// loop over the faces:
+	for (int i=0; i<nFaces; i++) {
+		int V0 = facesH[i].v0;
+		int V1 = facesH[i].v1;
+		int V2 = facesH[i].v2;
+		float centZ = (nodesH[V0].r.z + nodesH[V1].r.z + nodesH[V2].r.z)/3.0;
+		// assume capsules are still located at x = y = z = 0:
+		float divideZ = psi*a;  // psi is in range [-1,1]
+		if (centZ  > divideZ) facesH[i].faceType = 0;  // soft
+		if (centZ <= divideZ) facesH[i].faceType = 1;  // hard
+	}
+}
+
+
+
+// --------------------------------------------------------
 // calculate separation distance using PBCs:
 // --------------------------------------------------------
 
@@ -1520,6 +1542,44 @@ void class_capsules_ibm3D::compute_node_forces_skalak(int nBlocks, int nThreads)
 	// Third, compute the Skalak forces for each face:
 	compute_node_force_membrane_skalak_IBM3D
 	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
+	
+	// Fourth, compute the bending force for each edge:		
+	compute_node_force_membrane_bending_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);
+		
+	// Fifth, compute the volume conservation force for each face:
+	compute_node_force_membrane_volume_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
+					
+	// Sixth, re-wrap node coordinates:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);
+			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on nodes based 
+// on the membrane mechanics model (Skalak model):
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::compute_node_forces_skalak_Janus(float ksSoft, float ksHard, int nBlocks, int nThreads)
+{
+	// First, zero the node forces and the cell volumes:
+	zero_node_forces_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
+			
+	zero_cell_volumes_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
+	// Second, unwrap node coordinates:
+	unwrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,cells,Box,pbcFlag,nNodes);	
+					
+	// Third, compute the Skalak forces for each face:
+	compute_node_force_membrane_skalak_Janus_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,ksSoft,ksHard,nFaces);
 	
 	// Fourth, compute the bending force for each edge:		
 	compute_node_force_membrane_bending_IBM3D

@@ -49,7 +49,6 @@ __global__ void update_node_position_include_force_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
 		nodes[i].r += nodes[i].v*dt + 0.5*dt*dt*(nodes[i].f/m);
-		nodes[i].v += dt*(nodes[i].f/m);
 	}	
 }
 

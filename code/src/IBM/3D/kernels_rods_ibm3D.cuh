@@ -45,6 +45,12 @@ __global__ void update_bead_positions_rods_IBM3D(
 	int);
 	
 	
+__global__ void update_bead_positions_rods_singlet_IBM3D(
+	beadrod*,
+	rod*,
+	int);
+	
+	
 __global__ void update_rod_position_orientation_IBM3D(
 	rod*,
 	float,
@@ -56,6 +62,13 @@ __global__ void update_rod_position_orientation_IBM3D(
 __global__ void update_rod_position_orientation_fluid_IBM3D(
 	rod*,
 	float,
+	float,
+	float,
+	int);
+
+
+__global__ void update_rod_position_fluid_IBM3D(
+	rod*,
 	float,
 	float,
 	int);
@@ -164,7 +177,19 @@ __global__ void extrapolate_rod_pusher_force_IBM3D(
 	int,
 	int,
 	int);
-	
+
+
+__global__ void extrapolate_rod_rotlet_forces_IBM3D(
+	rod*,
+	beadrod*,
+	float*,
+	float*,
+	float*,
+	int,
+	int,
+	int,
+	int);
+		
 		
 __global__ void build_bin_lists_for_beads_IBM3D(
 	beadrod*,

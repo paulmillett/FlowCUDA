@@ -547,6 +547,47 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 
 
 // --------------------------------------------------------
+// Take step forward for rods IBM:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_Spinners(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  bead positions
+	// ----------------------------------------------------------
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// re-build bin lists for rod beads:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+		
+	// calculate IBM forces:
+	zero_bead_forces(nBlocks,nThreads);
+	zero_rod_forces_torques_moments(nBlocks,nThreads);
+	nonbonded_bead_interactions(nBlocks,nThreads);	
+	//compute_wall_forces(nBlocks,nThreads);		
+	lbm.extrapolate_rod_rotlet_forces(nBlocks,nThreads,rods,beads,nRods);
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	sum_rod_forces_torques_moments(nBlocks,nThreads);
+	//compute_thermal_force_torque_rod(nBlocks,nThreads);
+	//compute_rod_propulsion_force(nBlocks,nThreads);
+	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,rods,nRods);
+		
+	// update IBM positions:
+	enforce_max_rod_force_torque(nBlocks,nThreads);
+	update_rod_position_fluid(nBlocks,nThreads);
+	update_bead_position_rods_singlet(nBlocks,nThreads);
+	wrap_bead_coordinates(nBlocks,nThreads);
+		
+}
+
+
+
+// --------------------------------------------------------
 // Take step forward for rods & capsules IBM:
 // --------------------------------------------------------
 
@@ -772,13 +813,28 @@ void class_rods_ibm3D::set_rod_position_orientation(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
-// Call to "update_bead_positions_euler_rods_IBM3D" kernel:
+// Call to "update_bead_positions_rods_IBM3D" kernel:
 // --------------------------------------------------------
 
 void class_rods_ibm3D::update_bead_position_rods(int nBlocks, int nThreads)
 {
 	update_bead_positions_rods_IBM3D
 	<<<nBlocks,nThreads>>> (beads,rods,L0,nBeads);
+	
+	wrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_bead_positions_rods_singlet_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::update_bead_position_rods_singlet(int nBlocks, int nThreads)
+{
+	update_bead_positions_rods_singlet_IBM3D
+	<<<nBlocks,nThreads>>> (beads,rods,nBeads);
 	
 	wrap_bead_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);	
@@ -809,6 +865,21 @@ void class_rods_ibm3D::update_rod_position_orientation_fluid(int nBlocks, int nT
 {
 	update_rod_position_orientation_fluid_IBM3D
 	<<<nBlocks,nThreads>>> (rods,dt,fricT,fricR,nRods);
+	
+	wrap_rod_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (rods,Box,pbcFlag,nRods);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_rod_position_fluid_IBM3D" kernel: 
+// --------------------------------------------------------
+
+void class_rods_ibm3D::update_rod_position_fluid(int nBlocks, int nThreads)
+{
+	update_rod_position_fluid_IBM3D
+	<<<nBlocks,nThreads>>> (rods,dt,fricT,nRods);
 	
 	wrap_rod_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (rods,Box,pbcFlag,nRods);	

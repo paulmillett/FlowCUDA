@@ -136,6 +136,26 @@ __global__ void update_bead_positions_rods_IBM3D(
 // IBM3D bead update kernel:
 // --------------------------------------------------------
 
+__global__ void update_bead_positions_rods_singlet_IBM3D(
+	beadrod* beads,
+	rod* rods,
+	int nBeads)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		int rodID = beads[i].rodID;
+		// use only for rods consisting of 1 bead:
+		beads[i].r = rods[rodID].r;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D bead update kernel:
+// --------------------------------------------------------
+
 __global__ void update_rod_position_orientation_IBM3D(
 	rod* rods,
 	float dt,
@@ -179,6 +199,26 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 		rods[i].p += dt*(fluid_torque(i,rods) + cross(rods[i].t,rods[i].p)/fricR);
 		rods[i].p = normalize(rods[i].p);
 		*/		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D bead update kernel:
+// --------------------------------------------------------
+
+__global__ void update_rod_position_fluid_IBM3D(
+	rod* rods,
+	float dt,
+	float fricT,
+	int nRods)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nRods) {		
+		// only update position (if nBeadsPerRod==1)
+		rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
 	}
 }
 
@@ -647,7 +687,8 @@ __global__ void extrapolate_rod_pusher_force_IBM3D(
 		// loop over footprint for "headBead"
 		// --------------------------------------
 		
-		int bID = rods[i].headBead;
+		/*
+		int bID = rods[i].centerBead + 0;  //rods[i].headBead;
 		float brx = beads[bID].r.x;
 		float bry = beads[bID].r.y;
 		float brz = beads[bID].r.z;			
@@ -670,12 +711,14 @@ __global__ void extrapolate_rod_pusher_force_IBM3D(
 				}
 			}		
 		}
+		*/
 		
 		// --------------------------------------
 		// loop over footprint for "tailBead"
 		// --------------------------------------
 		
-		bID = rods[i].tailBead;
+		/*
+		bID = rods[i].centerBead + 1;  //rods[i].tailBead;
 		brx = beads[bID].r.x;
 		bry = beads[bID].r.y;
 		brz = beads[bID].r.z;			
@@ -697,7 +740,202 @@ __global__ void extrapolate_rod_pusher_force_IBM3D(
 					atomicAdd(&fzLBM[ndx],del*force.z);
 				}
 			}		
-		}		
+		}
+		*/
+				
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to extrapolate IBM node force to LBM lattice
+// --------------------------------------------------------
+
+__global__ void extrapolate_rod_rotlet_forces_IBM3D(
+	rod* rods,
+	beadrod* beads,
+	float* fxLBM,
+	float* fyLBM,
+	float* fzLBM,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nRods)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nRods) {
+						
+		// --------------------------------------
+		// loop over footprint for force 1
+		// --------------------------------------
+				
+		int bID = rods[i].centerBead;
+		float brx = beads[bID].r.x + 1.0;
+		float bry = beads[bID].r.y;
+		float brz = beads[bID].r.z;			
+		int i0 = int(floor(brx));
+		int j0 = int(floor(bry));
+		int k0 = int(floor(brz));
+		float3 force = rods[i].fp*make_float3(0.0f,1.0f,0.0f);
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = brx - float(ii);
+					float ry = bry - float(jj);
+					float rz = brz - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*force.x);
+					atomicAdd(&fyLBM[ndx],del*force.y);
+					atomicAdd(&fzLBM[ndx],del*force.z);
+				}
+			}		
+		}
+		
+		// --------------------------------------
+		// loop over footprint for force 2
+		// --------------------------------------
+				
+		bID = rods[i].centerBead;
+		brx = beads[bID].r.x;
+		bry = beads[bID].r.y + 1.0;
+		brz = beads[bID].r.z;			
+		i0 = int(floor(brx));
+		j0 = int(floor(bry));
+		k0 = int(floor(brz));
+		force = rods[i].fp*make_float3(-1.0f,0.0f,0.0f);
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = brx - float(ii);
+					float ry = bry - float(jj);
+					float rz = brz - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*force.x);
+					atomicAdd(&fyLBM[ndx],del*force.y);
+					atomicAdd(&fzLBM[ndx],del*force.z);
+				}
+			}		
+		}
+		
+		// --------------------------------------
+		// loop over footprint for force 3
+		// --------------------------------------
+				
+		bID = rods[i].centerBead;
+		brx = beads[bID].r.x - 1.0;
+		bry = beads[bID].r.y;
+		brz = beads[bID].r.z;			
+		i0 = int(floor(brx));
+		j0 = int(floor(bry));
+		k0 = int(floor(brz));
+		force = rods[i].fp*make_float3(0.0f,-1.0f,0.0f);
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = brx - float(ii);
+					float ry = bry - float(jj);
+					float rz = brz - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*force.x);
+					atomicAdd(&fyLBM[ndx],del*force.y);
+					atomicAdd(&fzLBM[ndx],del*force.z);
+				}
+			}		
+		}
+		
+		// --------------------------------------
+		// loop over footprint for force 4
+		// --------------------------------------
+				
+		bID = rods[i].centerBead;
+		brx = beads[bID].r.x;
+		bry = beads[bID].r.y - 1.0;
+		brz = beads[bID].r.z;			
+		i0 = int(floor(brx));
+		j0 = int(floor(bry));
+		k0 = int(floor(brz));
+		force = rods[i].fp*make_float3(1.0f,0.0f,0.0f);
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = brx - float(ii);
+					float ry = bry - float(jj);
+					float rz = brz - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*force.x);
+					atomicAdd(&fyLBM[ndx],del*force.y);
+					atomicAdd(&fzLBM[ndx],del*force.z);
+				}
+			}		
+		}
+		
+		// --------------------------------------
+		// loop over footprint for force 5
+		// --------------------------------------
+				
+		bID = rods[i].centerBead;
+		brx = beads[bID].r.x;
+		bry = beads[bID].r.y;
+		brz = beads[bID].r.z + 1.0;			
+		i0 = int(floor(brx));
+		j0 = int(floor(bry));
+		k0 = int(floor(brz));
+		force = rods[i].fp*make_float3(0.0f,0.0f,-1.0f);
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = brx - float(ii);
+					float ry = bry - float(jj);
+					float rz = brz - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*force.x);
+					atomicAdd(&fyLBM[ndx],del*force.y);
+					atomicAdd(&fzLBM[ndx],del*force.z);
+				}
+			}		
+		}
+		
+		// --------------------------------------
+		// loop over footprint for force 6
+		// --------------------------------------
+				
+		bID = rods[i].centerBead;
+		brx = beads[bID].r.x;
+		bry = beads[bID].r.y;
+		brz = beads[bID].r.z - 1.0;			
+		i0 = int(floor(brx));
+		j0 = int(floor(bry));
+		k0 = int(floor(brz));
+		force = rods[i].fp*make_float3(0.0f,0.0f,1.0f);
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = brx - float(ii);
+					float ry = bry - float(jj);
+					float rz = brz - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*force.x);
+					atomicAdd(&fyLBM[ndx],del*force.y);
+					atomicAdd(&fzLBM[ndx],del*force.z);
+				}
+			}		
+		}
+				
 	}	
 }
 

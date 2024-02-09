@@ -21,6 +21,7 @@ struct node {
 
 struct triangle {
 	int cellID;
+	int faceType;
 	int v0,v1,v2;
 	float area;
 	float area0;

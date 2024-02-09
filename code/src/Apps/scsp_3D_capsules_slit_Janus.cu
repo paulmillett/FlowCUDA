@@ -1,5 +1,5 @@
 
-# include "scsp_3D_rods_fluid.cuh"
+# include "scsp_3D_capsules_slit_Janus.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
+scsp_3D_capsules_slit_Janus::scsp_3D_capsules_slit_Janus() : lbm(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -34,14 +34,9 @@ scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
 	// GPU parameters:
 	// ----------------------------------------------
 	
-	int sizeROD = rods.get_max_array_size();	
-	int sizeMAX = max(nVoxels,sizeROD);	
 	nThreads = inputParams("GPU/nThreads",512);
-	nBlocks = (sizeMAX+(nThreads-1))/nThreads;  // integer division
+	nBlocks = (nVoxels+(nThreads-1))/nThreads;  // integer division
 	
-	cout << "largest array size = " << sizeMAX << endl;
-	cout << "nBlocks = " << nBlocks << ", nThreads = " << nThreads << endl;
-		
 	// ----------------------------------------------
 	// time parameters:
 	// ----------------------------------------------
@@ -54,30 +49,31 @@ scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-	shearVel = inputParams("LBM/shearVel",0.0);
-	float Re = inputParams("LBM/Re",2.0);
-	shearVel = 2.0*Re*nu/float(Nz);
+	bodyForx = inputParams("LBM/bodyForx",0.0);
+	Re = inputParams("LBM/Re",2.0);
 	
 	// ----------------------------------------------
-	// Rods Immersed-Boundary parameters:
+	// Immersed-Boundary parameters:
 	// ----------------------------------------------
-		
-	int nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);
-	nRods = inputParams("IBM_RODS/nRods",1);
-	fp = inputParams("IBM_RODS/fp",0.0);
-	L0 = inputParams("IBM_RODS/L0",0.5);
-	Pe = inputParams("IBM_RODS/Pe",0.0);
-	kT = inputParams("IBM_RODS/kT",0.0);
-	gam = inputParams("IBM_RODS/gamma",0.1);
-	Drod = inputParams("IBM_RODS/diam",1.0);
-	nBeads = nBeadsPerRod*nRods;
-	Lrod = float(nBeadsPerRod)*L0;
+	
+	int nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
+	int nCells = inputParams("IBM/nCells",1);
+	nNodes = nNodesPerCell*nCells;
+	a = inputParams("IBM/a",10.0);
+	CaSoft = inputParams("IBM/CaSoft",1.0);
+	CaHard = inputParams("IBM/CaHard",1.0);
+	gam = inputParams("IBM/gamma",0.1);
+	psi = inputParams("IBM/psi",0.0);
+	C = inputParams("IBM/C",1.0);
+	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
+	initRandom = inputParams("IBM/initRandom",1);
+	ibmFile = inputParams("IBM/ibmFile","sphere.dat");
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	rods.set_pbcFlag(1,1,0);
+	ibm.set_pbcFlag(1,1,0);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -89,20 +85,27 @@ scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
 	// output parameters:
 	// ----------------------------------------------
 	
+	vtkFormat = inputParams("Output/format","polydata");
 	iskip = inputParams("Output/iskip",1);
 	jskip = inputParams("Output/jskip",1);
 	kskip = inputParams("Output/kskip",1);
 	nVTKOutputs = inputParams("Output/nVTKOutputs",0);
-	precision = inputParams("Output/precision",3);
-		
+	
 	// ----------------------------------------------
 	// allocate array memory (host & device):
 	// ----------------------------------------------
 	
 	lbm.allocate();
 	lbm.allocate_forces();
-	rods.allocate();	
+	ibm.allocate();	
 	
+	// ----------------------------------------------
+	// even though there is only one capsule, 
+	// set up bins for it:
+	// ----------------------------------------------
+	
+	ibm.initialize_bins();
+		
 }
 
 
@@ -111,10 +114,10 @@ scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_rods_fluid::~scsp_3D_rods_fluid()
+scsp_3D_capsules_slit_Janus::~scsp_3D_capsules_slit_Janus()
 {
 	lbm.deallocate();
-	rods.deallocate();
+	ibm.deallocate();	
 }
 
 
@@ -123,7 +126,7 @@ scsp_3D_rods_fluid::~scsp_3D_rods_fluid()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_rods_fluid::initSystem()
+void scsp_3D_capsules_slit_Janus::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -132,9 +135,9 @@ void scsp_3D_rods_fluid::initSystem()
 	
 	GetPot inputParams("input.dat");
 	string latticeSource = inputParams("Lattice/source","box");	
-	
+		
 	// ----------------------------------------------
-	// create the lattice assuming shear flow.
+	// create the lattice for shear flow (same as slit):
 	// ----------------------------------------------	
 	
 	lbm.create_lattice_box_slit();
@@ -146,121 +149,108 @@ void scsp_3D_rods_fluid::initSystem()
 	lbm.stream_index_pull();
 			
 	// ----------------------------------------------			
-	// initialize macros: 
+	// initialize velocities: 
 	// ----------------------------------------------
 	
-	for (int i=0; i<nVoxels; i++) {
-		lbm.setU(i,0.0);
-		lbm.setV(i,0.0);
-		lbm.setW(i,0.0);
-		lbm.setR(i,1.0);		
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = k*Nx*Ny + j*Nx + i;
+				lbm.setU(ndx,0.0);
+				lbm.setV(ndx,0.0);
+				lbm.setW(ndx,0.0);
+				lbm.setR(ndx,1.0);
+			}
+		}
 	}
 	
 	// ----------------------------------------------			
-	// initialize rod immersed boundary info: 
+	// initialize immersed boundary info: 
 	// ----------------------------------------------
+		
+	ibm.read_ibm_information(ibmFile);
+	ibm.duplicate_cells();
+	ibm.assign_cellIDs_to_nodes();
+	ibm.assign_refNode_to_cells();
+	ibm.set_cells_types(1);	
+	ibm.define_Janus_capsule_geometry(a,psi);	
+	ibm.shift_node_positions(0,float(Nx)/2.0,float(Ny)/2.0,float(Nz)/2.0+2.0);
 	
-	rods.create_first_rod();
-	rods.duplicate_rods();
-	rods.assign_rodIDs_to_beads();
+	float rho = 1.0;
+	float h = float(Nz)/2.0;
+	float umax = Re*nu/h;		
+	bodyForx = 2.0*rho*umax*umax/(Re*h);
+	ksSoft = rho*umax*umax*a/(CaSoft*Re);
+	ksHard = rho*umax*umax*a/(CaHard*Re);	
 	
-	fp = Pe*kT/Lrod;
-	up = fp/gam;
-	rods.set_fp(fp);
-	rods.set_up(up);
-	rods.set_rods_radii(Drod/2.0);
+	float Ks = ksSoft;
+	float Kb = Ks*a*a*0.003;
+	float Kv = inputParams("IBM/kv",0.0000);
+	ibm.set_cells_mechanical_props(Ks,Kb,Kv,C,CaSoft);
+	
 	cout << "  " << endl;
-	cout << "Rod kT = " << kT << endl;
-	cout << "Rod fp = " << fp << endl;
-	cout << "Rod up = " << up << endl;
-	
-	// ----------------------------------------------			
-	// drag friction coefficients using Broersma's
-	// relations.  See Tsay et al. J. Amer. Chem. Soc.
-	// 128:1639(2006)
-	// ----------------------------------------------
-	
-	// translational:
-	float delt = log(2*Lrod/Drod);  // this is natural log
-	float g1 = 0.807 + 0.15/delt + 13.5/delt/delt - 37.0/delt/delt/delt + 22.0/delt/delt/delt/delt;
-	float g2 = -0.193 + 0.15/delt + 8.1/delt/delt - 18.0/delt/delt/delt + 9.0/delt/delt/delt/delt;
-	float pref = delt - 0.5*(g1 + g2);
-	if (pref < 1.0) pref = 1.0;
-	float DT = pref*kT/(3.0*M_PI*nu*Lrod);  // diffusivity (assume fluid density = 1)
-	float fricT = kT/DT;
-	float noiseT = sqrt(2.0*fricT*kT);
-	rods.set_friction_coefficient_translational(fricT);
-	rods.set_noise_strength_translational(noiseT);
-	cout << "Rod fricT = " << fricT << endl;
-	cout << "Rod noiseT = " << noiseT << endl;	
-	
-	// rotational:
-	g1 = 1.14 + 0.2/delt + 16.0/delt/delt - 63.0/delt/delt/delt + 62.0/delt/delt/delt/delt;
-	pref = delt - g1;
-	if (pref < 0.5) pref = 0.5;
-	float DR = pref*3.0*kT/(M_PI*nu*Lrod*Lrod*Lrod);  // rotational diffusivity
-	float fricR = kT/DR;
-	float noiseR = sqrt(2.0*fricR*kT);
-	rods.set_friction_coefficient_rotational(fricR);
-	rods.set_noise_strength_rotational(noiseR);
-	cout << "Rod fricR = " << fricR << endl;
-	cout << "Rod noiseR = " << noiseR << endl;	
-	
+	cout << "Capsule ks (Soft) = " << ksSoft << endl;
+	cout << "Capsule ks (Hard) = " << ksHard << endl;
+	cout << "Capsule Kb = " << Kb << endl;
+	cout << "  " << endl;
+	cout << "H = " << h << endl;
+	cout << "umax = " << umax << endl;
+	cout << "fx = " << bodyForx << endl;
+	cout << "Re = " << umax*h/nu << endl;
+	cout << "  " << endl;
+			
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
 	
-	rods.build_binMap(nBlocks,nThreads);	
-	rods.shift_bead_positions(0,32.0,30.0,41.5);
-	rods.shift_bead_positions(1,32.0,35.0,41.5);	
-	
-	
+	ibm.build_binMap(nBlocks,nThreads); 
+		
 	// ----------------------------------------------		
 	// copy arrays from host to device: 
 	// ----------------------------------------------
 	
 	lbm.memcopy_host_to_device();
-	rods.memcopy_host_to_device();
+	ibm.memcopy_host_to_device();
 		
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
 	lbm.initial_equilibrium(nBlocks,nThreads);	
-		
+	
+	// ----------------------------------------------
+	// calculate rest geometries for membrane: 
+	// ----------------------------------------------
+	
+	ibm.rest_geometries_skalak(nBlocks,nThreads);
+	
 	// ----------------------------------------------
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	//srand(time(NULL));
+	srand(time(NULL));
 	
 	// ----------------------------------------------
-	// randomly disperse filaments: 
+	// shrink and randomly disperse cells: 
 	// ----------------------------------------------
-		
-	//rods.randomize_rods(Lrod+2.0);
-	rods.set_rod_position_orientation(nBlocks,nThreads);
-		
+				
+	//float scale = 1.0;  //0.7
+	//ibm.shrink_and_randomize_cells(scale,16.0,a+2.0);
+	//ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
+			
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
 	
-	rods.memcopy_device_to_host();
+	ibm.memcopy_device_to_host();
 	writeOutput("macros",0);
 	
 	// ----------------------------------------------
 	// set IBM velocities & forces to zero: 
 	// ----------------------------------------------
 	
-	rods.zero_bead_forces(nBlocks,nThreads);
+	ibm.zero_velocities_forces(nBlocks,nThreads);
 	
-	// ----------------------------------------------
-	// initialize cuRand state for the thermal noise
-	// force:
-	// ----------------------------------------------
-	
-	rods.initialize_cuRand(nBlocks,nThreads);
-		
 }
 
 
@@ -271,7 +261,7 @@ void scsp_3D_rods_fluid::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_rods_fluid::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_capsules_slit_Janus::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -292,10 +282,12 @@ void scsp_3D_rods_fluid::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler(lbm,nBlocks,nThreads);
-			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
-			lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
-			cudaDeviceSynchronize();
+			// decide on update type:
+			if (ibmUpdate == "ibm") {
+				stepIBM();
+			} else if (ibmUpdate == "verlet") {
+				stepVerlet();
+			}			
 		}
 		cout << " " << endl;
 		cout << "... done equilibrating!" << endl;
@@ -308,11 +300,13 @@ void scsp_3D_rods_fluid::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 		
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;
-		rods.stepIBM_Euler(lbm,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);
-		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
-		cudaDeviceSynchronize();
+		cummulativeSteps++;	
+		// decide on update type:
+		if (ibmUpdate == "ibm") {
+			stepIBM();
+		} else if (ibmUpdate == "verlet") {
+			stepVerlet();
+		}		
 	}
 	
 	cout << cummulativeSteps << endl;	
@@ -322,7 +316,7 @@ void scsp_3D_rods_fluid::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 	
 	lbm.memcopy_device_to_host();
-	rods.memcopy_device_to_host();    
+	ibm.memcopy_device_to_host();    
 	
 	// ----------------------------------------------
 	// write output from this cycle:
@@ -335,25 +329,104 @@ void scsp_3D_rods_fluid::cycleForward(int stepsPerCycle, int currentCycle)
 
 
 // --------------------------------------------------------
+// Take a time-step with the traditional IBM approach:
+// --------------------------------------------------------
+
+void scsp_3D_capsules_slit_Janus::stepIBM()
+{
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// re-build bin lists for IBM nodes:
+	ibm.reset_bin_lists(nBlocks,nThreads);
+	ibm.build_bin_lists(nBlocks,nThreads);
+			
+	// compute IBM node forces:
+	ibm.compute_node_forces_skalak_Janus(ksSoft,ksHard,nBlocks,nThreads);
+	ibm.nonbonded_node_interactions(nBlocks,nThreads);
+	ibm.wall_forces_zdir(nBlocks,nThreads);
+	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
+			
+	// update fluid:
+	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
+	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+	lbm.stream_collide_save_forcing(nBlocks,nThreads);
+	//lbm.set_boundary_slit_density(nBlocks,nThreads);
+	
+	// update membrane:
+	//ibm.update_node_positions(nBlocks,nThreads);
+	//ibm.update_node_positions_verlet_1(nBlocks,nThreads);
+	ibm.update_node_positions_include_force(nBlocks,nThreads);
+	
+	// CUDA sync
+	cudaDeviceSynchronize();
+}
+
+
+
+// --------------------------------------------------------
+// Take a time-step with the velocity-Verlet approach for IBM:
+// --------------------------------------------------------
+
+void scsp_3D_capsules_slit_Janus::stepVerlet()
+{
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// first step of IBM velocity verlet:
+	ibm.update_node_positions_verlet_1(nBlocks,nThreads);
+	
+	// re-build bin lists for IBM nodes:
+	ibm.reset_bin_lists(nBlocks,nThreads);
+	ibm.build_bin_lists(nBlocks,nThreads);
+			
+	// compute IBM node forces:
+	ibm.compute_node_forces_skalak_Janus(ksSoft,ksHard,nBlocks,nThreads);
+	ibm.nonbonded_node_interactions(nBlocks,nThreads);
+	ibm.wall_forces_zdir(nBlocks,nThreads);
+			
+	// update fluid:
+	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.nodes,nNodes);
+	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+	lbm.stream_collide_save_forcing(nBlocks,nThreads);
+	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
+	lbm.set_boundary_slit_density(nBlocks,nThreads);
+	
+	// second step of IBM velocity verlet:
+	ibm.update_node_positions_verlet_2(nBlocks,nThreads);
+	
+	// CUDA sync		
+	cudaDeviceSynchronize();
+}
+
+
+
+// --------------------------------------------------------
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_rods_fluid::writeOutput(std::string tagname, int step)
+void scsp_3D_capsules_slit_Janus::writeOutput(std::string tagname, int step)
 {				
+	
+	int precision = 3;
 	
 	if (step == 0) {
 		// only print out vtk files
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
-		rods.write_output("rods",step);
+		ibm.write_output("ibm",step);
 	}
 	
-	if (step > 0) { 					
+	if (step > 0) { 
+		// analyze membrane geometry:
+		ibm.capsule_geometry_analysis(step);
+		ibm.output_capsule_data();
+			
 		// write vtk output for LBM and IBM:
 		int intervalVTK = nSteps/nVTKOutputs;
 		if (nVTKOutputs == 0) intervalVTK = nSteps;
 		if (step%intervalVTK == 0) {
-			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
-			rods.write_output("rods",step);
+			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
+			ibm.write_output("ibm",step);
 		}
 	}	
 }

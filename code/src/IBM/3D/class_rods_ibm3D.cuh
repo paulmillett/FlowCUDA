@@ -85,6 +85,7 @@ class class_rods_ibm3D {
 	float calc_separation_pbc(float3,float3);
 	void stepIBM_Euler_no_fluid(int,int);
 	void stepIBM_Euler(class_scsp_D3Q19&,int,int);
+	void stepIBM_Euler_Spinners(class_scsp_D3Q19&,int,int);
 	void stepIBM_capsules_rods_no_fluid(class_capsules_ibm3D&,int,int);
 	void stepIBM_capsules_rods(class_capsules_ibm3D&,class_scsp_D3Q19&,int,int);
 	void stepIBM_push_into_sphere(int,float,float,float,float,int,int);
@@ -92,8 +93,10 @@ class class_rods_ibm3D {
 	void zero_rod_forces_torques_moments(int,int);
 	void set_rod_position_orientation(int,int);
 	void update_bead_position_rods(int,int);
+	void update_bead_position_rods_singlet(int,int);
 	void update_rod_position_orientation(int,int);
 	void update_rod_position_orientation_fluid(int,int);
+	void update_rod_position_fluid(int,int);
 	void zero_bead_forces(int,int);
 	void enforce_max_bead_force(int,int);
 	void enforce_max_rod_force_torque(int,int);

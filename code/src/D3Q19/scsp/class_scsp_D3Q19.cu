@@ -905,6 +905,22 @@ void class_scsp_D3Q19::extrapolate_rod_pusher_force(int nBlocks, int nThreads,
 
 
 // --------------------------------------------------------
+// Call to "extrapolate_rod_rotlet_forces_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::extrapolate_rod_rotlet_forces(int nBlocks, int nThreads,
+	                                                 rod* rods, beadrod* beads, int nRods)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	extrapolate_rod_rotlet_forces_IBM3D
+	<<<nBlocks,nThreads>>> (rods,beads,Fx,Fy,Fz,Nx,Ny,Nz,nRods);	
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_zero_forces_D3Q19" kernel:
 // --------------------------------------------------------
 
