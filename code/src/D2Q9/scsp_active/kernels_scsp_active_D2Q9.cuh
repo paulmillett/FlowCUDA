@@ -45,6 +45,7 @@ __global__ void scsp_active_stream_collide_save_forcing_D2Q9(
 __global__ void scsp_active_update_orientation_D2Q9(
 	float2*,
 	float2*,
+	float2*,
 	int*,
 	float,
 	float,
@@ -53,7 +54,11 @@ __global__ void scsp_active_update_orientation_D2Q9(
 
 __global__ void scsp_active_fluid_stress_D2Q9(
 	float2*,
+	float2*,
 	tensor2D*,
+	int*,
+	float,
+	float,
 	float,
 	int);
 
@@ -63,6 +68,53 @@ __global__ void scsp_active_fluid_forces_D2Q9(
 	tensor2D*,
 	int*,
 	int);
-		
+
+
+__global__ void scsp_active_fluid_molecular_field_D2Q9(
+	float2*,
+	float2*,
+	tensor2D*,
+	int*,
+	float,
+	float,
+	int);
+
+
+__global__ void scsp_active_fluid_molecular_field_with_phi_D2Q9(
+	float*,
+	float2*,
+	float2*,
+	tensor2D*,
+	int*,
+	float,
+	float,
+	int);
+			
+	
+__global__ void scsp_active_fluid_chemical_potential_D2Q9(
+	float*,
+	float*,
+	int*,
+	float,
+	float,
+	int);
+	
+	
+__global__ void scsp_active_fluid_capillary_force_D2Q9(
+	float*,
+	float*,
+	float2*,
+	int*,
+	int);
+	
+	
+__global__ void scsp_active_fluid_update_phi_D2Q9(
+	float*,
+	float*,
+	float2*,
+	int*,
+	float,
+	int);
+			
 
 # endif  // KERNELS_SCSP_ACTIVE_D2Q9_H

@@ -23,11 +23,18 @@ private:
 	float sf;
 	float fricR;
 	float activity;
+	float a;
+	float alpha;
+	float kapp;
+	float kapphi;
+	float mob;
 		
 	// host arrays:
 	float* rH;
+	float* phiH;
 	float2* uH;
 	float2* pH;
+	float2* hH;
 	int* nListH;
 	int* voxelTypeH;
 	int* streamIndexH;
@@ -36,9 +43,12 @@ private:
 	float* r;
 	float* f1;
 	float* f2;
+	float* phi;
+	float* chempot;
 	float2* u;
 	float2* F;
 	float2* p;
+	float2* h;
 	tensor2D* stress;
 	int* voxelType;
 	int* streamIndex;
@@ -60,16 +70,23 @@ public:
 	void setPx(int,float);
 	void setPy(int,float);
 	void setR(int,float);
+	void setPhi(int,float);
 	void setVoxelType(int,int);
 	float getU(int);
 	float getV(int);
 	float getR(int);
+	float getPhi(int);
 	void initial_equilibrium(int,int);
 	void stream_collide_save(int,int);	
 	void stream_collide_save_forcing(int,int);
 	void scsp_active_update_orientation(int,int);
 	void scsp_active_fluid_stress(int,int);
 	void scsp_active_fluid_forces(int,int);
+	void scsp_active_fluid_molecular_field(int,int);
+	void scsp_active_fluid_molecular_field_with_phi(int,int);
+	void scsp_active_fluid_chemical_potential(int,int);
+	void scsp_active_fluid_capillary_force(int,int);
+	void scsp_active_fluid_update_phi(int,int);
 	void zero_forces(int,int);	
 	void write_output(std::string,int);
 

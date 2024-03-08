@@ -342,6 +342,7 @@ __global__ void scsp_active_stream_collide_save_forcing_D2Q9(
 __global__ void scsp_active_update_orientation_D2Q9(
 	float2* u,
 	float2* p,
+	float2* h,
 	int* nList,
 	float sf,
 	float fricR,
@@ -371,8 +372,6 @@ __global__ void scsp_active_update_orientation_D2Q9(
 		float2 dpdt1 = (sf*D - O)*p[i];
 		
 		// advection contribution to dpdt (see Wikipedia page on 'material derivative'):
-		float px  = p[i].x;
-		float py  = p[i].y;
 		float pxE = p[nList[offst+1]].x;  // east
 		float pxN = p[nList[offst+2]].x;  // north
 		float pxW = p[nList[offst+3]].x;  // west
@@ -389,15 +388,12 @@ __global__ void scsp_active_update_orientation_D2Q9(
 		dpdt2 *= -1.0f;
 		
 		// molecular field contribution to dpdt:
-		float pmag = sqrt(px*px + py*py);
-		float dfdpmag = pmag*pmag*pmag - pmag;
-		float laplpx = (pxE + pxW + pxN + pxS - 4.0*px);   // assume dx=1
-		float laplpy = (pyE + pyW + pyN + pyS - 4.0*py);   // assume dx=1;
-		float2 dpdt3 = make_float2(dfdpmag*px - laplpx, dfdpmag*py - laplpy)/fricR;
-		dpdt3 *= -1.0f;
-		
+		float2 dpdt3 = -h[i]/fricR;
+				
 		// update orientation field:
 		p[i] += dpdt1 + dpdt2 + dpdt3;   // assume dt=1.0
+		
+		//p[i] = normalize(p[i]);
 		
 	}
 }
@@ -411,14 +407,33 @@ __global__ void scsp_active_update_orientation_D2Q9(
 
 __global__ void scsp_active_fluid_stress_D2Q9(
 	float2* p,
+	float2* h,
 	tensor2D* stress,
-	float activity,
+	int* nList,
+	float sf,
+	float kapp,
+	float activity,	
 	int nVoxels)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
-	if (i < nVoxels) {		
+	if (i < nVoxels) {
+				
+		// calculate the elastic (passive) stress tensor:
+		int offst = 9*i;
+		tensor2D ph = dyadic(p[i],h[i]);
+		tensor2D phT = transpose(ph);
+		tensor2D symph = 0.5*(ph - phT);
+		tensor2D asymph = 0.5*sf*(ph + phT);
+		stress[i] = symph - asymph;		
+		tensor2D dp;
+		dp.xx = (p[nList[offst+1]].x - p[nList[offst+3]].x) / 2.0;  // assume dx=1
+		dp.xy = (p[nList[offst+2]].x - p[nList[offst+4]].x) / 2.0;  // assume dx=1
+		dp.yx = (p[nList[offst+1]].y - p[nList[offst+3]].y) / 2.0;  // assume dx=1
+		dp.yy = (p[nList[offst+2]].y - p[nList[offst+4]].y) / 2.0;  // assume dx=1
+		stress[i] += kapp*dp*transpose(dp);
+						
 		// calculate active stress tensor:
-		stress[i] = -activity*dyadic(p[i]);
+		stress[i] += -activity*dyadic(p[i]);
 	}
 }
 
@@ -448,5 +463,167 @@ __global__ void scsp_active_fluid_forces_D2Q9(
 	}
 	
 }
+
+
+
+// --------------------------------------------------------
+// Kernel to calculate the molecular field "h" = dFdp
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_molecular_field_D2Q9(
+	float2* h,
+	float2* p,
+	tensor2D* stress,
+	int* nList,
+	float alpha,
+	float kapp,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		int offst = 9*i;	
+		// molecular field:
+		float px  = p[i].x;
+		float py  = p[i].y;
+		float pxE = p[nList[offst+1]].x;  // east
+		float pxN = p[nList[offst+2]].x;  // north
+		float pxW = p[nList[offst+3]].x;  // west
+		float pxS = p[nList[offst+4]].x;  // south
+		float pyE = p[nList[offst+1]].y;  // east
+		float pyN = p[nList[offst+2]].y;  // north
+		float pyW = p[nList[offst+3]].y;  // west
+		float pyS = p[nList[offst+4]].y;  // south		
+		float pmag = sqrt(px*px + py*py);
+		float dfdpmag = alpha*(pmag*pmag*pmag - pmag);
+		float laplpx = (pxE + pxW + pxN + pxS - 4.0*px);   // assume dx=1
+		float laplpy = (pyE + pyW + pyN + pyS - 4.0*py);   // assume dx=1
+		h[i].x = dfdpmag*px - kapp*laplpx;
+		h[i].y = dfdpmag*py - kapp*laplpy;		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to calculate the molecular field "h" = dFdp
+// here including the order parameter 'phi'
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_molecular_field_with_phi_D2Q9(
+	float* phi,
+	float2* h,
+	float2* p,
+	tensor2D* stress,
+	int* nList,
+	float alpha,
+	float kapp,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		int offst = 9*i;	
+		// molecular field:
+		float px  = p[i].x;
+		float py  = p[i].y;
+		float pxE = p[nList[offst+1]].x;  // east
+		float pxN = p[nList[offst+2]].x;  // north
+		float pxW = p[nList[offst+3]].x;  // west
+		float pxS = p[nList[offst+4]].x;  // south
+		float pyE = p[nList[offst+1]].y;  // east
+		float pyN = p[nList[offst+2]].y;  // north
+		float pyW = p[nList[offst+3]].y;  // west
+		float pyS = p[nList[offst+4]].y;  // south		
+		float pmag = sqrt(px*px + py*py);
+		float phicoeff = (phi[i] - 0.5)/0.5;   // phi_critical = 0.5
+		float dfdpmag = alpha*(pmag*pmag*pmag - pmag*phicoeff);
+		float laplpx = (pxE + pxW + pxN + pxS - 4.0*px);   // assume dx=1
+		float laplpy = (pyE + pyW + pyN + pyS - 4.0*py);   // assume dx=1
+		h[i].x = dfdpmag*px - kapp*laplpx;
+		h[i].y = dfdpmag*py - kapp*laplpy;		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to calculate the chemical potential of the 
+// order parameter:
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_chemical_potential_D2Q9(
+	float* phi,
+	float* chempot,
+	int* nList,
+	float a,
+	float kapphi,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		int offst = 9*i;
+		float phii = phi[i];
+		float phiE = phi[nList[offst+1]];  // east
+		float phiN = phi[nList[offst+2]];  // north
+		float phiW = phi[nList[offst+3]];  // west
+		float phiS = phi[nList[offst+4]];  // south
+		float lapl = (phiE + phiW + phiN + phiS - 4.0*phii);  // assume dx=1
+		chempot[i] = a*(4.0*phii*phii*phii - 6.0*phii*phii + 2.0*phii) - kapphi*lapl;
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to calculate the interfacial capillary force
+// the fluid:
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_capillary_force_D2Q9(
+	float* phi,
+	float* chempot,
+	float2* F,
+	int* nList,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		int offst = 9*i;
+		float gradphix = (phi[nList[offst+1]] - phi[nList[offst+3]])/2.0;  // assume dx=1
+		float gradphiy = (phi[nList[offst+2]] - phi[nList[offst+4]])/2.0;  // assume dx=1
+		float2 capF = chempot[i]*make_float2(gradphix,gradphiy);
+		F[i] += capF;
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to update the order parameter phi:
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_update_phi_D2Q9(
+	float* phi,
+	float* chempot,
+	float2* u,
+	int* nList,
+	float mob,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		int offst = 9*i;
+		float cpi = chempot[i];
+		float cpE = chempot[nList[offst+1]];  // east
+		float cpN = chempot[nList[offst+2]];  // north
+		float cpW = chempot[nList[offst+3]];  // west
+		float cpS = chempot[nList[offst+4]];  // south
+		float lapl = (cpE + cpW + cpN + cpS - 4.0*cpi);  // assume dx=1		
+		float gradphix = (phi[nList[offst+1]] - phi[nList[offst+3]])/2.0;  // assume dx=1
+		float gradphiy = (phi[nList[offst+2]] - phi[nList[offst+4]])/2.0;  // assume dx=1
+		float2 gradphi = make_float2(gradphix,gradphiy);
+		phi[i] += mob*lapl - dot(u[i],gradphi);   // assume dt=1
+	}		
+}
+
 
 

@@ -25,10 +25,14 @@ class_scsp_active_D2Q9::class_scsp_active_D2Q9()
 	sf = inputParams("LBM/sf",1.0);
 	fricR = inputParams("LBM/fricR",1.0);
 	activity = inputParams("LBM/activity",0.0);
+	alpha = inputParams("LBM/alpha",1.0);
+	kapp = inputParams("LBM/kapp",1.0);
+	kapphi = inputParams("LBM/kapphi",1.0);
+	mob = inputParams("LBM/mob",1.0);
+	a = inputParams("LBM/a",1.0);
 	Nx = inputParams("Lattice/Nx",1);
 	Ny = inputParams("Lattice/Ny",1);
-	Nz = inputParams("Lattice/Nz",1);
-	
+	Nz = inputParams("Lattice/Nz",1);	
 }
 
 
@@ -52,8 +56,10 @@ void class_scsp_active_D2Q9::allocate()
 {
 	// allocate array memory (host):
     rH = (float*)malloc(nVoxels*sizeof(float));
+	phiH = (float*)malloc(nVoxels*sizeof(float));
 	uH = (float2*)malloc(nVoxels*sizeof(float2));
 	pH = (float2*)malloc(nVoxels*sizeof(float2));
+	hH = (float2*)malloc(nVoxels*sizeof(float2));
 	nListH = (int*)malloc(nVoxels*Q*sizeof(int));
 	voxelTypeH = (int*)malloc(nVoxels*sizeof(int));
 	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));	
@@ -63,8 +69,11 @@ void class_scsp_active_D2Q9::allocate()
 	cudaMalloc((void **) &u, nVoxels*sizeof(float2));
 	cudaMalloc((void **) &F, nVoxels*sizeof(float2));
 	cudaMalloc((void **) &p, nVoxels*sizeof(float2));
+	cudaMalloc((void **) &h, nVoxels*sizeof(float2));
 	cudaMalloc((void **) &f1, nVoxels*Q*sizeof(float));
 	cudaMalloc((void **) &f2, nVoxels*Q*sizeof(float));	
+	cudaMalloc((void **) &phi, nVoxels*Q*sizeof(float));
+	cudaMalloc((void **) &chempot, nVoxels*Q*sizeof(float));	
 	cudaMalloc((void **) &stress, nVoxels*sizeof(tensor2D));		
 	cudaMalloc((void **) &voxelType, nVoxels*sizeof(int));
 	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));	
@@ -82,6 +91,7 @@ void class_scsp_active_D2Q9::deallocate()
 	// free array memory (host):
 	free(uH);
 	free(pH);
+	free(hH);
 	free(rH);
 	free(nListH);
 	free(voxelTypeH);
@@ -91,6 +101,7 @@ void class_scsp_active_D2Q9::deallocate()
 	cudaFree(F);
 	cudaFree(u);
 	cudaFree(p);
+	cudaFree(h);
 	cudaFree(r);
 	cudaFree(f1);
 	cudaFree(f2);
@@ -110,7 +121,8 @@ void class_scsp_active_D2Q9::memcopy_host_to_device()
 {
     cudaMemcpy(r, rH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
 	cudaMemcpy(u, uH, sizeof(float2)*nVoxels, cudaMemcpyHostToDevice);	
-	cudaMemcpy(p, pH, sizeof(float2)*nVoxels, cudaMemcpyHostToDevice);	
+	cudaMemcpy(p, pH, sizeof(float2)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(phi, phiH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
 	cudaMemcpy(nList, nListH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
 	cudaMemcpy(voxelType, voxelTypeH, sizeof(int)*nVoxels, cudaMemcpyHostToDevice);
 	cudaMemcpy(streamIndex, streamIndexH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
@@ -127,6 +139,8 @@ void class_scsp_active_D2Q9::memcopy_device_to_host()
     cudaMemcpy(rH, r, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(uH, u, sizeof(float2)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(pH, p, sizeof(float2)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(hH, h, sizeof(float2)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(phiH, phi, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 }
 
 
@@ -182,6 +196,11 @@ void class_scsp_active_D2Q9::setR(int i, float val)
 	rH[i] = val;
 }
 
+void class_scsp_active_D2Q9::setPhi(int i, float val)
+{
+	phiH[i] = val;
+}
+
 void class_scsp_active_D2Q9::setVoxelType(int i, int val)
 {
 	voxelTypeH[i] = val;
@@ -206,6 +225,11 @@ float class_scsp_active_D2Q9::getV(int i)
 float class_scsp_active_D2Q9::getR(int i)
 {
 	return rH[i];
+}
+
+float class_scsp_active_D2Q9::getPhi(int i)
+{
+	return phiH[i];
 }
 
 
@@ -271,7 +295,7 @@ void class_scsp_active_D2Q9::stream_collide_save_forcing(int nBlocks, int nThrea
 void class_scsp_active_D2Q9::scsp_active_update_orientation(int nBlocks, int nThreads)
 {
 	scsp_active_update_orientation_D2Q9 
-	<<<nBlocks,nThreads>>> (u,p,nList,sf,fricR,nVoxels);
+	<<<nBlocks,nThreads>>> (u,p,h,nList,sf,fricR,nVoxels);
 }
 
 
@@ -283,7 +307,7 @@ void class_scsp_active_D2Q9::scsp_active_update_orientation(int nBlocks, int nTh
 void class_scsp_active_D2Q9::scsp_active_fluid_stress(int nBlocks, int nThreads)
 {
 	scsp_active_fluid_stress_D2Q9 
-	<<<nBlocks,nThreads>>> (p,stress,activity,nVoxels);
+	<<<nBlocks,nThreads>>> (p,h,stress,nList,sf,kapp,activity,nVoxels);
 }
 
 
@@ -300,6 +324,67 @@ void class_scsp_active_D2Q9::scsp_active_fluid_forces(int nBlocks, int nThreads)
 
 
 
+// --------------------------------------------------------
+// Call to "scsp_active_fluid_molecular_field_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_D2Q9::scsp_active_fluid_molecular_field(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_molecular_field_D2Q9 
+	<<<nBlocks,nThreads>>> (h,p,stress,nList,alpha,kapp,nVoxels);
+	
+	cudaError_t err = cudaGetLastError();
+	if (err != cudaSuccess) 
+	    printf("Error: %s\n", cudaGetErrorString(err));
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_fluid_molecular_field_with_phi_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_D2Q9::scsp_active_fluid_molecular_field_with_phi(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_molecular_field_with_phi_D2Q9 
+	<<<nBlocks,nThreads>>> (phi,h,p,stress,nList,alpha,kapp,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_fluid_chemical_potential_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_D2Q9::scsp_active_fluid_chemical_potential(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_chemical_potential_D2Q9 
+	<<<nBlocks,nThreads>>> (phi,chempot,nList,a,kapphi,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_fluid_capillary_force_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_D2Q9::scsp_active_fluid_capillary_force(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_capillary_force_D2Q9 
+	<<<nBlocks,nThreads>>> (phi,chempot,F,nList,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_fluid_update_phi_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_D2Q9::scsp_active_fluid_update_phi(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_update_phi_D2Q9 
+	<<<nBlocks,nThreads>>> (phi,chempot,u,nList,mob,nVoxels);
+}
 
 
 
@@ -352,7 +437,7 @@ void class_scsp_active_D2Q9::write_output(std::string tagname, int step)
 		for (int j=0; j<Ny; j++) {
 			for (int i=0; i<Nx; i++) {
 				int ndx = k*Nx*Ny + j*Nx + i;
-				outfile << fixed << setprecision(5) << rH[ndx] << endl;
+				outfile << fixed << setprecision(5) << phiH[ndx] << endl;
 			}
 		}
 	}	
@@ -394,6 +479,26 @@ void class_scsp_active_D2Q9::write_output(std::string tagname, int step)
 			}
 		}
 	}
+	
+	// -----------------------------------------------				
+	// Write the 'molecular field' data:
+	// NOTE: x-data increases fastest,
+	//       then y-data	
+	// -----------------------------------------------
+	
+	outfile << "   " << endl;
+	outfile << "VECTORS Molecular-field float" << endl;		
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = k*Nx*Ny + j*Nx + i;
+				outfile << fixed << setprecision(5) << hH[ndx].x << " "
+					                                << hH[ndx].y << " " 
+													<< 0.0 << endl;
+			}
+		}
+	}
+	
 	
 	// -----------------------------------------------
 	//	Close the file:

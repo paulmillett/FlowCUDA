@@ -28,6 +28,14 @@ inline __host__ __device__ tensor2D operator+(tensor2D a, tensor2D b)
 	return c;
 }
 
+inline __host__ __device__ void operator+=(tensor2D &a, tensor2D b)
+{
+	a.xx += b.xx;
+    a.xy += b.xy;
+	a.yx += b.yx;
+	a.yy += b.yy;
+}
+
 inline __host__ __device__ tensor2D operator-(tensor2D a, tensor2D b)
 {
     tensor2D c;
@@ -80,6 +88,18 @@ inline __host__ __device__ tensor2D dyadic(float2 a)
 	float ayy = a.y*a.y;
 	c.xx = axx; c.xy = axy;
 	c.yx = axy; c.yy = ayy;
+	return c;
+}
+
+inline __host__ __device__ tensor2D dyadic(float2 a, float2 b)
+{
+    tensor2D c;
+	float cxx = a.x*b.x;
+	float cxy = a.x*b.y;
+	float cyx = a.y*b.x;
+	float cyy = a.y*b.y;
+	c.xx = cxx; c.xy = cxy;
+	c.yx = cyx; c.yy = cyy;
 	return c;
 }
 

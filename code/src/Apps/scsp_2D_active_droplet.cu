@@ -1,5 +1,5 @@
 
-# include "scsp_2D_active.cuh"
+# include "scsp_2D_active_droplet.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_2D_active::scsp_2D_active() : lbm()
+scsp_2D_active_droplet::scsp_2D_active_droplet() : lbm()
 {		
 	
 	// ----------------------------------------------
@@ -24,8 +24,10 @@ scsp_2D_active::scsp_2D_active() : lbm()
 	// lattice parameters:
 	// ----------------------------------------------
 	
+	Nx = inputParams("Lattice/Nx",1);
+	Ny = inputParams("Lattice/Ny",1);
 	nVoxels = inputParams("Lattice/nVoxels",0);
-	Q = inputParams("Lattice/Q",19);	
+	Q = inputParams("Lattice/Q",9);	
 	
 	// ----------------------------------------------
 	// GPU parameters:
@@ -45,7 +47,8 @@ scsp_2D_active::scsp_2D_active() : lbm()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-		
+	dropRad = inputParams("LBM/dropRad",10.0);
+	
 	// ----------------------------------------------
 	// allocate array memory (host & device):
 	// ----------------------------------------------
@@ -60,7 +63,7 @@ scsp_2D_active::scsp_2D_active() : lbm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_2D_active::~scsp_2D_active()
+scsp_2D_active_droplet::~scsp_2D_active_droplet()
 {	
 	lbm.deallocate();
 }
@@ -71,7 +74,7 @@ scsp_2D_active::~scsp_2D_active()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_2D_active::initSystem()
+void scsp_2D_active_droplet::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -97,17 +100,33 @@ void scsp_2D_active::initSystem()
 	}
 	
 	// ----------------------------------------------			
+	// initialize order parameter phi: 
+	// ----------------------------------------------
+	
+	for (int j=0; j<Ny; j++) {
+		for (int i=0; i<Nx; i++) {		
+			int ndx = j*Nx + i;	
+			float dx = float(i) - float(Nx/2.0);
+			float dy = float(j) - float(Ny/2.0);
+			float r = sqrt(dx*dx + dy*dy);
+			float phi = 1.0 - 0.5*(tanh(r - dropRad) + 1.0);
+			lbm.setPhi(ndx,phi);
+		}
+	}
+	
+	// ----------------------------------------------			
 	// initialize orientation: 
 	// ----------------------------------------------
 		
 	for (int i=0; i<nVoxels; i++) {
-		float theta = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5); 
+		float phi = lbm.getPhi(i);
+		float theta = 0.0;   //2.0*M_PI*((float)rand()/RAND_MAX - 0.5); 
 		float px = 1.0;
 		float py = 0.0;
 		float pxr = px*cos(theta) - py*sin(theta);
 		float pyr = px*sin(theta) + py*cos(theta);
-		lbm.setPx(i,pxr);
-		lbm.setPy(i,pyr);	
+		lbm.setPx(i,pxr*phi);
+		lbm.setPy(i,pyr*phi);	
 	}
 		
 	// ----------------------------------------------
@@ -138,7 +157,7 @@ void scsp_2D_active::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_2D_active::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_2D_active_droplet::cycleForward(int stepsPerCycle, int currentCycle)
 {
 	
 	// ----------------------------------------------
@@ -155,10 +174,13 @@ void scsp_2D_active::cycleForward(int stepsPerCycle, int currentCycle)
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;		
 		lbm.zero_forces(nBlocks,nThreads);
-		lbm.scsp_active_fluid_molecular_field(nBlocks,nThreads);
+		lbm.scsp_active_fluid_chemical_potential(nBlocks,nThreads);
+		lbm.scsp_active_fluid_molecular_field_with_phi(nBlocks,nThreads);		
 		lbm.scsp_active_fluid_stress(nBlocks,nThreads);
 		lbm.scsp_active_fluid_forces(nBlocks,nThreads);
-		lbm.scsp_active_update_orientation(nBlocks,nThreads);		
+		lbm.scsp_active_fluid_capillary_force(nBlocks,nThreads);
+		lbm.scsp_active_update_orientation(nBlocks,nThreads);
+		lbm.scsp_active_fluid_update_phi(nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
@@ -185,7 +207,7 @@ void scsp_2D_active::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_2D_active::writeOutput(std::string tagname, int step)
+void scsp_2D_active_droplet::writeOutput(std::string tagname, int step)
 {
 	
 	// ----------------------------------------------

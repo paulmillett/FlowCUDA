@@ -24,6 +24,7 @@
 # include "../Apps/mcmp_2D_drag_bb.cuh"
 # include "../Apps/scsp_2D_obstacle.cuh"
 # include "../Apps/scsp_2D_active.cuh"
+# include "../Apps/scsp_2D_active_droplet.cuh"
 # include "../Apps/scsp_2D_expand.cuh"
 # include "../Apps/scsp_2D_expand_2.cuh"
 # include "../Apps/scsp_3D_iolets.cuh"
@@ -101,6 +102,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "mcmp_2D_drag_bb") return new mcmp_2D_drag_bb();
 	if (specifier == "scsp_2D_obstacle") return new scsp_2D_obstacle();
 	if (specifier == "scsp_2D_active") return new scsp_2D_active();
+	if (specifier == "scsp_2D_active_droplet") return new scsp_2D_active_droplet();
 	if (specifier == "scsp_2D_expand") return new scsp_2D_expand();
 	if (specifier == "scsp_2D_expand_2") return new scsp_2D_expand_2();
 	if (specifier == "scsp_3D_iolets") return new scsp_3D_iolets();
