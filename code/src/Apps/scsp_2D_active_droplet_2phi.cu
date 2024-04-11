@@ -1,5 +1,5 @@
 
-# include "scsp_2D_active_droplet.cuh"
+# include "scsp_2D_active_droplet_2phi.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_2D_active_droplet::scsp_2D_active_droplet() : lbm()
+scsp_2D_active_droplet_2phi::scsp_2D_active_droplet_2phi() : lbm()
 {		
 	
 	// ----------------------------------------------
@@ -63,7 +63,7 @@ scsp_2D_active_droplet::scsp_2D_active_droplet() : lbm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_2D_active_droplet::~scsp_2D_active_droplet()
+scsp_2D_active_droplet_2phi::~scsp_2D_active_droplet_2phi()
 {	
 	lbm.deallocate();
 }
@@ -74,7 +74,7 @@ scsp_2D_active_droplet::~scsp_2D_active_droplet()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet::initSystem()
+void scsp_2D_active_droplet_2phi::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -111,7 +111,8 @@ void scsp_2D_active_droplet::initSystem()
 			float r = sqrt(dx*dx + dy*dy);
 			float phi = 1.0 - 0.5*(tanh(r - dropRad) + 1.0);
 			//if (phi < 0.01) phi = 0.01;
-			lbm.setPhi(ndx,phi);
+			lbm.setPhi1(ndx,phi);
+			lbm.setPhi2(ndx,1.0-phi);
 		}
 	}
 	
@@ -120,7 +121,7 @@ void scsp_2D_active_droplet::initSystem()
 	// ----------------------------------------------
 		
 	for (int i=0; i<nVoxels; i++) {
-		float phi = lbm.getPhi(i);
+		float phi = lbm.getPhi1(i);
 		float theta = 0.0;   //2.0*M_PI*((float)rand()/RAND_MAX - 0.5); 
 		float px = 1.0;
 		float py = 0.0;
@@ -158,7 +159,7 @@ void scsp_2D_active_droplet::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_2D_active_droplet_2phi::cycleForward(int stepsPerCycle, int currentCycle)
 {
 	
 	// ----------------------------------------------
@@ -208,7 +209,7 @@ void scsp_2D_active_droplet::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet::writeOutput(std::string tagname, int step)
+void scsp_2D_active_droplet_2phi::writeOutput(std::string tagname, int step)
 {
 	
 	// ----------------------------------------------

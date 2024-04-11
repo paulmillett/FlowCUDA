@@ -23,8 +23,10 @@ struct tensor2D {
 inline __host__ __device__ tensor2D operator+(tensor2D a, tensor2D b)
 {
     tensor2D c;
-	c.xx = a.xx+b.xx; c.xy = a.xy+b.xy;
-	c.yx = a.yx+b.yx; c.yy = a.yy+b.yy;
+	c.xx = a.xx + b.xx;
+	c.xy = a.xy + b.xy;
+	c.yx = a.yx + b.yx;
+	c.yy = a.yy + b.yy;
 	return c;
 }
 
@@ -39,8 +41,10 @@ inline __host__ __device__ void operator+=(tensor2D &a, tensor2D b)
 inline __host__ __device__ tensor2D operator-(tensor2D a, tensor2D b)
 {
     tensor2D c;
-	c.xx = a.xx-b.xx; c.xy = a.xy-b.xy;
-	c.yx = a.yx-b.yx; c.yy = a.yy-b.yy;
+	c.xx = a.xx - b.xx;
+	c.xy = a.xy - b.xy;
+	c.yx = a.yx - b.yx;
+	c.yy = a.yy - b.yy;
 	return c;
 }
 
@@ -72,34 +76,41 @@ inline __host__ __device__ float2 operator*(tensor2D a, float2 b)
 	return c;
 }
 
+inline __host__ __device__ void operator*=(tensor2D &a, float b)
+{
+	a.xx *= b;
+    a.xy *= b;
+	a.yx *= b;
+	a.yy *= b;
+}
+
 inline __host__ __device__ tensor2D identity2D()
 {
     tensor2D c;
-	c.xx = 1.0f; c.xy = 0.0f;
-	c.yx = 0.0f; c.yy = 1.0f;
+	c.xx = 1.0f;
+	c.xy = 0.0f;
+	c.yx = 0.0f; 
+	c.yy = 1.0f;
 	return c;
 }
 
 inline __host__ __device__ tensor2D dyadic(float2 a)
 {
     tensor2D c;
-	float axx = a.x*a.x;
-	float axy = a.x*a.y;
-	float ayy = a.y*a.y;
-	c.xx = axx; c.xy = axy;
-	c.yx = axy; c.yy = ayy;
+	c.xx = a.x*a.x;
+	c.xy = a.x*a.y;
+	c.yx = a.y*a.x;
+	c.yy = a.y*a.y;
 	return c;
 }
 
 inline __host__ __device__ tensor2D dyadic(float2 a, float2 b)
 {
     tensor2D c;
-	float cxx = a.x*b.x;
-	float cxy = a.x*b.y;
-	float cyx = a.y*b.x;
-	float cyy = a.y*b.y;
-	c.xx = cxx; c.xy = cxy;
-	c.yx = cyx; c.yy = cyy;
+	c.xx = a.x*b.x;
+	c.xy = a.x*b.y;
+	c.yx = a.y*b.x;
+	c.yy = a.y*b.y;
 	return c;
 }
 
@@ -110,8 +121,6 @@ inline __host__ __device__ tensor2D transpose(tensor2D a)
 	c.yx = a.xy;	
 	return c;
 }
-
-
 
 
 # endif  // TENSOR2D_H

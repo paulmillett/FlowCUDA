@@ -17,7 +17,7 @@ __global__ void scsp_active_zero_forces_D2Q9(
 	if (i < nVoxels) {			
 		F[i].x = 0.0;
 		F[i].y = 0.0;
-	}
+	} 
 }
 
 
@@ -357,44 +357,66 @@ __global__ void scsp_active_update_orientation_D2Q9(
 		
 	if (i < nVoxels) {
 		
-		int offst = 9*i;	
-		
-		// calculate gradient of velocity field		
-		tensor2D W;
-		W.xx = (u[nList[offst+1]].x - u[nList[offst+3]].x) / 2.0;  // assume dx=1
-		W.xy = (u[nList[offst+2]].x - u[nList[offst+4]].x) / 2.0;  // assume dx=1
-		W.yx = (u[nList[offst+1]].y - u[nList[offst+3]].y) / 2.0;  // assume dx=1
-		W.yy = (u[nList[offst+2]].y - u[nList[offst+4]].y) / 2.0;  // assume dx=1
-				
+		// calculate gradient of velocity field (at the end, enforce tracelessness)
+		tensor2D W = grad_vector_field_D2Q9(i,u,nList);
+		float tr = (1.0/2.0)*(W.xx + W.yy);
+		W.xx -= tr;
+		W.yy -= tr;
+			
 		// calculate symmetric and anti-symmetric flow field contribution to dpdt:
 		tensor2D D = 0.5*(W + transpose(W));
 		tensor2D O = 0.5*(W - transpose(W));
-		float2 dpdt1 = (sf*D - O)*p[i];
+		float2 dpdt1 = -sf*D*p[i] + O*p[i];
 		
 		// advection contribution to dpdt (see Wikipedia page on 'material derivative'):
-		float pxE = p[nList[offst+1]].x;  // east
-		float pxN = p[nList[offst+2]].x;  // north
-		float pxW = p[nList[offst+3]].x;  // west
-		float pxS = p[nList[offst+4]].x;  // south
-		float pyE = p[nList[offst+1]].y;  // east
-		float pyN = p[nList[offst+2]].y;  // north
-		float pyW = p[nList[offst+3]].y;  // west
-		float pyS = p[nList[offst+4]].y;  // south		
-		float dpxdx = (pxE - pxW) / 2.0;  // assume dx=1
-		float dpxdy = (pxN - pxS) / 2.0;  // assume dx=1
-		float dpydx = (pyE - pyW) / 2.0;  // assume dx=1
-		float dpydy = (pyN - pyS) / 2.0;  // assume dx=1
-		float2 dpdt2 = make_float2(u[i].x*dpxdx + u[i].y*dpxdy, u[i].x*dpydx + u[i].y*dpydy);
+		tensor2D dp = grad_vector_field_D2Q9(i,p,nList);
+		float2 dpdt2 = make_float2(u[i].x*dp.xx + u[i].y*dp.xy, u[i].x*dp.yx + u[i].y*dp.yy);
 		dpdt2 *= -1.0f;
 		
 		// molecular field contribution to dpdt:
 		float2 dpdt3 = -h[i]/fricR;
 				
-		// update orientation field:
-		p[i] += dpdt1 + dpdt2 + dpdt3;   // assume dt=1.0
+		// update orientation field (assuming dt=1.0):
+		p[i] += dpdt1 + dpdt2 + dpdt3;
 		
-		//p[i] = normalize(p[i]);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 update kernel for the orientation field assuming
+// only diffusive transport.  See: Marth & Voigt 
+// Interface Focus 6 (2016) 20160037.
+// --------------------------------------------------------
+
+__global__ void scsp_active_update_orientation_diffusive_D2Q9(
+	float2* p,
+	float2* h,
+	int* nList,
+	float fricR,
+	int nVoxels)
+{
+	
+	// -----------------------------------------------
+	// define voxel:
+	// -----------------------------------------------
+	
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
 		
+	if (i < nVoxels) {
+		
+		// advection contribution to dpdt (see Wikipedia page on 'material derivative'):
+		float v0 = 0.0001;
+		float2 u0 = v0*p[i];
+		tensor2D dp = grad_vector_field_D2Q9(i,p,nList);
+		float2 dpdt2 = make_float2(u0.x*dp.xx + u0.y*dp.xy, u0.x*dp.yx + u0.y*dp.yy);
+		dpdt2 *= -1.0f;
+		
+		// molecular field contribution to dpdt:
+		float2 dpdt = -h[i]/fricR;
+		p[i] += dpdt + dpdt2;   // assume dt=1.0	
+			
 	}
 }
 
@@ -419,21 +441,17 @@ __global__ void scsp_active_fluid_stress_D2Q9(
 	if (i < nVoxels) {
 				
 		// calculate the elastic (passive) stress tensor:
-		int offst = 9*i;
 		tensor2D ph = dyadic(p[i],h[i]);
 		tensor2D phT = transpose(ph);
 		tensor2D symph = 0.5*(ph - phT);
 		tensor2D asymph = 0.5*sf*(ph + phT);
-		stress[i] = symph - asymph;		
-		tensor2D dp;
-		dp.xx = (p[nList[offst+1]].x - p[nList[offst+3]].x) / 2.0;  // assume dx=1
-		dp.xy = (p[nList[offst+2]].x - p[nList[offst+4]].x) / 2.0;  // assume dx=1
-		dp.yx = (p[nList[offst+1]].y - p[nList[offst+3]].y) / 2.0;  // assume dx=1
-		dp.yy = (p[nList[offst+2]].y - p[nList[offst+4]].y) / 2.0;  // assume dx=1
-		stress[i] += kapp*dp*transpose(dp);
+		tensor2D dp = grad_vector_field_D2Q9(i,p,nList);;
+		dp = transpose(dp);
+		stress[i] = symph - asymph - kapp*dp*transpose(dp);
 						
 		// calculate active stress tensor:
-		stress[i] += -activity*dyadic(p[i]);
+		stress[i] += -activity*(dyadic(p[i]) - 0.5*identity2D());
+		
 	}
 }
 
@@ -452,16 +470,8 @@ __global__ void scsp_active_fluid_forces_D2Q9(
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i < nVoxels) {
-		int offst = 9*i;	
-		// divergence of stress tensor:
-		float dsxxdx = (stress[nList[offst+1]].xx - stress[nList[offst+3]].xx) / 2.0;  // assume dx=1
-		float dsxydy = (stress[nList[offst+2]].xy - stress[nList[offst+4]].xy) / 2.0;  // assume dx=1
-		float dsyxdx = (stress[nList[offst+1]].yx - stress[nList[offst+3]].yx) / 2.0;  // assume dx=1
-		float dsyydy = (stress[nList[offst+2]].yy - stress[nList[offst+4]].yy) / 2.0;  // assume dx=1
-		float2 force = make_float2(dsxxdx + dsxydy, dsyxdx + dsyydy);
-		F[i] += force;
-	}
-	
+		F[i] += divergence_tensor_field_D2Q9(i,stress,nList);
+	}	
 }
 
 
@@ -481,24 +491,10 @@ __global__ void scsp_active_fluid_molecular_field_D2Q9(
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i < nVoxels) {		
-		int offst = 9*i;	
 		// molecular field:
-		float px  = p[i].x;
-		float py  = p[i].y;
-		float pxE = p[nList[offst+1]].x;  // east
-		float pxN = p[nList[offst+2]].x;  // north
-		float pxW = p[nList[offst+3]].x;  // west
-		float pxS = p[nList[offst+4]].x;  // south
-		float pyE = p[nList[offst+1]].y;  // east
-		float pyN = p[nList[offst+2]].y;  // north
-		float pyW = p[nList[offst+3]].y;  // west
-		float pyS = p[nList[offst+4]].y;  // south		
-		float pmag = sqrt(px*px + py*py);
-		float dfdpmag = alpha*(pmag*pmag*pmag - pmag);
-		float laplpx = (pxE + pxW + pxN + pxS - 4.0*px);   // assume dx=1
-		float laplpy = (pyE + pyW + pyN + pyS - 4.0*py);   // assume dx=1
-		h[i].x = dfdpmag*px - kapp*laplpx;
-		h[i].y = dfdpmag*py - kapp*laplpy;		
+		float p2 = length2(p[i]);
+		float2 dfdp = alpha*p[i]*(p2 - 1.0);
+		h[i] = dfdp - kapp*laplacian_vector_field_D2Q9(i,p,nList);
 	}
 }
 
@@ -517,29 +513,16 @@ __global__ void scsp_active_fluid_molecular_field_with_phi_D2Q9(
 	int* nList,
 	float alpha,
 	float kapp,
+	float beta,
 	int nVoxels)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i < nVoxels) {		
-		int offst = 9*i;	
 		// molecular field:
-		float px  = p[i].x;
-		float py  = p[i].y;
-		float pxE = p[nList[offst+1]].x;  // east
-		float pxN = p[nList[offst+2]].x;  // north
-		float pxW = p[nList[offst+3]].x;  // west
-		float pxS = p[nList[offst+4]].x;  // south
-		float pyE = p[nList[offst+1]].y;  // east
-		float pyN = p[nList[offst+2]].y;  // north
-		float pyW = p[nList[offst+3]].y;  // west
-		float pyS = p[nList[offst+4]].y;  // south		
-		float pmag = sqrt(px*px + py*py);
+		float p2 = length2(p[i]);
 		float phicoeff = (phi[i] - 0.5)/0.5;   // phi_critical = 0.5
-		float dfdpmag = alpha*(pmag*pmag*pmag - pmag*phicoeff);
-		float laplpx = (pxE + pxW + pxN + pxS - 4.0*px);   // assume dx=1
-		float laplpy = (pyE + pyW + pyN + pyS - 4.0*py);   // assume dx=1
-		h[i].x = dfdpmag*px - kapp*laplpx;
-		h[i].y = dfdpmag*py - kapp*laplpy;		
+		float2 dfdp = alpha*p[i]*(p2 - phicoeff);
+		h[i] = dfdp - kapp*laplacian_vector_field_D2Q9(i,p,nList) + beta*grad_scalar_field_D2Q9(i,phi,nList);	
 	}
 }
 
@@ -553,21 +536,55 @@ __global__ void scsp_active_fluid_molecular_field_with_phi_D2Q9(
 __global__ void scsp_active_fluid_chemical_potential_D2Q9(
 	float* phi,
 	float* chempot,
+	float2* p,
 	int* nList,
 	float a,
+	float alpha,
 	float kapphi,
+	float beta,
 	int nVoxels)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i < nVoxels) {		
-		int offst = 9*i;
+		float laplphi = laplacian_scalar_field_D2Q9(i,phi,nList);
+		float divp = divergence_vector_field_D2Q9(i,p,nList);
 		float phii = phi[i];
-		float phiE = phi[nList[offst+1]];  // east
-		float phiN = phi[nList[offst+2]];  // north
-		float phiW = phi[nList[offst+3]];  // west
-		float phiS = phi[nList[offst+4]];  // south
-		float lapl = (phiE + phiW + phiN + phiS - 4.0*phii);  // assume dx=1
-		chempot[i] = a*(4.0*phii*phii*phii - 6.0*phii*phii + 2.0*phii) - kapphi*lapl;
+		chempot[i] = a*(4.0*phii*phii*phii - 6.0*phii*phii + 2.0*phii) - kapphi*laplphi - beta*divp;
+		//float p2 = length2(p[i]);
+		//chempot[i] -= 0.25*alpha*p2;
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to calculate the chemical potentials of the 
+// order parameters (used when there are 2 phi's):
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_chemical_potential_2phi_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* chempot1,
+	float* chempot2,
+	float2* p,
+	int* nList,
+	float a,
+	float alpha,
+	float kapphi,
+	float beta,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		float laplphi1 = laplacian_scalar_field_D2Q9(i,phi1,nList);
+		float laplphi2 = laplacian_scalar_field_D2Q9(i,phi2,nList);
+		float divp = divergence_vector_field_D2Q9(i,p,nList);
+		float phi1i = phi1[i];
+		float phi2i = phi2[i];
+		// chemical potentials for phi1,phi2:
+		chempot1[i] = a*12.0*(phi1i*phi1i*phi1i - phi1i*phi1i + phi1i*phi2i*phi2i) - kapphi*laplphi1 - beta*divp;
+		chempot2[i] = a*12.0*(phi2i*phi2i*phi2i - phi2i*phi2i + phi2i*phi1i*phi1i) - kapphi*laplphi2;
 	}		
 }
 
@@ -587,11 +604,30 @@ __global__ void scsp_active_fluid_capillary_force_D2Q9(
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i < nVoxels) {		
-		int offst = 9*i;
-		float gradphix = (phi[nList[offst+1]] - phi[nList[offst+3]])/2.0;  // assume dx=1
-		float gradphiy = (phi[nList[offst+2]] - phi[nList[offst+4]])/2.0;  // assume dx=1
-		float2 capF = chempot[i]*make_float2(gradphix,gradphiy);
-		F[i] += capF;
+		F[i] += chempot[i]*grad_scalar_field_D2Q9(i,phi,nList);
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to calculate the interfacial capillary force
+// the fluid (used when there are 2 phi's):
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_capillary_force_2phi_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* chempot1,
+	float* chempot2,
+	float2* F,
+	int* nList,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		F[i] += chempot1[i]*grad_scalar_field_D2Q9(i,phi1,nList) + 
+			    chempot2[i]*grad_scalar_field_D2Q9(i,phi2,nList);
 	}		
 }
 
@@ -611,19 +647,265 @@ __global__ void scsp_active_fluid_update_phi_D2Q9(
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i < nVoxels) {		
-		int offst = 9*i;
-		float cpi = chempot[i];
-		float cpE = chempot[nList[offst+1]];  // east
-		float cpN = chempot[nList[offst+2]];  // north
-		float cpW = chempot[nList[offst+3]];  // west
-		float cpS = chempot[nList[offst+4]];  // south
-		float lapl = (cpE + cpW + cpN + cpS - 4.0*cpi);  // assume dx=1		
-		float gradphix = (phi[nList[offst+1]] - phi[nList[offst+3]])/2.0;  // assume dx=1
-		float gradphiy = (phi[nList[offst+2]] - phi[nList[offst+4]])/2.0;  // assume dx=1
-		float2 gradphi = make_float2(gradphix,gradphiy);
-		phi[i] += mob*lapl - dot(u[i],gradphi);   // assume dt=1
+		float laplcp = laplacian_scalar_field_D2Q9(i,chempot,nList);
+		float2 gradphi = grad_scalar_field_D2Q9(i,phi,nList);
+		phi[i] += mob*laplcp - dot(u[i],gradphi);   // assume dt=1
 	}		
 }
+
+
+
+// --------------------------------------------------------
+// Kernel to update the order parameter phi (used when
+// there are 2 phi's):
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_update_phi_2phi_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* chempot1,
+	float* chempot2,
+	float2* u,
+	int* nList,
+	float mob,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		float laplcp1 = laplacian_scalar_field_D2Q9(i,chempot1,nList);
+		float laplcp2 = laplacian_scalar_field_D2Q9(i,chempot2,nList);
+		float2 gradphi1 = grad_scalar_field_D2Q9(i,phi1,nList);
+		float2 gradphi2 = grad_scalar_field_D2Q9(i,phi2,nList);
+		phi1[i] += mob*laplcp1 - dot(u[i],gradphi1);   // assume dt=1
+		phi2[i] += mob*laplcp2 - dot(u[i],gradphi2);   // assume dt=1
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to update the order parameter phi assuming only
+// diffusive transport:
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_update_phi_diffusive_D2Q9(
+	float* phi,
+	float* chempot,
+	float2* u,
+	int* nList,
+	float mob,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		float laplcp = laplacian_scalar_field_D2Q9(i,chempot,nList);
+		float divuphi = divergence_vector_scalar_field_D2Q9(i,u,phi,nList);		
+		phi[i] += mob*laplcp - divuphi;   // assume dt=1
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to set the velocity field:
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_set_velocity_field_D2Q9(
+	float2* u,
+	float2* p,
+	float v0,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		u[i] = v0*p[i];
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+// ************************************************************************************************
+//      Kernels that perform vector calculus operations
+// ************************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+// --------------------------------------------------------
+// Kernel to compute gradient of vector field:
+// --------------------------------------------------------
+
+__device__ tensor2D grad_vector_field_D2Q9(
+	int i,
+	float2* v,
+	int* nList)
+{
+	int offst = 9*i;
+	tensor2D dv;
+	// assuming dx=dy=1:
+	dv.xx = (v[nList[offst+1]].x - v[nList[offst+3]].x)/2.0;  // d(v_x)/dx
+	dv.xy = (v[nList[offst+2]].x - v[nList[offst+4]].x)/2.0;  // d(v_x)/dy
+	dv.yx = (v[nList[offst+1]].y - v[nList[offst+3]].y)/2.0;  // d(v_y)/dy
+	dv.yy = (v[nList[offst+2]].y - v[nList[offst+4]].y)/2.0;  // d(v_y)/dy
+	return dv; 
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to compute gradient of scalar field:
+// --------------------------------------------------------
+
+__device__ float2 grad_scalar_field_D2Q9(
+	int i,
+	float* a,
+	int* nList)
+{
+	int offst = 9*i;
+	// assuming dx=dy=1:
+	float gradx = (a[nList[offst+1]] - a[nList[offst+3]])/2.0;  // da/dx
+	float grady = (a[nList[offst+2]] - a[nList[offst+4]])/2.0;  // da/dy
+	return make_float2(gradx,grady);
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to compute laplacian of vector field.  This
+// returns grad^2(vx) and grad^2(vy) as a float2:
+// --------------------------------------------------------
+
+__device__ float2 laplacian_vector_field_D2Q9(
+	int i,
+	float2* v,
+	int* nList)
+{
+	int offst = 9*i;	
+	float vx0 = v[i].x;
+	float vy0 = v[i].y;
+	float vxE = v[nList[offst+1]].x;  // east
+	float vxN = v[nList[offst+2]].x;  // north
+	float vxW = v[nList[offst+3]].x;  // west
+	float vxS = v[nList[offst+4]].x;  // south
+	float vyE = v[nList[offst+1]].y;  // east
+	float vyN = v[nList[offst+2]].y;  // north
+	float vyW = v[nList[offst+3]].y;  // west
+	float vyS = v[nList[offst+4]].y;  // south	
+	// assuming dx=dy=1:
+	return make_float2(vxE + vxW + vxN + vxS - 4.0*vx0,
+	                   vyE + vyW + vyN + vyS - 4.0*vy0);
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to compute laplacian of scalar field.
+// --------------------------------------------------------
+
+__device__ float laplacian_scalar_field_D2Q9(
+	int i,
+	float* a,
+	int* nList)
+{
+	int offst = 9*i;	
+	float a0 = a[i];
+	float aE = a[nList[offst+1]];  // east
+	float aN = a[nList[offst+2]];  // north
+	float aW = a[nList[offst+3]];  // west
+	float aS = a[nList[offst+4]];  // south
+	// assuming dx=dy=1:
+	return (aE + aW + aN + aS - 4.0*a0);
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to compute divergence of vector field:
+// --------------------------------------------------------
+
+__device__ float divergence_vector_field_D2Q9(
+	int i,
+	float2* v,
+	int* nList)
+{
+	int offst = 9*i;	
+	// assuming dx=dy=1:
+	float dvxdx = (v[nList[offst+1]].x - v[nList[offst+3]].x)/2.0;
+	float dvydy = (v[nList[offst+2]].y - v[nList[offst+4]].y)/2.0;
+	return dvxdx + dvydy;
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to compute divergence of vector field times
+// scalar field:
+// --------------------------------------------------------
+
+__device__ float divergence_vector_scalar_field_D2Q9(
+	int i,
+	float2* v,
+	float* a,
+	int* nList)
+{
+	int offst = 9*i;	
+	// assuming dx=dy=1:	
+	float aE = a[nList[offst+1]];  // east
+	float aN = a[nList[offst+2]];  // north
+	float aW = a[nList[offst+3]];  // west
+	float aS = a[nList[offst+4]];  // south		
+	float vxE = v[nList[offst+1]].x;  // east
+	float vyN = v[nList[offst+2]].y;  // north
+	float vxW = v[nList[offst+3]].x;  // west
+	float vyS = v[nList[offst+4]].y;  // south
+	float gradvxax = (vxE*aE - vxW*aW)/2.0;
+	float gradvyay = (vyN*aN - vyS*aS)/2.0;
+	return gradvxax + gradvyay;
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to compute divergence of tensor field:
+// --------------------------------------------------------
+
+__device__ float2 divergence_tensor_field_D2Q9(
+	int i,
+	tensor2D* t,
+	int* nList)
+{
+	int offst = 9*i;	
+	// divergence of tensor (see Wiki page on 'divergence'):
+	float dtxxdx = (t[nList[offst+1]].xx - t[nList[offst+3]].xx) / 2.0;  // assume dx=1
+	float dtxydy = (t[nList[offst+2]].xy - t[nList[offst+4]].xy) / 2.0;  // assume dx=1
+	float dtyxdx = (t[nList[offst+1]].yx - t[nList[offst+3]].yx) / 2.0;  // assume dx=1
+	float dtyydy = (t[nList[offst+2]].yy - t[nList[offst+4]].yy) / 2.0;  // assume dx=1
+	return make_float2(dtxxdx + dtxydy, dtyxdx + dtyydy);
+}
+
+
+
+
+
+
+
+
 
 
 

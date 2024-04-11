@@ -1,5 +1,5 @@
 
-# include "scsp_2D_active_droplet.cuh"
+# include "scsp_2D_active_droplet_diffusive.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_2D_active_droplet::scsp_2D_active_droplet() : lbm()
+scsp_2D_active_droplet_diffusive::scsp_2D_active_droplet_diffusive() : lbm()
 {		
 	
 	// ----------------------------------------------
@@ -63,7 +63,7 @@ scsp_2D_active_droplet::scsp_2D_active_droplet() : lbm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_2D_active_droplet::~scsp_2D_active_droplet()
+scsp_2D_active_droplet_diffusive::~scsp_2D_active_droplet_diffusive()
 {	
 	lbm.deallocate();
 }
@@ -74,7 +74,7 @@ scsp_2D_active_droplet::~scsp_2D_active_droplet()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet::initSystem()
+void scsp_2D_active_droplet_diffusive::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -158,7 +158,7 @@ void scsp_2D_active_droplet::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_2D_active_droplet_diffusive::cycleForward(int stepsPerCycle, int currentCycle)
 {
 	
 	// ----------------------------------------------
@@ -174,15 +174,11 @@ void scsp_2D_active_droplet::cycleForward(int stepsPerCycle, int currentCycle)
 	
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;		
-		lbm.zero_forces(nBlocks,nThreads);
 		lbm.scsp_active_fluid_chemical_potential(nBlocks,nThreads);
-		lbm.scsp_active_fluid_molecular_field_with_phi(nBlocks,nThreads);		
-		lbm.scsp_active_fluid_stress(nBlocks,nThreads);
-		lbm.scsp_active_fluid_forces(nBlocks,nThreads);
-		lbm.scsp_active_fluid_capillary_force(nBlocks,nThreads);
-		lbm.scsp_active_update_orientation(nBlocks,nThreads);
-		lbm.scsp_active_fluid_update_phi(nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		lbm.scsp_active_fluid_molecular_field_with_phi(nBlocks,nThreads);
+		lbm.scsp_active_fluid_set_velocity_field(nBlocks,nThreads);	
+		lbm.scsp_active_update_orientation_diffusive(nBlocks,nThreads);
+		lbm.scsp_active_fluid_update_phi_diffusive(nBlocks,nThreads); 
 		cudaDeviceSynchronize();
 	}
 	
@@ -208,7 +204,7 @@ void scsp_2D_active_droplet::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet::writeOutput(std::string tagname, int step)
+void scsp_2D_active_droplet_diffusive::writeOutput(std::string tagname, int step)
 {
 	
 	// ----------------------------------------------

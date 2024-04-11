@@ -1,6 +1,6 @@
 
-# ifndef CLASS_SCSP_ACTIVE_D2Q9_H
-# define CLASS_SCSP_ACTIVE_D2Q9_H
+# ifndef CLASS_SCSP_ACTIVE_2PHI_D2Q9_H
+# define CLASS_SCSP_ACTIVE_2PHI_D2Q9_H
 
 # include "../init/lattice_builders_D2Q9.cuh"
 # include "../init/stream_index_builder_D2Q9.cuh"
@@ -10,7 +10,7 @@
 
 
 
-class class_scsp_active_D2Q9 {
+class class_scsp_active_2phi_D2Q9 {
 	
 private:
 
@@ -32,7 +32,8 @@ private:
 		
 	// host arrays:
 	float* rH;
-	float* phiH;
+	float* phi1H;
+	float* phi2H;
 	float2* uH;
 	float2* pH;
 	float2* hH;
@@ -44,8 +45,10 @@ private:
 	float* r;
 	float* f1;
 	float* f2;
-	float* phi;
-	float* chempot;
+	float* phi1;
+	float* phi2;
+	float* chempot1;
+	float* chempot2;
 	float2* u;
 	float2* F;
 	float2* p;
@@ -57,8 +60,8 @@ private:
 	
 public:
 
-	class_scsp_active_D2Q9();
-	~class_scsp_active_D2Q9();
+	class_scsp_active_2phi_D2Q9();
+	~class_scsp_active_2phi_D2Q9();
 	void allocate();
 	void deallocate();
 	void allocate_forces();
@@ -71,12 +74,14 @@ public:
 	void setPx(int,float);
 	void setPy(int,float);
 	void setR(int,float);
-	void setPhi(int,float);
+	void setPhi1(int,float);
+	void setPhi2(int,float);
 	void setVoxelType(int,int);
 	float getU(int);
 	float getV(int);
 	float getR(int);
-	float getPhi(int);
+	float getPhi1(int);
+	float getPhi2(int);
 	void initial_equilibrium(int,int);
 	void stream_collide_save(int,int);	
 	void stream_collide_save_forcing(int,int);
@@ -96,4 +101,4 @@ public:
 
 };
 
-# endif  // CLASS_SCSP_ACTIVE_D2Q9_H
+# endif  // CLASS_SCSP_ACTIVE_2PHI_D2Q9_H
