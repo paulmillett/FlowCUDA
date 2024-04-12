@@ -18,6 +18,8 @@ private:
 	int nThreads;
 	int Nx,Ny,Nz;
 	int nSteps;
+	int iskip;
+	int jskip;
 	float nu;
 	float dropRad;
 	

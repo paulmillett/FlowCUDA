@@ -1,13 +1,13 @@
 
-# ifndef SCSP_2D_ACTIVE_DROPLET_H
-# define SCSP_2D_ACTIVE_DROPLET_H
+# ifndef SCSP_2D_ACTIVE_DROPLET_3PHI_H
+# define SCSP_2D_ACTIVE_DROPLET_3PHI_H
 
 # include "../Base/FlowBase.cuh"
-# include "../D2Q9/scsp_active/class_scsp_active_D2Q9.cuh"
+# include "../D2Q9/scsp_active/class_scsp_active_3phi_D2Q9.cuh"
 # include <cuda.h>
 # include <string>
 
-class scsp_2D_active_droplet : public FlowBase {
+class scsp_2D_active_droplet_3phi : public FlowBase {
 	
 private:
 
@@ -24,16 +24,16 @@ private:
 	float dropRad;
 	
 	// objects:
-	class_scsp_active_D2Q9 lbm;
+	class_scsp_active_3phi_D2Q9 lbm;
 	
 public:
 
-	scsp_2D_active_droplet();
-	~scsp_2D_active_droplet();
+	scsp_2D_active_droplet_3phi();
+	~scsp_2D_active_droplet_3phi();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	
 };
 
-# endif  // SCSP_2D_ACTIVE_DROPLET_H
+# endif  // SCSP_2D_ACTIVE_DROPLET_2PHI_H

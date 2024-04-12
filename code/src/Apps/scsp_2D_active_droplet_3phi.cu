@@ -1,5 +1,5 @@
 
-# include "scsp_2D_active_droplet_2phi.cuh"
+# include "scsp_2D_active_droplet_3phi.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_2D_active_droplet_2phi::scsp_2D_active_droplet_2phi() : lbm()
+scsp_2D_active_droplet_3phi::scsp_2D_active_droplet_3phi() : lbm()
 {		
 	
 	// ----------------------------------------------
@@ -70,7 +70,7 @@ scsp_2D_active_droplet_2phi::scsp_2D_active_droplet_2phi() : lbm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_2D_active_droplet_2phi::~scsp_2D_active_droplet_2phi()
+scsp_2D_active_droplet_3phi::~scsp_2D_active_droplet_3phi()
 {	
 	lbm.deallocate();
 }
@@ -81,7 +81,7 @@ scsp_2D_active_droplet_2phi::~scsp_2D_active_droplet_2phi()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet_2phi::initSystem()
+void scsp_2D_active_droplet_3phi::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -113,15 +113,39 @@ void scsp_2D_active_droplet_2phi::initSystem()
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {		
 			int ndx = j*Nx + i;	
-			float dx = float(i) - float(Nx/2.0);
-			float dy = float(j) - float(Ny/2.0);
+			float phi1 = 0.0;
+			float phi2 = 0.0;
+			// phi 1 domain:
+			float centx = float(Nx)/2.0 + (2.0/3.0)*dropRad;
+			float centy = float(Ny)/2.0;
+			float dx = float(i) - centx;
+			float dy = float(j) - centy;
 			float r = sqrt(dx*dx + dy*dy);
-			float phi = 1.0 - 0.5*(tanh(r - dropRad) + 1.0);
-			//if (phi < 0.01) phi = 0.01;
-			lbm.setPhi1(ndx,phi);
-			lbm.setPhi2(ndx,1.0-phi);
+			if (r < dropRad && i > Nx/2) phi1 = 1.0;
+			// phi 2 domain:
+			centx = float(Nx)/2.0 - (2.0/3.0)*dropRad;
+			centy = float(Ny)/2.0;
+			dx = float(i) - centx;
+			dy = float(j) - centy;
+			r = sqrt(dx*dx + dy*dy);
+			if (r < dropRad && i < Nx/2) phi2 = 1.0;
+			// set values:
+			lbm.setPhi1(ndx,phi1);
+			lbm.setPhi2(ndx,phi2);
+			lbm.setPhi3(ndx,1.0 - phi1 - phi2);			
 		}
 	}
+	
+	// ----------------------------------------------			
+	// relax phi fields:
+	// ----------------------------------------------
+	
+	lbm.memcopy_host_to_device();	
+	for (int i=0; i<10000; i++) {
+		lbm.scsp_active_fluid_chemical_potential(nBlocks,nThreads);
+		lbm.scsp_active_fluid_update_phi(nBlocks,nThreads);
+	}	
+	lbm.memcopy_device_to_host();	
 	
 	// ----------------------------------------------			
 	// initialize orientation: 
@@ -166,7 +190,7 @@ void scsp_2D_active_droplet_2phi::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet_2phi::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_2D_active_droplet_3phi::cycleForward(int stepsPerCycle, int currentCycle)
 {
 	
 	// ----------------------------------------------
@@ -216,7 +240,7 @@ void scsp_2D_active_droplet_2phi::cycleForward(int stepsPerCycle, int currentCyc
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_2D_active_droplet_2phi::writeOutput(std::string tagname, int step)
+void scsp_2D_active_droplet_3phi::writeOutput(std::string tagname, int step)
 {
 	
 	// ----------------------------------------------

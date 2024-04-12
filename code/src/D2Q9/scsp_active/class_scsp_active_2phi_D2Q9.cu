@@ -454,7 +454,7 @@ void class_scsp_active_2phi_D2Q9::scsp_active_fluid_set_velocity_field(int nBloc
 // Wrtie output:
 // --------------------------------------------------------
 
-void class_scsp_active_2phi_D2Q9::write_output(std::string tagname, int step)
+void class_scsp_active_2phi_D2Q9::write_output(std::string tagname, int step, int iskip, int jskip)
 {
 	
 	// -----------------------------------------------
@@ -468,6 +468,16 @@ void class_scsp_active_2phi_D2Q9::write_output(std::string tagname, int step)
 	outfile.open(filename.c_str(), ios::out | ios::app);
 	
 	// -----------------------------------------------
+	//	find output dimensions considering
+	//  iskip, jskip:
+	// -----------------------------------------------
+	
+	int Nxs = Nx/iskip;
+	int Nys = Ny/jskip;
+	if (Nx%2 && iskip>1) Nxs++;  // if odd, then add 1
+	if (Ny%2 && jskip>1) Nys++;
+	
+	// -----------------------------------------------
 	//	Write the 'vtk' file header:
 	// -----------------------------------------------
 	
@@ -477,11 +487,11 @@ void class_scsp_active_2phi_D2Q9::write_output(std::string tagname, int step)
 	outfile << "ASCII" << endl;
 	outfile << " " << endl;
 	outfile << "DATASET STRUCTURED_POINTS" << endl;
-	outfile << "DIMENSIONS" << d << Nx << d << Ny << d << Nz << endl;
+	outfile << "DIMENSIONS" << d << Nxs << d << Nys << d << Nz << endl;
 	outfile << "ORIGIN " << d << 0 << d << 0 << d << 0 << endl;
-	outfile << "SPACING" << d << 1.0 << d << 1.0 << d << 1.0 << endl;
+	outfile << "SPACING" << d << 1.0*iskip << d << 1.0*jskip << d << 1.0 << endl;
 	outfile << " " << endl;
-	outfile << "POINT_DATA " << Nx*Ny*Nz << endl;
+	outfile << "POINT_DATA " << Nxs*Nys*Nz << endl;
 	outfile << "SCALARS " << tagname << " float" << endl;
 	outfile << "LOOKUP_TABLE default" << endl;
 	
@@ -492,8 +502,8 @@ void class_scsp_active_2phi_D2Q9::write_output(std::string tagname, int step)
 	// -----------------------------------------------
 	
 	for (int k=0; k<Nz; k++) {
-		for (int j=0; j<Ny; j++) {
-			for (int i=0; i<Nx; i++) {
+		for (int j=0; j<Ny; j+=jskip) {
+			for (int i=0; i<Nx; i+=iskip) {
 				int ndx = k*Nx*Ny + j*Nx + i;
 				outfile << fixed << setprecision(5) << phi2H[ndx] << endl;
 			}
@@ -509,8 +519,8 @@ void class_scsp_active_2phi_D2Q9::write_output(std::string tagname, int step)
 	outfile << "   " << endl;
 	outfile << "VECTORS Velocity float" << endl;		
 	for (int k=0; k<Nz; k++) {
-		for (int j=0; j<Ny; j++) {
-			for (int i=0; i<Nx; i++) {
+		for (int j=0; j<Ny; j+=jskip) {
+			for (int i=0; i<Nx; i+=iskip) {
 				int ndx = k*Nx*Ny + j*Nx + i;
 				outfile << fixed << setprecision(5) << uH[ndx].x << " "
 					                                << uH[ndx].y << " " 
@@ -528,8 +538,8 @@ void class_scsp_active_2phi_D2Q9::write_output(std::string tagname, int step)
 	outfile << "   " << endl;
 	outfile << "VECTORS Orientation float" << endl;		
 	for (int k=0; k<Nz; k++) {
-		for (int j=0; j<Ny; j++) {
-			for (int i=0; i<Nx; i++) {
+		for (int j=0; j<Ny; j+=jskip) {
+			for (int i=0; i<Nx; i+=iskip) {
 				int ndx = k*Nx*Ny + j*Nx + i;
 				outfile << fixed << setprecision(5) << pH[ndx].x << " "
 					                                << pH[ndx].y << " " 
@@ -537,27 +547,7 @@ void class_scsp_active_2phi_D2Q9::write_output(std::string tagname, int step)
 			}
 		}
 	}
-	
-	// -----------------------------------------------				
-	// Write the 'molecular field' data:
-	// NOTE: x-data increases fastest,
-	//       then y-data	
-	// -----------------------------------------------
-	
-	outfile << "   " << endl;
-	outfile << "VECTORS Molecular-field float" << endl;		
-	for (int k=0; k<Nz; k++) {
-		for (int j=0; j<Ny; j++) {
-			for (int i=0; i<Nx; i++) {
-				int ndx = k*Nx*Ny + j*Nx + i;
-				outfile << fixed << setprecision(5) << hH[ndx].x << " "
-					                                << hH[ndx].y << " " 
-													<< 0.0 << endl;
-			}
-		}
-	}
-	
-	
+		
 	// -----------------------------------------------
 	//	Close the file:
 	// -----------------------------------------------

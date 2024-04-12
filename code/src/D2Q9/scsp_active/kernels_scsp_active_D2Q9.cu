@@ -580,11 +580,49 @@ __global__ void scsp_active_fluid_chemical_potential_2phi_D2Q9(
 		float laplphi1 = laplacian_scalar_field_D2Q9(i,phi1,nList);
 		float laplphi2 = laplacian_scalar_field_D2Q9(i,phi2,nList);
 		float divp = divergence_vector_field_D2Q9(i,p,nList);
-		float phi1i = phi1[i];
-		float phi2i = phi2[i];
+		float p1 = phi1[i];
+		float p2 = phi2[i];
 		// chemical potentials for phi1,phi2:
-		chempot1[i] = a*12.0*(phi1i*phi1i*phi1i - phi1i*phi1i + phi1i*phi2i*phi2i) - kapphi*laplphi1 - beta*divp;
-		chempot2[i] = a*12.0*(phi2i*phi2i*phi2i - phi2i*phi2i + phi2i*phi1i*phi1i) - kapphi*laplphi2;
+		chempot1[i] = a*12.0*(p1*p1*p1 - p1*p1 + p1*p2*p2) - kapphi*laplphi1 - beta*divp;
+		chempot2[i] = a*12.0*(p2*p2*p2 - p2*p2 + p2*p1*p1) - kapphi*laplphi2;
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to calculate the chemical potentials of the 
+// order parameters (used when there are 3 phi's):
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_chemical_potential_3phi_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* phi3,
+	float* chempot1,
+	float* chempot2,
+	float* chempot3,
+	float2* p,
+	int* nList,
+	float a,
+	float alpha,
+	float kapphi,
+	float beta,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		float laplphi1 = laplacian_scalar_field_D2Q9(i,phi1,nList);
+		float laplphi2 = laplacian_scalar_field_D2Q9(i,phi2,nList);
+		float laplphi3 = laplacian_scalar_field_D2Q9(i,phi3,nList);
+		float divp = divergence_vector_field_D2Q9(i,p,nList);
+		float p1 = phi1[i];
+		float p2 = phi2[i];
+		float p3 = phi3[i];
+		// chemical potentials for phi1,phi2,phi3:
+		chempot1[i] = a*12.0*(p1*p1*p1 - p1*p1 + p1*(p2*p2 + p3*p3)) - kapphi*laplphi1 - beta*divp;
+		chempot2[i] = a*12.0*(p2*p2*p2 - p2*p2 + p2*(p1*p1 + p3*p3)) - kapphi*laplphi2;
+		chempot3[i] = a*12.0*(p3*p3*p3 - p3*p3 + p3*(p1*p1 + p2*p2)) - kapphi*laplphi3;
 	}		
 }
 
@@ -628,6 +666,32 @@ __global__ void scsp_active_fluid_capillary_force_2phi_D2Q9(
 	if (i < nVoxels) {		
 		F[i] += chempot1[i]*grad_scalar_field_D2Q9(i,phi1,nList) + 
 			    chempot2[i]*grad_scalar_field_D2Q9(i,phi2,nList);
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to calculate the interfacial capillary force
+// the fluid (used when there are 3 phi's):
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_capillary_force_3phi_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* phi3,
+	float* chempot1,
+	float* chempot2,
+	float* chempot3,
+	float2* F,
+	int* nList,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		F[i] += chempot1[i]*grad_scalar_field_D2Q9(i,phi1,nList) + 
+			    chempot2[i]*grad_scalar_field_D2Q9(i,phi2,nList) + 
+				chempot3[i]*grad_scalar_field_D2Q9(i,phi3,nList);
 	}		
 }
 
@@ -678,6 +742,39 @@ __global__ void scsp_active_fluid_update_phi_2phi_D2Q9(
 		float2 gradphi2 = grad_scalar_field_D2Q9(i,phi2,nList);
 		phi1[i] += mob*laplcp1 - dot(u[i],gradphi1);   // assume dt=1
 		phi2[i] += mob*laplcp2 - dot(u[i],gradphi2);   // assume dt=1
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to update the order parameter phi (used when
+// there are 3 phi's):
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_update_phi_3phi_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* phi3,
+	float* chempot1,
+	float* chempot2,
+	float* chempot3,
+	float2* u,
+	int* nList,
+	float mob,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		float laplcp1 = laplacian_scalar_field_D2Q9(i,chempot1,nList);
+		float laplcp2 = laplacian_scalar_field_D2Q9(i,chempot2,nList);
+		float laplcp3 = laplacian_scalar_field_D2Q9(i,chempot3,nList);
+		float2 gradphi1 = grad_scalar_field_D2Q9(i,phi1,nList);
+		float2 gradphi2 = grad_scalar_field_D2Q9(i,phi2,nList);
+		float2 gradphi3 = grad_scalar_field_D2Q9(i,phi3,nList);
+		phi1[i] += mob*laplcp1 - dot(u[i],gradphi1);   // assume dt=1
+		phi2[i] += mob*laplcp2 - dot(u[i],gradphi2);   // assume dt=1
+		phi3[i] += mob*laplcp3 - dot(u[i],gradphi3);   // assume dt=1
 	}		
 }
 

@@ -50,6 +50,13 @@ scsp_2D_active_droplet::scsp_2D_active_droplet() : lbm()
 	dropRad = inputParams("LBM/dropRad",10.0);
 	
 	// ----------------------------------------------
+	// Output parameters:
+	// ----------------------------------------------
+	
+	iskip = inputParams("Output/iskip",1);
+	jskip = inputParams("Output/jskip",1);
+	
+	// ----------------------------------------------
 	// allocate array memory (host & device):
 	// ----------------------------------------------
 	
@@ -217,7 +224,7 @@ void scsp_2D_active_droplet::writeOutput(std::string tagname, int step)
 	// "io/write_vtk_output.cuh"
 	// ----------------------------------------------
 	
-	lbm.write_output(tagname,step);
+	lbm.write_output(tagname,step,iskip,jskip);
 			
 }
 

@@ -26,6 +26,7 @@
 # include "../Apps/scsp_2D_active.cuh"
 # include "../Apps/scsp_2D_active_droplet.cuh"
 # include "../Apps/scsp_2D_active_droplet_2phi.cuh"
+# include "../Apps/scsp_2D_active_droplet_3phi.cuh"
 # include "../Apps/scsp_2D_active_droplet_diffusive.cuh"
 # include "../Apps/scsp_2D_expand.cuh"
 # include "../Apps/scsp_2D_expand_2.cuh"
@@ -106,6 +107,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_2D_active") return new scsp_2D_active();
 	if (specifier == "scsp_2D_active_droplet") return new scsp_2D_active_droplet();
 	if (specifier == "scsp_2D_active_droplet_2phi") return new scsp_2D_active_droplet_2phi();
+	if (specifier == "scsp_2D_active_droplet_3phi") return new scsp_2D_active_droplet_3phi();
 	if (specifier == "scsp_2D_active_droplet_diffusive") return new scsp_2D_active_droplet_diffusive();
 	if (specifier == "scsp_2D_expand") return new scsp_2D_expand();
 	if (specifier == "scsp_2D_expand_2") return new scsp_2D_expand_2();

@@ -97,7 +97,7 @@ public:
 	void scsp_active_fluid_update_phi_diffusive(int,int);
 	void scsp_active_fluid_set_velocity_field(int,int);
 	void zero_forces(int,int);	
-	void write_output(std::string,int);
+	void write_output(std::string,int,int,int);
 
 };
 

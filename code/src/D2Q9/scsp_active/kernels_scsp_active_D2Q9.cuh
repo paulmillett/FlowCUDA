@@ -125,6 +125,22 @@ __global__ void scsp_active_fluid_chemical_potential_2phi_D2Q9(
 	float,
 	int);
 
+
+__global__ void scsp_active_fluid_chemical_potential_3phi_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float2*,
+	int*,
+	float,
+	float,
+	float,
+	float,
+	int);
+
 	
 __global__ void scsp_active_fluid_capillary_force_D2Q9(
 	float*,
@@ -143,6 +159,18 @@ __global__ void scsp_active_fluid_capillary_force_2phi_D2Q9(
 	int*,
 	int);
 		
+
+__global__ void scsp_active_fluid_capillary_force_3phi_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float2*,
+	int*,
+	int);
+
 	
 __global__ void scsp_active_fluid_update_phi_D2Q9(
 	float*,
@@ -164,6 +192,19 @@ __global__ void scsp_active_fluid_update_phi_2phi_D2Q9(
 	int);
 
 
+__global__ void scsp_active_fluid_update_phi_3phi_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float2*,
+	int*,
+	float,
+	int);
+		
+		
 __global__ void scsp_active_fluid_update_phi_diffusive_D2Q9(
 	float*,
 	float*,

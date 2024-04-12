@@ -45,7 +45,14 @@ scsp_2D_active::scsp_2D_active() : lbm()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-		
+	
+	// ----------------------------------------------
+	// Output parameters:
+	// ----------------------------------------------
+	
+	iskip = inputParams("Output/iskip",1);
+	jskip = inputParams("Output/jskip",1);
+	
 	// ----------------------------------------------
 	// allocate array memory (host & device):
 	// ----------------------------------------------
@@ -194,7 +201,7 @@ void scsp_2D_active::writeOutput(std::string tagname, int step)
 	// "io/write_vtk_output.cuh"
 	// ----------------------------------------------
 	
-	lbm.write_output(tagname,step);
+	lbm.write_output(tagname,step,iskip,jskip);
 			
 }
 
