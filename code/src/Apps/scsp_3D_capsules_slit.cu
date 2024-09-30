@@ -219,7 +219,7 @@ void scsp_3D_capsules_slit::initSystem()
 				
 	if (initRandom) {
 		float scale = 1.0;  //0.7
-		ibm.shrink_and_randomize_cells(scale,16.0,a+2.0);
+		ibm.shrink_and_randomize_cells(scale,16.0,a+2.0,a+2.0);
 		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 		
 		/*

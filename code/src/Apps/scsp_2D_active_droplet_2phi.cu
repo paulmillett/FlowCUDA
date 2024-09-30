@@ -191,6 +191,7 @@ void scsp_2D_active_droplet_2phi::cycleForward(int stepsPerCycle, int currentCyc
 		lbm.scsp_active_update_orientation(nBlocks,nThreads);
 		lbm.scsp_active_fluid_update_phi(nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		lbm.set_wall_velocity_ydir(0.0,nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
 	

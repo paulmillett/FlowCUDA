@@ -85,6 +85,7 @@ public:
 	void initial_equilibrium(int,int);
 	void stream_collide_save(int,int);	
 	void stream_collide_save_forcing(int,int);
+	void set_wall_velocity_ydir(float,int,int);
 	void scsp_active_update_orientation(int,int);
 	void scsp_active_update_orientation_diffusive(int,int);
 	void scsp_active_fluid_stress(int,int);

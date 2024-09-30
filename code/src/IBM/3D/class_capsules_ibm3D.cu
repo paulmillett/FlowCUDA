@@ -440,6 +440,8 @@ void class_capsules_ibm3D::duplicate_cells()
 				edgesH[ii].v1 = edgesH[i].v1 + cellsH[c].indxN0;
 				edgesH[ii].f0 = edgesH[i].f0 + cellsH[c].indxF0;
 				edgesH[ii].f1 = edgesH[i].f1 + cellsH[c].indxF0;
+				if (edgesH[i].f0 < 0) edgesH[ii].f0 = edgesH[i].f0;  // for edges with only one face (sheets only)
+				if (edgesH[i].f1 < 0) edgesH[ii].f1 = edgesH[i].f1;  // for edges with only one face (sheets only)
 			}
 			// copy face info:
 			for (int i=0; i<cellsH[0].nFaces; i++) {
@@ -652,7 +654,7 @@ void class_capsules_ibm3D::randomize_cells(float sepWall)
 // within the box:
 // --------------------------------------------------------
 
-void class_capsules_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float sepMin, float sepWall)
+void class_capsules_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float sepMin, float sepWallY, float sepWallZ)
 {
 	// copy node positions from device to host:
 	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);	
@@ -673,8 +675,8 @@ void class_capsules_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
 			tooClose = false;
 			// get random position
 			shift.x = (float)rand()/RAND_MAX*Box.x;
-			shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
-			shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
+			shift.y = sepWallY + (float)rand()/RAND_MAX*(Box.y-2.0*sepWallY);
+			shift.z = sepWallZ + (float)rand()/RAND_MAX*(Box.z-2.0*sepWallZ);
 			// check with other cells
 			for (int d=0; d<c; d++) {
 				float sep = calc_separation_pbc(shift,cellCOM[d]);
@@ -1048,12 +1050,14 @@ void class_capsules_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThre
 		lbm.zero_forces(nBlocks,nThreads);
 	
 		// re-build bin lists for IBM nodes:
-		reset_bin_lists(nBlocks,nThreads);
-		build_bin_lists(nBlocks,nThreads);
+		if (nCells > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}		
 			
 		// update IBM:
 		compute_node_forces_skalak(nBlocks,nThreads);
-		nonbonded_node_interactions(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
@@ -1079,12 +1083,14 @@ void class_capsules_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThre
 		update_node_positions_verlet_1(nBlocks,nThreads);
 	
 		// re-build bin lists for IBM nodes:
-		reset_bin_lists(nBlocks,nThreads);
-		build_bin_lists(nBlocks,nThreads);
+		if (nCells > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}
 			
 		// update IBM:
 		compute_node_forces_skalak(nBlocks,nThreads);
-		nonbonded_node_interactions(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
 		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,nodes,nNodes);
@@ -1129,6 +1135,72 @@ void class_capsules_ibm3D::stepIBM_no_fluid(int nSteps, bool zeroFlag, int nBloc
 	repA = repA0;
 }
 
+
+
+// --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
+{
+	
+	// ----------------------------------------------------------
+	// the traditional IBM update, except here
+	// the forces on the IBM nodes are included to calculate the
+	// new node positions (see 'update_node_positions_verlet_1')
+	// ----------------------------------------------------------
+	
+	if (ibmUpdate == "ibm") {
+		
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+	
+		// re-build bin lists for IBM nodes:
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+			
+		// update IBM:
+		compute_node_forces_skalak_sheets(nBlocks,nThreads);
+		nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
+		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
+		
+	} 
+	
+	// ----------------------------------------------------------
+	//  here, the velocity-Verlet algorithm is used to update the 
+	//  node positions - using a viscous drag force proportional
+	//  to the difference between the node velocities and the 
+	//  fluid velocities
+	// ----------------------------------------------------------
+	
+	else if (ibmUpdate == "verlet") {
+	
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+	
+		// first step of IBM velocity verlet:
+		update_node_positions_verlet_1(nBlocks,nThreads);
+	
+		// re-build bin lists for IBM nodes:
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+			
+		// update IBM:
+		compute_node_forces_skalak_sheets(nBlocks,nThreads);
+		nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,nodes,nNodes);
+		update_node_positions_verlet_2(nBlocks,nThreads);
+		
+	}
+		
+}
 
 
 
@@ -1599,6 +1671,42 @@ void class_capsules_ibm3D::compute_node_forces_skalak_Janus(float ksSoft, float 
 
 // --------------------------------------------------------
 // Calls to kernels that compute forces on nodes based 
+// on the membrane mechanics model (Skalak model).  This
+// one assumes elastic sheets, so volume correction is
+// turned off:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::compute_node_forces_skalak_sheets(int nBlocks, int nThreads)
+{
+	// First, zero the node forces and the cell volumes:
+	zero_node_forces_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
+			
+	zero_cell_volumes_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
+	// Second, unwrap node coordinates:
+	unwrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,cells,Box,pbcFlag,nNodes);	
+					
+	// Third, compute the Skalak forces for each face:
+	compute_node_force_membrane_skalak_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
+	
+	// Fourth, compute the bending force for each edge:		
+	compute_node_force_membrane_bending_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);
+					
+	// Sixth, re-wrap node coordinates:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);
+			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on nodes based 
 // on the membrane mechanics model (FENE model):
 // --------------------------------------------------------
 
@@ -2000,6 +2108,65 @@ void class_capsules_ibm3D::capsule_geometry_analysis(int step)
 	// -----------------------------------------
 	
 	outfile.close();
+	
+}
+
+
+
+// --------------------------------------------------------
+// Calculate various geometry properties of sheets,
+// including center-of-mass, etc.
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::sheet_geometry_analysis(int step)
+{
+			
+	// -----------------------------------------
+	// Loop over the sheets, calculate center-of-mass
+	// and Taylor deformation parameter.  
+	// -----------------------------------------
+			
+	for (int c=0; c<nCells; c++) {
+		
+		cellsH[c].intrain = false;
+		
+		// -----------------------------------------
+		// maxT1:
+		// -----------------------------------------
+		
+		float maxT1 = -100.0;  // maximum principle tension of capsule		
+		int fstr = cellsH[c].indxF0;
+		int fend = fstr + cellsH[c].nFaces;
+		for (int f=fstr; f<fend; f++) {			
+			if (facesH[f].T1 > maxT1) maxT1 = facesH[f].T1;
+		}		
+		cellsH[c].maxT1 = maxT1;
+		
+		// -----------------------------------------
+		// center of mass:
+		// -----------------------------------------
+		
+		int istr = cellsH[c].indxN0;
+		int iend = istr + cellsH[c].nNodes;
+		for (int i=istr; i<iend; i++) cellsH[c].com += nodesH[i].r;		
+		cellsH[c].com /= cellsH[c].nNodes;
+		cellsH[c].vol = 0.0;
+								
+		// -----------------------------------------
+		// calculate Taylor deformation parameters:
+		// -----------------------------------------
+				
+		cellsH[c].D = 0.0;
+		
+		// -----------------------------------------		
+		// calculate the sheet velocity:
+		// -----------------------------------------
+		
+		cellsH[c].vel = make_float3(0.0,0.0,0.0);
+		for (int i=istr; i<iend; i++) cellsH[c].vel += nodesH[i].v;		
+		cellsH[c].vel /= cellsH[c].nNodes;
+			
+	}
 	
 }
 

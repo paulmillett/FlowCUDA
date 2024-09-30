@@ -35,36 +35,52 @@ __global__ void scsp_active_initial_equilibrium_D2Q9(
 	// define current voxel:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	
-	if (i < nVoxels) {			
-		// useful constants: 
-		const float rho = r[i];
-		const float ux = u[i].x;
-		const float vy = u[i].y;
-		const float w0r = rho*4.0/9.0;
-		const float wsr = rho*1.0/9.0;
-		const float wdr = rho*1.0/36.0;
-		const float omusq = 1.0 - 1.5*(ux*ux + vy*vy);	
-		const float tux = 3.0*ux;
-		const float tvy = 3.0*vy;			
-		// equilibrium populations:
-		f1[9*i+0] = w0r*(omusq);		
-		float cidot3u = tux;
-		f1[9*i+1] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tvy;
-		f1[9*i+2] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -tux;
-		f1[9*i+3] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -tvy;
-		f1[9*i+4] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));	
-		cidot3u = tux+tvy;
-		f1[9*i+5] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tvy-tux;
-		f1[9*i+6] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = -(tux+tvy);
-		f1[9*i+7] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
-		cidot3u = tux-tvy;
-		f1[9*i+8] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	if (i < nVoxels) {
+		scsp_active_equilibrium_pop_D2Q9(i,f1,r,u);
 	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 initialize kernel: 
+// --------------------------------------------------------
+
+__device__ void scsp_active_equilibrium_pop_D2Q9(
+	int i,
+	float* f1,
+	float* r,
+	float2* u)
+{
+	// useful constants: 
+	const int offst = 9*i;
+	const float rho = r[i];
+	const float ux = u[i].x;
+	const float vy = u[i].y;
+	const float w0r = rho*4.0/9.0;
+	const float wsr = rho*1.0/9.0;
+	const float wdr = rho*1.0/36.0;
+	const float omusq = 1.0 - 1.5*(ux*ux + vy*vy);	
+	const float tux = 3.0*ux;
+	const float tvy = 3.0*vy;			
+	// equilibrium populations:
+	f1[offst+0] = w0r*(omusq);		
+	float cidot3u = tux;
+	f1[offst+1] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tvy;
+	f1[offst+2] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -tux;
+	f1[offst+3] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -tvy;
+	f1[offst+4] = wsr*(omusq + cidot3u*(1.0+0.5*cidot3u));	
+	cidot3u = tux+tvy;
+	f1[offst+5] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tvy-tux;
+	f1[offst+6] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = -(tux+tvy);
+	f1[offst+7] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
+	cidot3u = tux-tvy;
+	f1[offst+8] = wdr*(omusq + cidot3u*(1.0+0.5*cidot3u));
 }
 
 
@@ -335,6 +351,216 @@ __global__ void scsp_active_stream_collide_save_forcing_D2Q9(
 
 
 // --------------------------------------------------------
+// D2Q9 update kernel.
+// This algorithm is based on the optimized "stream-collide-
+// save" algorithm recommended by T. Kruger in the 
+// textbook: "The Lattice Boltzmann Method: Principles
+// and Practice".
+//
+// Here, viscosity is not constant, hence it is 
+// passed as an array
+//
+// --------------------------------------------------------
+
+__global__ void scsp_active_stream_collide_save_forcing_varvisc_D2Q9(
+	float* f1,
+    float* f2,
+	float* r,
+	float* indtr,
+	float2* u,
+	float2* F,
+	int* streamIndex,
+	int* voxelType,
+	float nu_in,
+	float nu_out,	
+	int nVoxels)
+{
+
+	// -----------------------------------------------
+	// define voxel:
+	// -----------------------------------------------
+	
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+		
+	if (i < nVoxels) {
+		
+		// --------------------------------------------------		
+		// voxel-specific parameters:
+		// --------------------------------------------------
+		
+		int offst = 9*i;	
+		float ft[9];
+		
+		// --------------------------------------------------		
+		// STREAMING - load populations from adjacent voxels,
+		//             note	that streamIndex[] accounts for
+		//             halfway bounceback conditions.
+		// --------------------------------------------------
+		
+		ft[0] = f1[streamIndex[offst+0]];                   
+		ft[1] = f1[streamIndex[offst+1]]; 
+		ft[2] = f1[streamIndex[offst+2]];  
+		ft[3] = f1[streamIndex[offst+3]];  
+		ft[4] = f1[streamIndex[offst+4]];  
+		ft[5] = f1[streamIndex[offst+5]]; 
+		ft[6] = f1[streamIndex[offst+6]];  
+		ft[7] = f1[streamIndex[offst+7]];  
+		ft[8] = f1[streamIndex[offst+8]]; 	
+				
+		// --------------------------------------------------
+		// MACROS - calculate the velocity and density (force
+		//          corrected).
+		// --------------------------------------------------	
+				
+		float rho = ft[0] + ft[1] + ft[2] + ft[3] + ft[4] + ft[5] + ft[6] + ft[7] + ft[8];
+		float rhoinv = 1.0/rho;
+		float ux = rhoinv*(ft[1] + ft[5] + ft[8] - (ft[3] + ft[6] + ft[7]) + 0.5*F[i].x);
+		float vy = rhoinv*(ft[2] + ft[5] + ft[6] - (ft[4] + ft[7] + ft[8]) + 0.5*F[i].y);
+		
+		// --------------------------------------------------
+		// COLLISION - perform the BGK collision operator
+		//             with Guo forcing.
+		// --------------------------------------------------
+					
+		// useful constants:
+		float indtri = indtr[i];
+		if (indtri > 1.0) indtri = 1.0;
+		if (indtri < 0.0) indtri = 0.0;
+		const float nu = nu_in*indtri + nu_out*(1.0-indtri);
+		const float w0 = 4.0/9.0;
+		const float ws = 1.0/9.0;
+		const float wd = 1.0/36.0;			
+		const float omega = 2.0/(6.0*nu + 1.0);   // 1/tau
+		const float omomega = 1.0 - omega;        // 1 - 1/tau
+		const float omomega2 = 1.0 - 0.5*omega;   // 1 - 1/(2tau)
+		const float omusq = 1.0 - 1.5*(ux*ux + vy*vy);
+					
+		// direction 0
+		float evel = 0.0;       // e dot velocity
+		float emiu = 0.0-ux;    // e minus u
+		float emiv = 0.0-vy;    // e minus v
+		float feq = w0*rho*omusq;
+		float frc = w0*(F[i].x*(3.0*emiu) + F[i].y*(3.0*emiv));
+		f2[offst+0] = omomega*ft[0] + omega*feq + omomega2*frc;
+		
+		// direction 1
+		evel = ux;
+		emiu = 1.0-ux;
+		emiv = 0.0-vy;
+		feq = ws*rho*(omusq + 3.0*evel + 4.5*evel*evel);
+		frc = ws*(F[i].x*(3.0*emiu + 9.0*evel) + F[i].y*(3.0*emiv));
+		f2[offst+1] = omomega*ft[1] + omega*feq + omomega2*frc;
+		
+		// direction 2
+		evel = vy; 
+		emiu = 0.0-ux;
+		emiv = 1.0-vy;
+		feq = ws*rho*(omusq + 3.0*evel + 4.5*evel*evel);
+		frc = ws*(F[i].x*(3.0*emiu) + F[i].y*(3.0*emiv + 9.0*evel));
+		f2[offst+2] = omomega*ft[2] + omega*feq + omomega2*frc;
+		
+		// direction 3
+		evel = -ux;
+		emiu = -1.0-ux;
+		emiv =  0.0-vy;
+		feq = ws*rho*(omusq + 3.0*evel + 4.5*evel*evel);
+		frc = ws*(F[i].x*(3.0*emiu - 9.0*evel) + F[i].y*(3.0*emiv));
+		f2[offst+3] = omomega*ft[3] + omega*feq + omomega2*frc;
+		
+		// direction 4
+		evel = -vy;
+		emiu =  0.0-ux;
+		emiv = -1.0-vy;
+		feq = ws*rho*(omusq + 3.0*evel + 4.5*evel*evel);
+		frc = ws*(F[i].x*(3.0*emiu) + F[i].y*(3.0*emiv - 9.0*evel));
+		f2[offst+4] = omomega*ft[4] + omega*feq + omomega2*frc;
+		
+		// direction 5
+		evel = ux + vy;
+		emiu = 1.0-ux;
+		emiv = 1.0-vy;
+		feq = wd*rho*(omusq + 3.0*evel + 4.5*evel*evel);
+		frc = wd*(F[i].x*(3.0*emiu + 9.0*evel) + F[i].y*(3.0*emiv + 9.0*evel));
+		f2[offst+5] = omomega*ft[5] + omega*feq + omomega2*frc;
+		
+		// direction 6
+		evel = -ux + vy;
+		emiu = -1.0-ux;
+		emiv =  1.0-vy;
+		feq = wd*rho*(omusq + 3.0*evel + 4.5*evel*evel);
+		frc = wd*(F[i].x*(3.0*emiu - 9.0*evel) + F[i].y*(3.0*emiv + 9.0*evel));
+		f2[offst+6] = omomega*ft[6] + omega*feq + omomega2*frc;
+		
+		// direction 7
+		evel = -ux - vy;
+		emiu = -1.0-ux;
+		emiv = -1.0-vy;
+		feq = wd*rho*(omusq + 3.0*evel + 4.5*evel*evel);
+		frc = wd*(F[i].x*(3.0*emiu - 9.0*evel) + F[i].y*(3.0*emiv - 9.0*evel));
+		f2[offst+7] = omomega*ft[7] + omega*feq + omomega2*frc;
+		
+		// direction 8
+		evel = ux - vy;
+		emiu =  1.0-ux;
+		emiv = -1.0-vy;
+		feq = wd*rho*(omusq + 3.0*evel + 4.5*evel*evel);
+		frc = wd*(F[i].x*(3.0*emiu + 9.0*evel) + F[i].y*(3.0*emiv - 9.0*evel));
+		f2[offst+8] = omomega*ft[8] + omega*feq + omomega2*frc;		
+	
+		// --------------------------------------------------		
+		// SAVE - write macros to arrays 
+		// --------------------------------------------------
+		
+		r[i] = rho;
+		u[i].x = ux;
+		u[i].y = vy;
+					
+	}
+}
+
+
+
+// --------------------------------------------------------
+// D2Q9 kernel to set wall velocities at the y=0 and
+// y=Ny-1 boundaries.
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+__global__ void scsp_active_set_boundary_velocity_D2Q9(
+	float uWall,
+	float* f1,													   
+	float2* u,
+	float* r,
+	int Nx,
+	int Ny,
+	int nVoxels)
+{
+	// define voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < nVoxels) {		
+		// 2D indices assuming data is ordered first x, then y
+		int yi = i/Nx; 
+		if (yi == 0) {
+			u[i].x = uWall;
+			u[i].y = 0.0;
+			r[i] = 1.0;
+			scsp_active_equilibrium_pop_D2Q9(i,f1,r,u);
+		} 
+		if (yi == Ny-1) {
+			u[i].x = uWall;
+			u[i].y = 0.0;
+			r[i] = 1.0;
+			scsp_active_equilibrium_pop_D2Q9(i,f1,r,u);
+		}		
+	}		
+}
+
+
+
+// --------------------------------------------------------
 // D2Q9 update kernel for the orientation field.
 // See: Tjhung et al. Soft Matter (2011) 7:7453
 // --------------------------------------------------------
@@ -364,9 +590,25 @@ __global__ void scsp_active_update_orientation_D2Q9(
 		W.yy -= tr;
 			
 		// calculate symmetric and anti-symmetric flow field contribution to dpdt:
+		
+		// ---------------------------------------
+		// My first working version (not correct):
+		// ---------------------------------------
+		
+		//tensor2D D = 0.5*(W + transpose(W));
+		//tensor2D O = 0.5*(W - transpose(W));
+		//float2 dpdt1 = -sf*D*p[i] + O*p[i];	
+		
+		// ---------------------------------------
+		// Model A: see Elgeti et al. Soft Matter (2011) 7:3177 and
+		// Giomi & Marhcetti Soft Matter (2011) 8:129
+		// {this model assumes W_ij = d_i(u_j) which is transpose of W, hence 
+		//  the minus sign in 'O'}
+		// ---------------------------------------
+		
 		tensor2D D = 0.5*(W + transpose(W));
-		tensor2D O = 0.5*(W - transpose(W));
-		float2 dpdt1 = -sf*D*p[i] + O*p[i];
+		tensor2D O = -0.5*(W - transpose(W));
+		float2 dpdt1 = sf*D*p[i] - O*p[i];
 		
 		// advection contribution to dpdt (see Wikipedia page on 'material derivative'):
 		tensor2D dp = grad_vector_field_D2Q9(i,p,nList);
@@ -441,14 +683,32 @@ __global__ void scsp_active_fluid_stress_D2Q9(
 	if (i < nVoxels) {
 				
 		// calculate the elastic (passive) stress tensor:
-		tensor2D ph = dyadic(p[i],h[i]);
+		
+		// ---------------------------------------
+		// My first working version (not correct):
+		// ---------------------------------------
+		
+		//tensor2D ph = dyadic(p[i],h[i]);
+		//tensor2D phT = transpose(ph);
+		//tensor2D asymph = 0.5*(ph - phT);
+		//tensor2D symph = 0.5*sf*(ph + phT);
+		//tensor2D dp = grad_vector_field_D2Q9(i,p,nList);;
+		//dp = transpose(dp);
+		//stress[i] = asymph - symph - kapp*dp*transpose(dp);
+		
+		// ---------------------------------------		
+		// Model A: see Elgeti et al. Soft Matter (2011) 7:3177 and
+		// Giomi & Marhcetti Soft Matter (2011) 8:129
+		// ---------------------------------------
+		
+		tensor2D ph = dyadic(p[i],-h[i]);  // use -h[i] here because h = -dF/dp in Model A
 		tensor2D phT = transpose(ph);
-		tensor2D symph = 0.5*(ph - phT);
-		tensor2D asymph = 0.5*sf*(ph + phT);
+		tensor2D asymph = 0.5*(ph - phT);
+		tensor2D symph = 0.5*sf*(ph + phT);
 		tensor2D dp = grad_vector_field_D2Q9(i,p,nList);;
 		dp = transpose(dp);
-		stress[i] = symph - asymph - kapp*dp*transpose(dp);
-						
+		stress[i] = asymph - symph - kapp*dp*transpose(dp);
+					
 		// calculate active stress tensor:
 		stress[i] += -activity*(dyadic(p[i]) - 0.5*identity2D());
 		
@@ -550,8 +810,6 @@ __global__ void scsp_active_fluid_chemical_potential_D2Q9(
 		float divp = divergence_vector_field_D2Q9(i,p,nList);
 		float phii = phi[i];
 		chempot[i] = a*(4.0*phii*phii*phii - 6.0*phii*phii + 2.0*phii) - kapphi*laplphi - beta*divp;
-		//float p2 = length2(p[i]);
-		//chempot[i] -= 0.25*alpha*p2;
 	}		
 }
 
@@ -781,6 +1039,102 @@ __global__ void scsp_active_fluid_update_phi_3phi_D2Q9(
 
 
 // --------------------------------------------------------
+// Kernel to update the order parameter phi (used when
+// there are 3 phi's):
+//
+// Note: here, the advection term is calculated not assuming
+// the velocity field is divergence free!
+//
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_update_phi_3phi_alternative_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* phi3,
+	float* chempot1,
+	float* chempot2,
+	float* chempot3,
+	float2* u,
+	int* nList,
+	float mob,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {		
+		float laplcp1 = laplacian_scalar_field_D2Q9(i,chempot1,nList);
+		float laplcp2 = laplacian_scalar_field_D2Q9(i,chempot2,nList);
+		float laplcp3 = laplacian_scalar_field_D2Q9(i,chempot3,nList);
+		phi1[i] += mob*laplcp1 - divergence_vector_scalar_field_D2Q9(i,u,phi1,nList);  // assume dt=1
+		phi2[i] += mob*laplcp2 - divergence_vector_scalar_field_D2Q9(i,u,phi2,nList);  // assume dt=1
+		phi3[i] += mob*laplcp3 - divergence_vector_scalar_field_D2Q9(i,u,phi3,nList);  // assume dt=1
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to sum the three order parameter fields:
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_zero_phisum_3phi_D2Q9(
+	float* phisum,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i == 0) {
+		phisum[0] = 0.0;
+		phisum[1] = 0.0;
+		phisum[2] = 0.0;
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to sum the three order parameter fields:
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_sum_phi_3phi_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* phi3,
+	float* phisum,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {
+		atomicAdd(&phisum[0],phi1[i]); 
+		atomicAdd(&phisum[1],phi2[i]); 
+		atomicAdd(&phisum[2],phi3[i]); 
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// Kernel to enforce conservation of the three order
+// parameters:
+// --------------------------------------------------------
+
+__global__ void scsp_active_fluid_enforce_conservation_3phi_D2Q9(
+	float* phi1,
+	float* phi2,
+	float* phi3,
+	float* phisum,
+	float* phisum0,
+	int nVoxels)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nVoxels) {
+		phi1[i] += (phisum0[0] - phisum[0])/float(nVoxels);
+		phi2[i] += (phisum0[1] - phisum[1])/float(nVoxels);
+		phi3[i] += (phisum0[2] - phisum[2])/float(nVoxels);
+	}		
+}
+
+
+
+// --------------------------------------------------------
 // Kernel to update the order parameter phi assuming only
 // diffusive transport:
 // --------------------------------------------------------
@@ -796,8 +1150,7 @@ __global__ void scsp_active_fluid_update_phi_diffusive_D2Q9(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i < nVoxels) {		
 		float laplcp = laplacian_scalar_field_D2Q9(i,chempot,nList);
-		float divuphi = divergence_vector_scalar_field_D2Q9(i,u,phi,nList);		
-		phi[i] += mob*laplcp - divuphi;   // assume dt=1
+		phi[i] += mob*laplcp - divergence_vector_scalar_field_D2Q9(i,u,phi,nList);	;   // assume dt=1
 	}		
 }
 

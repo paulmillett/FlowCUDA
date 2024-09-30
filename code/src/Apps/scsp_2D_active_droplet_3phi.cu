@@ -47,7 +47,9 @@ scsp_2D_active_droplet_3phi::scsp_2D_active_droplet_3phi() : lbm()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-	dropRad = inputParams("LBM/dropRad",10.0);
+	dropRad1 = inputParams("LBM/dropRad1",10.0);
+	dropRad2 = inputParams("LBM/dropRad2",10.0);
+	activity = inputParams("LBM/activity",-0.0005);
 	
 	// ----------------------------------------------
 	// Output parameters:
@@ -55,6 +57,7 @@ scsp_2D_active_droplet_3phi::scsp_2D_active_droplet_3phi() : lbm()
 	
 	iskip = inputParams("Output/iskip",1);
 	jskip = inputParams("Output/jskip",1);
+	nVTKOutputs = inputParams("Output/nVTKOutputs",0);
 	
 	// ----------------------------------------------
 	// allocate array memory (host & device):
@@ -110,31 +113,40 @@ void scsp_2D_active_droplet_3phi::initSystem()
 	// initialize order parameter phi: 
 	// ----------------------------------------------
 	
+	float phisum1 = 0.0;
+	float phisum2 = 0.0;
+	float phisum3 = 0.0;
+	
 	for (int j=0; j<Ny; j++) {
 		for (int i=0; i<Nx; i++) {		
 			int ndx = j*Nx + i;	
 			float phi1 = 0.0;
 			float phi2 = 0.0;
 			// phi 1 domain:
-			float centx = float(Nx)/2.0 + (2.0/3.0)*dropRad;
+			float centx = float(Nx)/2.0 + (2.0/3.0)*dropRad1;
 			float centy = float(Ny)/2.0;
 			float dx = float(i) - centx;
 			float dy = float(j) - centy;
 			float r = sqrt(dx*dx + dy*dy);
-			if (r < dropRad && i > Nx/2) phi1 = 1.0;
+			if (r < dropRad1 && i > Nx/2) phi1 = 1.0;
 			// phi 2 domain:
-			centx = float(Nx)/2.0 - (2.0/3.0)*dropRad;
+			centx = float(Nx)/2.0 - (2.0/3.0)*dropRad2;
 			centy = float(Ny)/2.0;
 			dx = float(i) - centx;
 			dy = float(j) - centy;
 			r = sqrt(dx*dx + dy*dy);
-			if (r < dropRad && i < Nx/2) phi2 = 1.0;
+			if (r < dropRad2 && i < Nx/2) phi2 = 1.0;
 			// set values:
 			lbm.setPhi1(ndx,phi1);
 			lbm.setPhi2(ndx,phi2);
-			lbm.setPhi3(ndx,1.0 - phi1 - phi2);			
+			lbm.setPhi3(ndx,1.0 - phi1 - phi2);	
+			phisum1 += phi1;
+			phisum2 += phi2;
+			phisum3 += 1.0 - phi1 - phi2;		
 		}
 	}
+	
+	lbm.setPhiSum(phisum1,phisum2,phisum3);
 	
 	// ----------------------------------------------			
 	// relax phi fields:
@@ -145,7 +157,7 @@ void scsp_2D_active_droplet_3phi::initSystem()
 		lbm.scsp_active_fluid_chemical_potential(nBlocks,nThreads);
 		lbm.scsp_active_fluid_update_phi(nBlocks,nThreads);
 	}	
-	lbm.memcopy_device_to_host();	
+	lbm.memcopy_device_to_host();
 	
 	// ----------------------------------------------			
 	// initialize orientation: 
@@ -153,9 +165,13 @@ void scsp_2D_active_droplet_3phi::initSystem()
 		
 	for (int i=0; i<nVoxels; i++) {
 		float phi = lbm.getPhi1(i);
-		float theta = 0.0;   //2.0*M_PI*((float)rand()/RAND_MAX - 0.5); 
+		float theta = 0.0;
 		float px = 1.0;
 		float py = 0.0;
+		if (activity > 0.0) {  // if extensile activity
+			px = 0.0;
+			py = 1.0;
+		}		
 		float pxr = px*cos(theta) - py*sin(theta);
 		float pyr = px*sin(theta) + py*cos(theta);
 		lbm.setPx(i,pxr*phi);
@@ -214,7 +230,9 @@ void scsp_2D_active_droplet_3phi::cycleForward(int stepsPerCycle, int currentCyc
 		lbm.scsp_active_fluid_capillary_force(nBlocks,nThreads);
 		lbm.scsp_active_update_orientation(nBlocks,nThreads);
 		lbm.scsp_active_fluid_update_phi(nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		//lbm.stream_collide_save_forcing(nBlocks,nThreads);		
+		lbm.stream_collide_save_forcing_varvisc(nBlocks,nThreads);
+		lbm.set_wall_velocity_ydir(0.0,nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
 	
@@ -241,15 +259,22 @@ void scsp_2D_active_droplet_3phi::cycleForward(int stepsPerCycle, int currentCyc
 // --------------------------------------------------------
 
 void scsp_2D_active_droplet_3phi::writeOutput(std::string tagname, int step)
-{
+{	
 	
 	// ----------------------------------------------
-	// decide which VTK file format to use for output
-	// function location:
-	// "io/write_vtk_output.cuh"
+	// write VTK file
 	// ----------------------------------------------
 	
-	lbm.write_output(tagname,step,iskip,jskip);
+	int intervalVTK = nSteps/nVTKOutputs;
+	if (step%intervalVTK == 0) {
+		lbm.write_output(tagname,step,iskip,jskip);
+	}
+		
+	// ----------------------------------------------
+	// write droplet data to file
+	// ----------------------------------------------
+	
+	lbm.write_output_droplet_properties(step);
 			
 }
 

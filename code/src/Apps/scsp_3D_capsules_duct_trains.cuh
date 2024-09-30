@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_CAPSULES_SLIT_TRAINS_H
-# define SCSP_3D_CAPSULES_SLIT_TRAINS_H
+# ifndef SCSP_3D_CAPSULES_DUCT_TRAINS_H
+# define SCSP_3D_CAPSULES_DUCT_TRAINS_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_capsules_slit_trains : public FlowBase {
+class scsp_3D_capsules_duct_trains : public FlowBase {
 	
 private:
 
@@ -53,14 +53,15 @@ private:
 		
 public:
 
-	scsp_3D_capsules_slit_trains();
-	~scsp_3D_capsules_slit_trains();
+	scsp_3D_capsules_duct_trains();
+	~scsp_3D_capsules_duct_trains();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	void calcMembraneParams(float,float,float);
 	void calcRefFlux();
+	float calcInfSum(float,float);
 	
 };
 
-# endif  // SCSP_3D_CAPSULES_SLIT_TRAINS_H
+# endif  // SCSP_3D_CAPSULES_DUCT_TRAINS_H

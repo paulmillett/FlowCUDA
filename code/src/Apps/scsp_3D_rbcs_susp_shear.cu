@@ -171,7 +171,7 @@ void scsp_3D_rbcs_susp_shear::initSystem()
 	// ----------------------------------------------
 	
 	float scale = 0.7;
-	ibm.shrink_and_randomize_cells(scale,16.0,11.0);
+	ibm.shrink_and_randomize_cells(scale,16.0,11.0,11.0);
 	ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 	
 	// ----------------------------------------------

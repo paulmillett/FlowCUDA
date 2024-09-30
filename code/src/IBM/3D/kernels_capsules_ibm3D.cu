@@ -744,12 +744,13 @@ __global__ void compute_node_force_membrane_bending_IBM3D(
 		// calculate bending force magnitude:
 		int F0 = edges[i].f0;
 		int F1 = edges[i].f1;
+		if (F0 < 0 || F1 < 0) return;  // if edge is on outer boundary of mesh (e.g. in sheets), then skip
 		int cID = faces[F0].cellID;
 		float kb = cells[cID].kb;
 		float3 n0 = faces[F0].norm;  // normals were calculated above in
 		float3 n1 = faces[F1].norm;  // "compute_node_force_membrane_area_IBM3D()"
 		float dtheta = angle_between_faces(n0,n1,n01) - edges[i].theta0;
-		float bendForceMag = kb*dtheta;  // = kb*(dtheta + dtheta/abs(2.467 - dtheta*dtheta));				
+		float bendForceMag = kb*dtheta;  // = kb*(dtheta + dtheta/abs(2.467 - dtheta*dtheta));	
 		// apply to the four points:
 		int pA = V0;
 		int pB = V1;

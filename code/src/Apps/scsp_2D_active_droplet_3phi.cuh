@@ -20,8 +20,11 @@ private:
 	int nSteps;
 	int iskip;
 	int jskip;
+	int nVTKOutputs;
 	float nu;
-	float dropRad;
+	float dropRad1;
+	float dropRad2;
+	float activity;
 	
 	// objects:
 	class_scsp_active_3phi_D2Q9 lbm;

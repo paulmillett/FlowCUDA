@@ -96,7 +96,7 @@ class class_capsules_ibm3D {
 	void rest_geometries_skalak(int,int);
 	void rest_geometries_FENE(int,int);
 	void randomize_cells(float);
-	void shrink_and_randomize_cells(float,float,float);
+	void shrink_and_randomize_cells(float,float,float,float);
 	void randomize_cells_above_plane(float,float,float,float);
 	void define_Janus_capsule_geometry(float,float);
 	float calc_separation_pbc(float3,float3);
@@ -119,6 +119,7 @@ class class_capsules_ibm3D {
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
 	void stepIBM_no_fluid(int,bool,int,int);
+	void stepIBM_sheets(class_scsp_D3Q19&,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
 	void extrapolate_force(float*,float*,float*,int,int);	
@@ -132,6 +133,7 @@ class class_capsules_ibm3D {
 	void compute_node_forces_spring(int,int);
 	void compute_node_forces_skalak(int,int);
 	void compute_node_forces_skalak_Janus(float,float,int,int);
+	void compute_node_forces_skalak_sheets(int,int);
 	void compute_node_forces_FENE(float,int,int);
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
@@ -143,6 +145,7 @@ class class_capsules_ibm3D {
 	void set_edge_rest_angles(float,int,int);
 	void output_capsule_data();
 	void capsule_geometry_analysis(int);
+	void sheet_geometry_analysis(int);
 	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);
 	void capsule_train_fraction(float,float,int);
 	

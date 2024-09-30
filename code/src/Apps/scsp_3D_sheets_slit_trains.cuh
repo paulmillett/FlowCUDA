@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_CAPSULES_SLIT_TRAINS_H
-# define SCSP_3D_CAPSULES_SLIT_TRAINS_H
+# ifndef SCSP_3D_SHEETS_SLIT_TRAINS_H
+# define SCSP_3D_SHEETS_SLIT_TRAINS_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_capsules_slit_trains : public FlowBase {
+class scsp_3D_sheets_slit_trains : public FlowBase {
 	
 private:
 
@@ -38,9 +38,7 @@ private:
 	float Q0;
 	float trainRij;
 	float trainAng;
-	float wavelength;
 	bool initRandom;
-	bool pulsatile;
 	std::string vtkFormat;
 	std::string ibmUpdate;
 	std::string ibmFile;
@@ -53,8 +51,8 @@ private:
 		
 public:
 
-	scsp_3D_capsules_slit_trains();
-	~scsp_3D_capsules_slit_trains();
+	scsp_3D_sheets_slit_trains();
+	~scsp_3D_sheets_slit_trains();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
@@ -63,4 +61,4 @@ public:
 	
 };
 
-# endif  // SCSP_3D_CAPSULES_SLIT_TRAINS_H
+# endif  // SCSP_3D_SHEETS_SLIT_TRAINS_H

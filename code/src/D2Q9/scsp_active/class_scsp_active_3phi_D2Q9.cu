@@ -22,6 +22,8 @@ class_scsp_active_3phi_D2Q9::class_scsp_active_3phi_D2Q9()
 	nVoxels = inputParams("Lattice/nVoxels",0);
 	numIolets = inputParams("Lattice/numIolets",0);
 	nu = inputParams("LBM/nu",0.1666666);
+	nu_in = inputParams("LBM/nu2",0.1666666);
+	nu_out = nu;
 	sf = inputParams("LBM/sf",1.0);
 	fricR = inputParams("LBM/fricR",1.0);
 	activity = inputParams("LBM/activity",0.0);
@@ -66,6 +68,7 @@ void class_scsp_active_3phi_D2Q9::allocate()
 	nListH = (int*)malloc(nVoxels*Q*sizeof(int));
 	voxelTypeH = (int*)malloc(nVoxels*sizeof(int));
 	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));	
+	phisum0H = (float*)malloc(3*sizeof(float));
 			
 	// allocate array memory (device):
 	cudaMalloc((void **) &r, nVoxels*sizeof(float));
@@ -84,7 +87,9 @@ void class_scsp_active_3phi_D2Q9::allocate()
 	cudaMalloc((void **) &stress, nVoxels*sizeof(tensor2D));		
 	cudaMalloc((void **) &voxelType, nVoxels*sizeof(int));
 	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));	
-	cudaMalloc((void **) &nList, nVoxels*Q*sizeof(int));	
+	cudaMalloc((void **) &nList, nVoxels*Q*sizeof(int));
+	cudaMalloc((void **) &phisum, 3*sizeof(float));
+	cudaMalloc((void **) &phisum0, 3*sizeof(float));
 }
 
 
@@ -105,7 +110,8 @@ void class_scsp_active_3phi_D2Q9::deallocate()
 	free(phi3H);
 	free(nListH);
 	free(voxelTypeH);
-	free(streamIndexH);	
+	free(streamIndexH);
+	free(phisum0H);
 		
 	// free array memory (device):
 	cudaFree(F);
@@ -125,6 +131,8 @@ void class_scsp_active_3phi_D2Q9::deallocate()
 	cudaFree(voxelType);
 	cudaFree(streamIndex);
 	cudaFree(nList);
+	cudaFree(phisum);
+	cudaFree(phisum0);
 }
 
 
@@ -172,6 +180,17 @@ void class_scsp_active_3phi_D2Q9::memcopy_device_to_host()
 void class_scsp_active_3phi_D2Q9::create_lattice_box_periodic()
 {
 	build_box_lattice_D2Q9(nVoxels,Nx,Ny,voxelTypeH,nListH);
+}
+
+
+
+// --------------------------------------------------------
+// Initialize lattice as a "box" with periodic BC's:
+// --------------------------------------------------------
+
+void class_scsp_active_3phi_D2Q9::create_lattice_box_shear()
+{
+	build_box_lattice_shear_D2Q9(nVoxels,Nx,Ny,voxelTypeH,nListH);
 }
 
 
@@ -234,6 +253,12 @@ void class_scsp_active_3phi_D2Q9::setPhi3(int i, float val)
 void class_scsp_active_3phi_D2Q9::setVoxelType(int i, int val)
 {
 	voxelTypeH[i] = val;
+}
+
+void class_scsp_active_3phi_D2Q9::setPhiSum(float sum1, float sum2, float sum3)
+{
+	phisum0H[0] = sum1; phisum0H[1] = sum2; phisum0H[2] = sum3;
+	cudaMemcpy(phisum0, phisum0H, sizeof(float)*3, cudaMemcpyHostToDevice);
 }
 
 
@@ -324,6 +349,36 @@ void class_scsp_active_3phi_D2Q9::stream_collide_save_forcing(int nBlocks, int n
 	float* temp = f1;
 	f1 = f2;
 	f2 = temp;
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_stream_collide_save_forcing_varvisc_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_3phi_D2Q9::stream_collide_save_forcing_varvisc(int nBlocks, int nThreads)
+{
+	scsp_active_stream_collide_save_forcing_varvisc_D2Q9 
+	<<<nBlocks,nThreads>>> (f1,f2,r,phi2,u,F,streamIndex,voxelType,nu_in,nu_out,nVoxels);
+	float* temp = f1;
+	f1 = f2;
+	f2 = temp;
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_set_boundary_velocity_D2Q9" kernel:
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+void class_scsp_active_3phi_D2Q9::set_wall_velocity_ydir(float uWall, int nBlocks, int nThreads)
+{
+	scsp_active_set_boundary_velocity_D2Q9 
+	<<<nBlocks,nThreads>>> (uWall,f1,u,r,Nx,Ny,nVoxels);
 }
 
 
@@ -441,6 +496,54 @@ void class_scsp_active_3phi_D2Q9::scsp_active_fluid_update_phi(int nBlocks, int 
 
 
 // --------------------------------------------------------
+// Call to "scsp_active_fluid_update_phi_3phi_alternative_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_3phi_D2Q9::scsp_active_fluid_update_phi_alternative(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_update_phi_3phi_alternative_D2Q9 
+	<<<nBlocks,nThreads>>> (phi1,phi2,phi3,chempot1,chempot2,chempot3,u,nList,mob,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_fluid_zero_phisum_3phi_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_3phi_D2Q9::scsp_active_fluid_zero_phisum_3phi(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_zero_phisum_3phi_D2Q9 
+	<<<nBlocks,nThreads>>> (phisum,nVoxels);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_fluid_sum_phi_3phi_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_3phi_D2Q9::scsp_active_fluid_sum_phi_3phi(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_sum_phi_3phi_D2Q9 
+	<<<nBlocks,nThreads>>> (phi1,phi2,phi3,phisum,nVoxels);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_active_fluid_enforce_conservation_3phi_D2Q9" kernel:
+// --------------------------------------------------------
+
+void class_scsp_active_3phi_D2Q9::scsp_active_fluid_enforce_conservation_3phi(int nBlocks, int nThreads)
+{
+	scsp_active_fluid_enforce_conservation_3phi_D2Q9 
+	<<<nBlocks,nThreads>>> (phi1,phi2,phi3,phisum,phisum0,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_active_fluid_update_phi_diffusive_D2Q9" kernel:
 // --------------------------------------------------------
 
@@ -523,7 +626,7 @@ void class_scsp_active_3phi_D2Q9::write_output(std::string tagname, int step, in
 		for (int j=0; j<Ny; j+=jskip) {
 			for (int i=0; i<Nx; i+=iskip) {
 				int ndx = k*Nx*Ny + j*Nx + i;
-				outfile << fixed << setprecision(5) << phi2H[ndx] << endl;
+				outfile << fixed << setprecision(5) << phi1H[ndx] - phi2H[ndx] << endl;
 			}
 		}
 	}	
@@ -576,6 +679,137 @@ void class_scsp_active_3phi_D2Q9::write_output(std::string tagname, int step, in
 
 
 
+// --------------------------------------------------------
+// Wrtie output for the droplet properties:
+// --------------------------------------------------------
+
+void class_scsp_active_3phi_D2Q9::write_output_droplet_properties(int step)
+{
+	
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "droplet_data.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------
+	// Calculate volume of droplets:
+	// -----------------------------------------
+	
+	float vol1 = 0.0;
+	float vol2 = 0.0;
+	float vol3 = 0.0;
+	for (int j=0; j<Ny; j++) {
+		for (int i=0; i<Nx; i++) {
+			int ndx = j*Nx + i;
+			vol1 += phi1H[ndx];
+			vol2 += phi2H[ndx];
+			vol3 += phi3H[ndx];
+		}
+	}
+	
+	// -----------------------------------------
+	// Enforce conservation of volume of fluids:
+	// -----------------------------------------
+	
+	for (int j=0; j<Ny; j++) {
+		for (int i=0; i<Nx; i++) {
+			int ndx = j*Nx + i;
+			phi1H[ndx] += (phisum0H[0] - vol1)/float(nVoxels);
+			phi2H[ndx] += (phisum0H[1] - vol2)/float(nVoxels);
+			phi3H[ndx] += (phisum0H[2] - vol3)/float(nVoxels);
+		}
+	}	
+	cudaMemcpy(phi1, phi1H, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(phi2, phi2H, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(phi3, phi3H, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
+	
+	// -----------------------------------------
+	// Calculate center-of-mass of droplets,
+	// taking into account the PBC's in the 
+	// x-direction (see the Wiki page on c.o.m)
+	// -----------------------------------------
+	
+	float p0ave1 = 0.0;  // droplet 1
+	float q0ave1 = 0.0;
+	float p0ave2 = 0.0;  // droplet 2
+	float q0ave2 = 0.0;
+	float yf1 = 0.0;
+	float yf2 = 0.0;
+	for (int j=0; j<Ny; j++) {
+		for (int i=0; i<Nx; i++) {
+			int ndx = j*Nx + i;
+			// x-dir
+			float t0x = (float(i)/float(Nx))*2*M_PI;
+			float p0x = cos(t0x);
+			float q0x = sin(t0x);
+			p0ave1 += p0x*phi1H[ndx];
+			q0ave1 += q0x*phi1H[ndx];	
+			p0ave2 += p0x*phi2H[ndx];
+			q0ave2 += q0x*phi2H[ndx];
+			// y-dir
+			yf1 += float(j)*phi1H[ndx];
+			yf2 += float(j)*phi2H[ndx];	
+		}
+	}
+	float pxave1 = p0ave1/vol1;
+	float qxave1 = q0ave1/vol1;
+	float pxave2 = p0ave2/vol2;
+	float qxave2 = q0ave2/vol2;
+	float txave1 = atan2(-qxave1,-pxave1) + M_PI;
+	float txave2 = atan2(-qxave2,-pxave2) + M_PI;
+	float xf1 = float(Nx)*txave1/(2*M_PI);
+	float xf2 = float(Nx)*txave2/(2*M_PI);
+	yf1 /= vol1;
+	yf2 /= vol2;
+	
+	// -----------------------------------------
+	// Calculate velocity of droplets:
+	// -----------------------------------------
+		
+	if (step == 0) {
+		velx1 = 0.0; vely1 = 0.0;
+		velx2 = 0.0; vely2 = 0.0;	
+	} 
+	else {
+		float dtstep = float(step - stepprev);
+		float dx1 = xf1 - xf1prev;
+		float dy1 = yf1 - yf1prev;
+		dx1 = dx1 - roundf(dx1/float(Nx))*float(Nx);
+		velx1 = dx1/dtstep;
+		vely1 = dy1/dtstep;
+		float dx2 = xf2 - xf2prev;
+		float dy2 = yf2 - yf2prev;
+		dx2 = dx2 - roundf(dx2/float(Nx))*float(Nx);
+		velx2 = dx2/dtstep;
+		vely2 = dy2/dtstep;
+	}	
+	
+	stepprev = step;
+	xf1prev = xf1; yf1prev = yf1;
+	xf2prev = xf2; yf2prev = yf2;
+		
+	// -----------------------------------------
+	// Print to file:
+	// -----------------------------------------
+		
+	outfile << fixed << setprecision(1) << setw(10) << step << " "
+		             << setprecision(4) << setw(12) << vol1 << " " 
+					 << setprecision(4) << setw(10) << xf1  << " " 
+					 << setprecision(4) << setw(10)	<< yf1  << " "
+					 << setprecision(7) << setw(11)	<< velx1 << " "
+					 << setprecision(7) << setw(11)	<< vely1 << " "
+					 << setprecision(4) << setw(12) << vol2 << " " 
+					 << setprecision(4) << setw(10) << xf2  << " " 
+					 << setprecision(4) << setw(10) << yf2  << " " 
+					 << setprecision(7) << setw(11)	<< velx2 << " "
+					 << setprecision(7) << setw(11)	<< vely2 << " " << endl;	
+		
+}
 
 
 

@@ -19,6 +19,13 @@ __global__ void scsp_active_initial_equilibrium_D2Q9(
 	int);
 
 
+__device__ void scsp_active_equilibrium_pop_D2Q9(
+	int,
+	float*,
+	float*,
+	float2*);
+
+
 __global__ void scsp_active_stream_collide_save_D2Q9(
 	float*,
 	float*,
@@ -39,6 +46,30 @@ __global__ void scsp_active_stream_collide_save_forcing_D2Q9(
 	int*,
 	int*,
 	float,
+	int);
+
+
+__global__ void scsp_active_stream_collide_save_forcing_varvisc_D2Q9(
+	float*,
+    float*,
+	float*,
+	float*,
+	float2*,
+	float2*,
+	int*,
+	int*,
+	float,
+	float,	
+	int);
+
+
+__global__ void scsp_active_set_boundary_velocity_D2Q9(
+	float,
+	float*,													   
+	float2*,
+	float*,
+	int,
+	int,
 	int);
 
 
@@ -202,6 +233,41 @@ __global__ void scsp_active_fluid_update_phi_3phi_D2Q9(
 	float2*,
 	int*,
 	float,
+	int);
+	
+	
+__global__ void scsp_active_fluid_update_phi_3phi_alternative_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float2*,
+	int*,
+	float,
+	int);
+	
+	
+__global__ void scsp_active_fluid_zero_phisum_3phi_D2Q9(
+	float*,
+	int);
+		
+		
+__global__ void scsp_active_fluid_sum_phi_3phi_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	int);
+	
+	
+__global__ void scsp_active_fluid_enforce_conservation_3phi_D2Q9(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
 	int);
 		
 		

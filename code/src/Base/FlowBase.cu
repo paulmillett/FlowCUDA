@@ -49,6 +49,7 @@
 # include "../Apps/scsp_3D_capsules_slit_Janus.cuh"
 # include "../Apps/scsp_3D_capsules_slit_membrane.cuh"
 # include "../Apps/scsp_3D_capsules_duct_margination.cuh"
+# include "../Apps/scsp_3D_capsules_duct_trains.cuh"
 # include "../Apps/scsp_3D_filaments.cuh"
 # include "../Apps/scsp_3D_filaments_fluid.cuh"
 # include "../Apps/scsp_3D_filaments_pusher.cuh"
@@ -61,6 +62,8 @@
 # include "../Apps/scsp_3D_rods_capsule.cuh"
 # include "../Apps/scsp_3D_rods_capsule_fluid.cuh"
 # include "../Apps/scsp_3D_duct_channel.cuh"
+# include "../Apps/scsp_3D_sheets_duct_trains.cuh"
+# include "../Apps/scsp_3D_sheets_slit_trains.cuh"
 # include "../Apps/scsp_3D_slit_channel.cuh"
 # include "../Apps/scsp_3D_rbcs_susp_shear.cuh"
 # include "../Apps/scsp_3D_rbcs_probe.cuh"
@@ -130,6 +133,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_capsules_slit_trains") return new scsp_3D_capsules_slit_trains();
 	if (specifier == "scsp_3D_capsules_slit_membrane") return new scsp_3D_capsules_slit_membrane();
 	if (specifier == "scsp_3D_capsules_duct_margination") return new scsp_3D_capsules_duct_margination();
+	if (specifier == "scsp_3D_capsules_duct_trains") return new scsp_3D_capsules_duct_trains();
 	if (specifier == "scsp_3D_filaments") return new scsp_3D_filaments();
 	if (specifier == "scsp_3D_filaments_fluid") return new scsp_3D_filaments_fluid();
 	if (specifier == "scsp_3D_filaments_pusher") return new scsp_3D_filaments_pusher();
@@ -143,6 +147,8 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_rods_capsule_fluid") return new scsp_3D_rods_capsule_fluid();
 	if (specifier == "scsp_3D_duct_channel") return new scsp_3D_duct_channel();
 	if (specifier == "scsp_3D_slit_channel") return new scsp_3D_slit_channel();
+	if (specifier == "scsp_3D_sheets_duct_trains") return new scsp_3D_sheets_duct_trains();
+	if (specifier == "scsp_3D_sheets_slit_trains") return new scsp_3D_sheets_slit_trains();
 	if (specifier == "scsp_3D_rbcs_susp_shear") return new scsp_3D_rbcs_susp_shear();
 	if (specifier == "scsp_3D_rbcs_probe") return new scsp_3D_rbcs_probe();
 	if (specifier == "scsp_3D_swell_ibm") return new scsp_3D_swell_ibm();

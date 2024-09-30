@@ -52,6 +52,8 @@ scsp_3D_capsules_slit_trains::scsp_3D_capsules_slit_trains() : lbm(),ibm()
 	bodyForx = inputParams("LBM/bodyForx",0.0);
 	float Re = inputParams("LBM/Re",2.0);
 	umax = inputParams("LBM/umax",0.1);
+	pulsatile = inputParams("LBM/pulsatile",0);
+	wavelength = inputParams("LBM/wavelength",100000.0);  // for pulsatile flow
 	
 	// ----------------------------------------------
 	// Immersed-Boundary parameters:
@@ -231,7 +233,7 @@ void scsp_3D_capsules_slit_trains::initSystem()
 	
 	if (initRandom) {
 		float scale = 1.0;   // 0.7;
-		ibm.shrink_and_randomize_cells(scale,2.0,a+2.0);
+		ibm.shrink_and_randomize_cells(scale,2.0,a+2.0,a+2.0);
 		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 	
 		
@@ -307,17 +309,7 @@ void scsp_3D_capsules_slit_trains::cycleForward(int stepsPerCycle, int currentCy
 			ibm.stepIBM(lbm,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
-			cudaDeviceSynchronize();
-			
-			/*
-			if (ibmUpdate == "ibm") {
-				stepIBM();
-			} else if (ibmUpdate == "verlet") {
-				stepVerlet();
-			}
-			*/
-			
-					
+			cudaDeviceSynchronize();					
 		}
 		cout << " " << endl;
 		cout << "... done equilibrating!" << endl;
@@ -330,20 +322,15 @@ void scsp_3D_capsules_slit_trains::cycleForward(int stepsPerCycle, int currentCy
 	// ----------------------------------------------
 		
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;	
+		cummulativeSteps++;
+		// if pulsatile flow, calculate bodyforce:
+		float bodyForxPul = bodyForx;
+		if (pulsatile) bodyForxPul *= sin(2*M_PI*float(cummulativeSteps)/wavelength);
+		// update IBM & LBM:
 		ibm.stepIBM(lbm,nBlocks,nThreads);
-		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+		lbm.add_body_force(bodyForxPul,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
-		cudaDeviceSynchronize();
-		
-		/*
-		if (ibmUpdate == "ibm") {
-			stepIBM();
-		} else if (ibmUpdate == "verlet") {
-			stepVerlet();
-		}
-		*/
-				
+		cudaDeviceSynchronize();				
 	}
 	
 	cout << cummulativeSteps << endl;	
@@ -361,79 +348,6 @@ void scsp_3D_capsules_slit_trains::cycleForward(int stepsPerCycle, int currentCy
 	
 	writeOutput("macros",cummulativeSteps);
 		
-}
-
-
-
-// --------------------------------------------------------
-// Take a time-step with the traditional IBM approach:
-// --------------------------------------------------------
-
-void scsp_3D_capsules_slit_trains::stepIBM()
-{
-	// zero fluid forces:
-	lbm.zero_forces(nBlocks,nThreads);
-	
-	// re-build bin lists for IBM nodes:
-	ibm.reset_bin_lists(nBlocks,nThreads);
-	ibm.build_bin_lists(nBlocks,nThreads);
-			
-	// compute IBM node forces:
-	ibm.compute_node_forces_skalak(nBlocks,nThreads);
-	ibm.nonbonded_node_interactions(nBlocks,nThreads);
-	ibm.wall_forces_zdir(nBlocks,nThreads);
-	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
-			
-	// update fluid:
-	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,ibm.nodes,nNodes);
-	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-	lbm.stream_collide_save_forcing(nBlocks,nThreads);
-	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
-	//lbm.set_boundary_slit_density(nBlocks,nThreads);
-	
-	// update membrane:
-	//ibm.update_node_positions(nBlocks,nThreads);
-	ibm.update_node_positions_verlet_1(nBlocks,nThreads);
-	
-	// CUDA sync
-	cudaDeviceSynchronize();
-}
-
-
-
-// --------------------------------------------------------
-// Take a time-step with the velocity-Verlet approach for IBM:
-// --------------------------------------------------------
-
-void scsp_3D_capsules_slit_trains::stepVerlet()
-{
-	// zero fluid forces:
-	lbm.zero_forces(nBlocks,nThreads);
-	
-	// first step of IBM velocity verlet:
-	ibm.update_node_positions_verlet_1(nBlocks,nThreads);
-	
-	// re-build bin lists for IBM nodes:
-	ibm.reset_bin_lists(nBlocks,nThreads);
-	ibm.build_bin_lists(nBlocks,nThreads);
-			
-	// compute IBM node forces:
-	ibm.compute_node_forces_skalak(nBlocks,nThreads);
-	ibm.nonbonded_node_interactions(nBlocks,nThreads);
-	ibm.wall_forces_zdir(nBlocks,nThreads);
-			
-	// update fluid:
-	lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,ibm.nodes,nNodes);
-	lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-	lbm.stream_collide_save_forcing(nBlocks,nThreads);
-	//lbm.set_boundary_slit_velocity(0.0,nBlocks,nThreads);
-	//lbm.set_boundary_slit_density(nBlocks,nThreads);
-	
-	// second step of IBM velocity verlet:
-	ibm.update_node_positions_verlet_2(nBlocks,nThreads);
-	
-	// CUDA sync		
-	cudaDeviceSynchronize();
 }
 
 

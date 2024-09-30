@@ -311,6 +311,21 @@ void class_scsp_active_2phi_D2Q9::stream_collide_save_forcing(int nBlocks, int n
 
 
 // --------------------------------------------------------
+// Call to "scsp_active_set_boundary_velocity_D2Q9" kernel:
+// NOTE: This should be called AFTER the collide-streaming
+//       step.  It should be the last calculation for the 
+//       fluid update.  
+// --------------------------------------------------------
+
+void class_scsp_active_2phi_D2Q9::set_wall_velocity_ydir(float uWall, int nBlocks, int nThreads)
+{
+	scsp_active_set_boundary_velocity_D2Q9 
+	<<<nBlocks,nThreads>>> (uWall,f1,u,r,Nx,Ny,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_active_update_orientation_D2Q9" kernel:
 // --------------------------------------------------------
 
