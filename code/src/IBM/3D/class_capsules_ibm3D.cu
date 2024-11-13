@@ -1141,6 +1141,79 @@ void class_capsules_ibm3D::stepIBM_no_fluid(int nSteps, bool zeroFlag, int nBloc
 // Take step forward for IBM using LBM object:
 // --------------------------------------------------------
 
+void class_capsules_ibm3D::stepIBM_force_one_capsule(class_scsp_D3Q19& lbm, float3 fadd, int cID, int nBlocks, int nThreads) 
+{
+	
+	// ----------------------------------------------------------
+	// the traditional IBM update, except here
+	// the forces on the IBM nodes are included to calculate the
+	// new node positions (see 'update_node_positions_verlet_1')
+	// ----------------------------------------------------------
+	
+	if (ibmUpdate == "ibm") {
+		
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+	
+		// re-build bin lists for IBM nodes:
+		if (nCells > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}		
+			
+		// update IBM:
+		compute_node_forces_skalak(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		add_force_to_cell(cID,fadd,nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
+		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
+		
+	} 
+	
+	// ----------------------------------------------------------
+	//  here, the velocity-Verlet algorithm is used to update the 
+	//  node positions - using a viscous drag force proportional
+	//  to the difference between the node velocities and the 
+	//  fluid velocities
+	// ----------------------------------------------------------
+	
+	else if (ibmUpdate == "verlet") {
+	
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+	
+		// first step of IBM velocity verlet:
+		update_node_positions_verlet_1(nBlocks,nThreads);
+	
+		// re-build bin lists for IBM nodes:
+		if (nCells > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}
+			
+		// update IBM:
+		compute_node_forces_skalak(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		add_force_to_cell(cID,fadd,nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,nodes,nNodes);
+		update_node_positions_verlet_2(nBlocks,nThreads);
+		
+	}
+		
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
 void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
 {
 	
@@ -1201,6 +1274,7 @@ void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, in
 	}
 		
 }
+
 
 
 
@@ -1398,6 +1472,18 @@ void class_capsules_ibm3D::add_xdir_force_to_nodes(int nBlocks, int nThreads, fl
 {
 	add_xdir_force_IBM3D
 	<<<nBlocks,nThreads>>> (nodes,fx,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "add_force_to_cell_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::add_force_to_cell(int cID, float3 f, int nBlocks, int nThreads)
+{
+	add_force_to_cell_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,f,cID,nNodes);
 }
 
 
@@ -2227,6 +2313,7 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 			
 	for (int c=0; c<nCells; c++) {
 		cellsH[c].intrain = false;
+		cellsH[c].trainID = 0;
 	}
 	
 	// -----------------------------------------
@@ -2259,17 +2346,9 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 			if (r2 < rcut2) {
 				float theta = atan2(dy,dx)*180.0/M_PI; 
 				// check if 'c' is in front of 'd':
-				if (theta < thetacut and theta > -thetacut) {
-					numNabors[c]++;
-					//cellsH[c].intrain = true;
-					//cellsH[d].intrain = true;
-				}
+				if (theta < thetacut and theta > -thetacut) numNabors[c]++;	
 				// check if 'd' is in front of 'c':
-				if (theta > (180.0-thetacut) or theta < (-180+thetacut)) { 
-					numNabors[c]++;
-					//cellsH[c].intrain = true;
-					//cellsH[d].intrain = true;
-				}					
+				if (theta > (180.0-thetacut) or theta < (-180+thetacut)) numNabors[c]++;
 			}			
 		}		
 	}
@@ -2328,31 +2407,145 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 	}
 	
 	// -----------------------------------------
-	// Find fraction of cells in trains:
+	// Find fraction of cells in trains, and
+	// give an initial value to 'trainID'.
 	// -----------------------------------------
 	
-	int nCellsTrain = 0;
+	int nCellsinTrain = 0;
 	for (int c=0; c<nCells; c++) {
-		if (cellsH[c].intrain == true) nCellsTrain++;
+		if (cellsH[c].intrain == true) {
+			nCellsinTrain++;
+			cellsH[c].trainID = nCellsinTrain;
+		}
 	}
-	float fracTrain = float(nCellsTrain)/float(nCells);
+	float fracTrain = float(nCellsinTrain)/float(nCells);
+	
+	// -----------------------------------------
+	// Iteratively find the correct values for
+	// 'trainID' by checking neighboring cells,
+	// and finding the lowest value.  Continue
+	// until no more changes occur.
+	// -----------------------------------------
+	
+	bool flagNbrChange = true;
+	
+	while (flagNbrChange) {
+		
+		flagNbrChange = false;
+		
+		for (int c=0; c<nCells; c++) {
+		
+			if (cellsH[c].intrain == false) continue;					
+						
+			float ix = cellsH[c].com.x;
+			float iy = cellsH[c].com.y;
+			float iz = cellsH[c].com.z;
+		
+			for (int d=0; d<nCells; d++) {
+			
+				if (d==c) continue;
+				if (cellsH[d].intrain == false) continue;
+			
+				float jx = cellsH[d].com.x;
+				float jy = cellsH[d].com.y;
+				float jz = cellsH[d].com.z;
+			
+				float dx = ix - jx;
+				float dy = iy - jy;
+				float dz = iz - jz;
+				dx -= roundf(dx/Box.x)*Box.x;
+				dy -= roundf(dy/Box.y)*Box.y;
+				float r2 = dx*dx + dy*dy + dz*dz;
+			
+				if (r2 < rcut2) {
+					float theta = atan2(dy,dx)*180.0/M_PI;
+					bool flag = false;					
+					// check if 'c' is in front of 'd' or behind 'd':
+					if (theta < thetacut and theta > -thetacut) flag = compare_nabor_trainIDs(c,d); 
+					if (theta > (180.0-thetacut) or theta < (-180+thetacut)) flag = compare_nabor_trainIDs(c,d); 
+					if (flag) flagNbrChange = true;
+				}			
+			}		
+		}		
+	}	 
+	
+	// -----------------------------------------
+	// Count the unique number of trains.  Here,
+	// we will also compress the trainID's down,
+	// so that the values increase contiguously
+	// from 1 up to numTrain.
+	// -----------------------------------------
+	
+	int numTrains = 0;
+	int trainIDSwap[nCells];
+	for (int i=0; i<nCells; i++) trainIDSwap[i] = 0;
+	
+	// loop over cells
+	for (int c=0; c<nCells; c++) {
+		if (cellsH[c].intrain == false) continue;
+		// determine if this 'trainID' has been considered already
+		bool newID = true;
+		for (int d=0; d<c; d++) {
+			if (cellsH[d].trainID == cellsH[c].trainID) newID = false;
+		}
+		// if 'trainID' has not been considered yet, increase numTrains
+		if (newID) {
+			numTrains++;
+			trainIDSwap[cellsH[c].trainID] = numTrains;
+		} 
+	}
+	
+	// loop over cells, and re-assign trainID so that it is
+	// contiguous starting at 1:
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].trainID = trainIDSwap[cellsH[c].trainID];
+	}
+	
+	// average number of cells in a train:
+	float aveCellsinTrain = float(nCellsinTrain)/float(numTrains);
 	
 	// -----------------------------------------
 	// Assign 'intrain' to 'cellType':
 	// -----------------------------------------
 		
 	for (int c=0; c<nCells; c++) {
-		if (cellsH[c].intrain == false) cellsH[c].cellType = 0;
-		if (cellsH[c].intrain == true)  cellsH[c].cellType = 1;
+		//if (cellsH[c].intrain == false) cellsH[c].cellType = 0;
+		//if (cellsH[c].intrain == true)  cellsH[c].cellType = 1;
+		cellsH[c].cellType = cellsH[c].trainID;
 	}
 		
 	// -----------------------------------------
 	// Print results:
 	// -----------------------------------------
 	
-	outfile << fixed << setprecision(4) << step << "  " << fracTrain << endl;
+	outfile << fixed << setprecision(4) << step << "  " 
+		                                << fracTrain << "  " 
+										<< numTrains << "  " 
+										<< aveCellsinTrain << endl;
 	outfile.close();
 	
+}
+
+
+
+// --------------------------------------------------------
+// Compare neighboring capsule's 'trainID' values.  If they
+// are different, change both to the lower value.
+// --------------------------------------------------------
+
+bool class_capsules_ibm3D::compare_nabor_trainIDs(int i, int j)
+{
+	bool flag = false;
+	// if trainID's are different, change to the lower value:
+	int iID = cellsH[i].trainID;	
+	int jID = cellsH[j].trainID;
+	if (iID != jID) {
+		int minID = min(iID,jID);
+		if (iID > minID) cellsH[i].trainID = minID;
+		if (jID > minID) cellsH[j].trainID = minID;
+		flag = true;
+	}
+	return flag;
 }
 
 

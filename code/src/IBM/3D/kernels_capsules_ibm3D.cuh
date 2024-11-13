@@ -143,6 +143,13 @@ __global__ void zero_node_forces_IBM3D(
 	int);
 
 
+__global__ void add_force_to_cell_IBM3D(
+	node*,
+	float3,
+	int,	
+	int);
+
+
 __global__ void zero_cell_volumes_IBM3D(
     cell*,
 	int);

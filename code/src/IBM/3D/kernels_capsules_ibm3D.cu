@@ -972,6 +972,27 @@ __global__ void zero_node_forces_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to add force to nodes of one cell:
+// --------------------------------------------------------
+
+__global__ void add_force_to_cell_IBM3D(
+	node* nodes,
+	float3 f,
+	int cID,	
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		if (nodes[i].cellID == cID) {
+			nodes[i].f += f;
+		}
+	}		
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to zero cell volumes:
 // --------------------------------------------------------
 

@@ -114,11 +114,13 @@ class class_capsules_ibm3D {
 	void enforce_max_node_force(int,int);
 	void add_drag_force_to_nodes(float,int,int);
 	void add_xdir_force_to_nodes(int,int,float);
+	void add_force_to_cell(int,float3,int,int);
 	void relax_node_positions_spring(int,float,float,int,int);
 	void relax_node_positions_skalak(int,float,float,int,int);
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
 	void stepIBM_no_fluid(int,bool,int,int);
+	void stepIBM_force_one_capsule(class_scsp_D3Q19&,float3,int,int,int) ;
 	void stepIBM_sheets(class_scsp_D3Q19&,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
@@ -148,6 +150,7 @@ class class_capsules_ibm3D {
 	void sheet_geometry_analysis(int);
 	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);
 	void capsule_train_fraction(float,float,int);
+	bool compare_nabor_trainIDs(int,int);
 	
 };
 

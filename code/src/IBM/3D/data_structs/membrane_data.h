@@ -60,6 +60,7 @@ struct cell {
 	int indxN0;  // starting node index for cell
 	int indxF0;  // starting face index for cell
 	int indxE0;  // starting edge index for cell
+	int trainID;
 	bool intrain;
 	float vol;
 	float vol0;
