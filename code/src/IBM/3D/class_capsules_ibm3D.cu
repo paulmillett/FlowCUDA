@@ -2321,38 +2321,13 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 	// how many nabors a capsule has in the 
 	// specified alignment (x-dir) zone.  
 	// -----------------------------------------
-	
+		
 	for (int c=0; c<nCells; c++) {
-		
-		float ix = cellsH[c].com.x;
-		float iy = cellsH[c].com.y;
-		float iz = cellsH[c].com.z;
-		
 		for (int d=0; d<nCells; d++) {
-			
-			if (d==c) continue;
-			
-			float jx = cellsH[d].com.x;
-			float jy = cellsH[d].com.y;
-			float jz = cellsH[d].com.z;
-			
-			float dx = ix - jx;
-			float dy = iy - jy;
-			float dz = iz - jz;
-			dx -= roundf(dx/Box.x)*Box.x;
-			dy -= roundf(dy/Box.y)*Box.y;
-			float r2 = dx*dx + dy*dy + dz*dz;
-			
-			if (r2 < rcut2) {
-				float theta = atan2(dy,dx)*180.0/M_PI; 
-				// check if 'c' is in front of 'd':
-				if (theta < thetacut and theta > -thetacut) numNabors[c]++;	
-				// check if 'd' is in front of 'c':
-				if (theta > (180.0-thetacut) or theta < (-180+thetacut)) numNabors[c]++;
-			}			
-		}		
+			if (check_if_cells_are_nabors_in_train(c,d,rcut2,thetacut)) numNabors[c]++;
+		}
 	}
-	
+		
 	// -----------------------------------------
 	// Loop over the capsules to see which are 
 	// in trains.  
@@ -2371,41 +2346,14 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 		// nabor has 2 nabors, if so then include
 		// it in the train:
 		if (numNabors[c] == 1) {
-			
-			float ix = cellsH[c].com.x;
-			float iy = cellsH[c].com.y;
-			float iz = cellsH[c].com.z;
-		
 			for (int d=0; d<nCells; d++) {
-			
-				if (d==c) continue;
-			
-				float jx = cellsH[d].com.x;
-				float jy = cellsH[d].com.y;
-				float jz = cellsH[d].com.z;
-			
-				float dx = ix - jx;
-				float dy = iy - jy;
-				float dz = iz - jz;
-				dx -= roundf(dx/Box.x)*Box.x;
-				dy -= roundf(dy/Box.y)*Box.y;
-				float r2 = dx*dx + dy*dy + dz*dz;
-			
-				if (r2 < rcut2) {
-					float theta = atan2(dy,dx)*180.0/M_PI; 
-					// check if 'c' is in front of 'd':
-					if (theta < thetacut and theta > -thetacut) {
-						if (numNabors[d] >= 2) cellsH[c].intrain = true;
-					}
-					// check if 'd' is in front of 'c':
-					if (theta > (180.0-thetacut) or theta < (-180+thetacut)) { 
-						if (numNabors[d] >= 2) cellsH[c].intrain = true;
-					}					
-				}			
+				if (check_if_cells_are_nabors_in_train(c,d,rcut2,thetacut)) {
+					if (numNabors[d] >= 2) cellsH[c].intrain = true;
+				}					
 			}				
 		}		
-	}
-	
+	}	
+		
 	// -----------------------------------------
 	// Find fraction of cells in trains, and
 	// give an initial value to 'trainID'.
@@ -2429,46 +2377,20 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 	
 	bool flagNbrChange = true;
 	
-	while (flagNbrChange) {
-		
-		flagNbrChange = false;
-		
-		for (int c=0; c<nCells; c++) {
-		
-			if (cellsH[c].intrain == false) continue;					
-						
-			float ix = cellsH[c].com.x;
-			float iy = cellsH[c].com.y;
-			float iz = cellsH[c].com.z;
-		
-			for (int d=0; d<nCells; d++) {
-			
-				if (d==c) continue;
+	while (flagNbrChange) {		
+		flagNbrChange = false;		
+		for (int c=0; c<nCells; c++) {		
+			if (cellsH[c].intrain == false) continue;			
+			for (int d=0; d<nCells; d++) {			
 				if (cellsH[d].intrain == false) continue;
-			
-				float jx = cellsH[d].com.x;
-				float jy = cellsH[d].com.y;
-				float jz = cellsH[d].com.z;
-			
-				float dx = ix - jx;
-				float dy = iy - jy;
-				float dz = iz - jz;
-				dx -= roundf(dx/Box.x)*Box.x;
-				dy -= roundf(dy/Box.y)*Box.y;
-				float r2 = dx*dx + dy*dy + dz*dz;
-			
-				if (r2 < rcut2) {
-					float theta = atan2(dy,dx)*180.0/M_PI;
-					bool flag = false;					
-					// check if 'c' is in front of 'd' or behind 'd':
-					if (theta < thetacut and theta > -thetacut) flag = compare_nabor_trainIDs(c,d); 
-					if (theta > (180.0-thetacut) or theta < (-180+thetacut)) flag = compare_nabor_trainIDs(c,d); 
+				if (check_if_cells_are_nabors_in_train(c,d,rcut2,thetacut)) {
+					bool flag = compare_nabor_trainIDs(c,d); 
 					if (flag) flagNbrChange = true;
-				}			
+				} 
 			}		
 		}		
-	}	 
-	
+	}
+		
 	// -----------------------------------------
 	// Count the unique number of trains.  Here,
 	// we will also compress the trainID's down,
@@ -2503,6 +2425,28 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 	
 	// average number of cells in a train:
 	float aveCellsinTrain = float(nCellsinTrain)/float(numTrains);
+		
+	// -----------------------------------------
+	// Calculate the average train length by
+	// summing up all neighboring cell separations
+	// -----------------------------------------
+	
+	float aveTrainLength = 0.0;
+		
+	for (int c=0; c<nCells; c++) {		
+		if (cellsH[c].intrain == false) continue;			
+		for (int d=0; d<c; d++) {			
+			if (cellsH[d].intrain == false) continue;
+			if (check_if_cells_are_nabors_in_train(c,d,rcut2,thetacut)) {
+				float3 dr = cellsH[c].com - cellsH[d].com;
+				dr.x -= roundf(dr.x/Box.x)*Box.x;  // PBC's in x-dir
+				dr.y -= roundf(dr.y/Box.y)*Box.y;  // PBC's in y-dir
+				aveTrainLength += length(dr);
+			}
+		}
+	}
+	
+	aveTrainLength /= float(numTrains);
 	
 	// -----------------------------------------
 	// Assign 'intrain' to 'cellType':
@@ -2521,9 +2465,38 @@ void class_capsules_ibm3D::capsule_train_fraction(float rcut, float thetacut, in
 	outfile << fixed << setprecision(4) << step << "  " 
 		                                << fracTrain << "  " 
 										<< numTrains << "  " 
-										<< aveCellsinTrain << endl;
+										<< aveCellsinTrain << "  " 
+										<< aveTrainLength  << "  "
+										<< aveTrainLength/Box.x << endl;
 	outfile.close();
 	
+}
+
+
+
+// --------------------------------------------------------
+// Determine if two cells are neighbors in a train.
+// --------------------------------------------------------
+
+bool class_capsules_ibm3D::check_if_cells_are_nabors_in_train(int i, int j, float rcut2, float thetacut)
+{
+	bool flag = false;
+	if (i != j) {
+		float dx = cellsH[i].com.x - cellsH[j].com.x;
+		float dy = cellsH[i].com.y - cellsH[j].com.y;
+		float dz = cellsH[i].com.z - cellsH[j].com.z;
+		dx -= roundf(dx/Box.x)*Box.x;  // PBC's
+		dy -= roundf(dy/Box.y)*Box.y;  // PBC's
+		float r2 = dx*dx + dy*dy + dz*dz;	
+		if (r2 < rcut2) {
+			float theta = atan2(dy,dx)*180.0/M_PI;
+			// check if 'i' is in front of 'j':
+			if (theta < thetacut and theta > -thetacut) flag = true;
+			// check if 'j' is in front of 'i':
+			if (theta > (180.0-thetacut) or theta < (-180+thetacut)) flag = true;
+		}
+	}
+	return flag;
 }
 
 

@@ -150,6 +150,7 @@ class class_capsules_ibm3D {
 	void sheet_geometry_analysis(int);
 	void subexpressions(const float,const float,const float,float&,float&,float&,float&,float&,float&);
 	void capsule_train_fraction(float,float,int);
+	bool check_if_cells_are_nabors_in_train(int,int,float,float);
 	bool compare_nabor_trainIDs(int,int);
 	
 };
