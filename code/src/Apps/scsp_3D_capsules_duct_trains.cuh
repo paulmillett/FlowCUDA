@@ -39,6 +39,9 @@ private:
 	float trainRij;
 	float trainAng;
 	float wavelength;
+	float sepMin;
+	float sepWallY;
+	float sepWallZ;
 	bool initRandom;
 	bool pulsatile;
 	std::string vtkFormat;

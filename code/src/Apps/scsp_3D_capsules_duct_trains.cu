@@ -71,6 +71,11 @@ scsp_3D_capsules_duct_trains::scsp_3D_capsules_duct_trains() : lbm(),ibm()
 	initRandom = inputParams("IBM/initRandom",1);
 	trainRij = inputParams("IBM/trainRij",2.8*a);
 	trainAng = inputParams("IBM/trainAng",15.0);
+	sepMin = inputParams("IBM/sepMin",0.9);
+	sepWallY = inputParams("IBM/sepWallY",10.0);
+	sepWallZ = inputParams("IBM/sepWallZ",1.3);
+	sepWallY += a;
+	sepWallZ += a;
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -227,16 +232,16 @@ void scsp_3D_capsules_duct_trains::initSystem()
 	
 	if (initRandom) {
 		float scale = 1.0;   // 0.7;
-		ibm.shrink_and_randomize_cells(scale,2.0,a+10.0,a+2.0);
+		ibm.shrink_and_randomize_cells(scale,sepMin,sepWallY,sepWallZ);
 		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 			
 		cout << " " << endl;
 		cout << "-----------------------------------------------" << endl;
 		cout << "Relaxing capsules..." << endl;
 		
-		//scale = 1.0/scale;
-		//ibm.relax_node_positions_skalak(90000,scale,0.1,nBlocks,nThreads);	
-		//ibm.relax_node_positions_skalak(90000,1.0,0.1,nBlocks,nThreads);
+		scale = 1.0/scale;
+		ibm.relax_node_positions_skalak(90000,scale,0.1,nBlocks,nThreads);	
+		ibm.relax_node_positions_skalak(90000,1.0,0.1,nBlocks,nThreads);
 		
 		cout << "... done relaxing" << endl;
 		cout << "-----------------------------------------------" << endl;
@@ -414,7 +419,9 @@ void scsp_3D_capsules_duct_trains::calcMembraneParams(float Re, float Ca, float 
 	if (umax > 0.03) {
 		umax = 0.03;
 		nu = umax*Dh/(2.0*Re);
-		lbm.setNu(nu); 		
+		lbm.setNu(nu);
+		cout << "  " << endl;
+		cout << "nu = " << nu << endl;	
 	}
 	bodyForx = umax*nu*M_PI*M_PI*M_PI/(16.0*w*w*infsum);
 		
