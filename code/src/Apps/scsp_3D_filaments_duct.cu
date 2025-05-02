@@ -1,5 +1,5 @@
 
-# include "scsp_3D_capsules_duct_trains.cuh"
+# include "scsp_3D_filaments_duct.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_duct_trains::scsp_3D_capsules_duct_trains() : lbm(),ibm()
+scsp_3D_filaments_duct::scsp_3D_filaments_duct() : lbm(),filams()
 {		
 	
 	// ----------------------------------------------
@@ -34,9 +34,14 @@ scsp_3D_capsules_duct_trains::scsp_3D_capsules_duct_trains() : lbm(),ibm()
 	// GPU parameters:
 	// ----------------------------------------------
 	
+	int sizeFIL = filams.get_max_array_size();	
+	int sizeMAX = max(nVoxels,sizeFIL);	
 	nThreads = inputParams("GPU/nThreads",512);
-	nBlocks = (nVoxels+(nThreads-1))/nThreads;  // integer division
+	nBlocks = (sizeMAX+(nThreads-1))/nThreads;  // integer division
 	
+	cout << "largest array size = " << sizeMAX << endl;
+	cout << "nBlocks = " << nBlocks << ", nThreads = " << nThreads << endl;
+		
 	// ----------------------------------------------
 	// time parameters:
 	// ----------------------------------------------
@@ -51,38 +56,30 @@ scsp_3D_capsules_duct_trains::scsp_3D_capsules_duct_trains() : lbm(),ibm()
 	nu = inputParams("LBM/nu",0.1666666);
 	bodyForx = inputParams("LBM/bodyForx",0.0);
 	float Re = inputParams("LBM/Re",2.0);
-	pulsatile_shift_updown = inputParams("LBM/pulsatile_shift_updown",0.0);  // = 0 (oscillatory flow); = 1 (shifts upward 1 amplitude)
 	umax = inputParams("LBM/umax",0.1);
-	pulsatile = inputParams("LBM/pulsatile",0);
-	wavelength = inputParams("LBM/wavelength",100000.0);  // for pulsatile flow
-	
+		
 	// ----------------------------------------------
-	// Immersed-Boundary parameters:
+	// Filaments Immersed-Boundary parameters:
 	// ----------------------------------------------
-	
-	int nNodesPerCell = inputParams("IBM/nNodesPerCell",0);
-	nCells = inputParams("IBM/nCells",1);
-	nNodes = nNodesPerCell*nCells;
-	a = inputParams("IBM/a",10.0);
-	float Ca = inputParams("IBM/Ca",1.0);
-	float ksmax = inputParams("IBM/ksmax",0.002);
-	gam = inputParams("IBM/gamma",0.1);
-	ibmFile = inputParams("IBM/ibmFile","sphere.dat");
-	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
-	initRandom = inputParams("IBM/initRandom",1);
-	trainRij = inputParams("IBM/trainRij",2.8*a);
-	trainAng = inputParams("IBM/trainAng",15.0);
-	sepMin = inputParams("IBM/sepMin",0.9);
-	sepWallY = inputParams("IBM/sepWallY",10.0);
-	sepWallZ = inputParams("IBM/sepWallZ",1.3);
-	sepWallY += a;
-	sepWallZ += a;
+		
+	int nBeadsPerFilam = inputParams("IBM_FILAMS/nBeadsPerFilam",0);
+	nFilams = inputParams("IBM_FILAMS/nFilams",1);
+	ks = inputParams("IBM_FILAMS/ks",0.1);
+	kb = inputParams("IBM_FILAMS/kb",0.0);
+	fp = inputParams("IBM_FILAMS/fp",0.0);
+	L0 = inputParams("IBM_FILAMS/L0",0.5);
+	Pe = inputParams("IBM_FILAMS/Pe",0.0);
+	PL = inputParams("IBM_FILAMS/PL",1.0);  // non-dimensional persistence length
+	kT = inputParams("IBM_FILAMS/kT",0.0);
+	gam = inputParams("IBM_FILAMS/gamma",0.1);
+	nBeads = nBeadsPerFilam*nFilams;
+	Lfil = float(nBeadsPerFilam)*L0;
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	ibm.set_pbcFlag(1,0,0);
+	filams.set_pbcFlag(1,0,0);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -94,30 +91,38 @@ scsp_3D_capsules_duct_trains::scsp_3D_capsules_duct_trains() : lbm(),ibm()
 	// output parameters:
 	// ----------------------------------------------
 	
-	vtkFormat = inputParams("Output/format","polydata");
 	iskip = inputParams("Output/iskip",1);
 	jskip = inputParams("Output/jskip",1);
 	kskip = inputParams("Output/kskip",1);
 	nVTKOutputs = inputParams("Output/nVTKOutputs",0);
 	precision = inputParams("Output/precision",3);
-	
+		
 	// ----------------------------------------------
 	// allocate array memory (host & device):
 	// ----------------------------------------------
 	
 	lbm.allocate();
 	lbm.allocate_forces();
-	ibm.allocate();	
+	filams.allocate();	
 	
 	// ----------------------------------------------
-	// determine membrane parameters (see function
-	// below), then calculate reference flux for no
-	// capsules:
+	// calculate body-force depending on Re:
 	// ----------------------------------------------
 	
-	calcMembraneParams(Re,Ca,ksmax);
-	calcRefFlux();
-	Q0 = inputParams("LBM/Q0",0.0);
+	float w = float(Ny)/2.0;
+	float h = float(Nz)/2.0;	
+	float Dh = 4.0*(4.0*w*h)/(4.0*(w+h));
+	float infsum = calcInfSum(w,h);	
+	umax = 2.0*Re*nu/Dh;      //Re*nu/h;
+	// modify if umax is too high due to high Re:
+	if (umax > 0.03) {
+		umax = 0.03;
+		nu = umax*Dh/(2.0*Re);
+		lbm.setNu(nu);
+		cout << "  " << endl;
+		cout << "nu = " << nu << endl;	
+	}
+	bodyForx = umax*nu*M_PI*M_PI*M_PI/(16.0*w*w*infsum);
 	
 }
 
@@ -127,10 +132,10 @@ scsp_3D_capsules_duct_trains::scsp_3D_capsules_duct_trains() : lbm(),ibm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_capsules_duct_trains::~scsp_3D_capsules_duct_trains()
+scsp_3D_filaments_duct::~scsp_3D_filaments_duct()
 {
 	lbm.deallocate();
-	ibm.deallocate();	
+	filams.deallocate();
 }
 
 
@@ -139,7 +144,7 @@ scsp_3D_capsules_duct_trains::~scsp_3D_capsules_duct_trains()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_capsules_duct_trains::initSystem()
+void scsp_3D_filaments_duct::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -148,7 +153,7 @@ void scsp_3D_capsules_duct_trains::initSystem()
 	
 	GetPot inputParams("input.dat");
 	string latticeSource = inputParams("Lattice/source","box");	
-		
+	
 	// ----------------------------------------------
 	// create the lattice for channel flow:
 	// ----------------------------------------------		
@@ -162,118 +167,91 @@ void scsp_3D_capsules_duct_trains::initSystem()
 	lbm.stream_index_pull();
 			
 	// ----------------------------------------------			
-	// initialize velocities: 
+	// initialize macros: 
 	// ----------------------------------------------
-		
-	float h = float(Nz)/2.0;
 	
-	for (int k=0; k<Nz; k++) {
-		for (int j=0; j<Ny; j++) {
-			for (int i=0; i<Nx; i++) {
-				int ndx = k*Nx*Ny + j*Nx + i;
-				lbm.setU(ndx,0.0);
-				lbm.setV(ndx,0.0);
-				lbm.setW(ndx,0.0);
-				lbm.setR(ndx,1.0);
-			}
-		}
+	for (int i=0; i<nVoxels; i++) {
+		lbm.setU(i,0.0);
+		lbm.setV(i,0.0);
+		lbm.setW(i,0.0);
+		lbm.setR(i,1.0);		
 	}
 	
 	// ----------------------------------------------			
-	// initialize immersed boundary info: 
-	// ----------------------------------------------
-		
-	ibm.read_ibm_information(ibmFile);
-	ibm.duplicate_cells();
-	ibm.assign_cellIDs_to_nodes();
-	ibm.assign_refNode_to_cells();	
-	
-	// ----------------------------------------------			
-	// rescale capsule sizes for normal distribution: 
+	// initialize filament immersed boundary info: 
 	// ----------------------------------------------
 	
-	cellSizes = inputParams("IBM/cellSizes","uniform");
-	float stddevA = inputParams("IBM/stddevA",0.0);
-	ibm.rescale_cell_radii(a,stddevA,cellSizes);	
-					
+	filams.create_first_filament();
+	filams.duplicate_filaments();
+	filams.assign_filamIDs_to_beads();
+	
+	fp = Pe*kT/Lfil/Lfil;
+	//kb = PL*kT;
+	up = fp*L0/gam;  // active velocity per bead
+	filams.set_ks(ks);
+	filams.set_kb(kb);
+	filams.set_fp(fp);
+	filams.set_up(up);
+	filams.set_filams_radii(0.5);
+	cout << "  " << endl;
+	cout << "Filament kT = " << kT << endl;
+	cout << "Filament ks = " << ks << endl;
+	cout << "Filament kb = " << kb << endl;
+	cout << "Filament fp = " << fp << endl;
+	cout << "Filament up = " << up << endl;
+			
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
 	
-	ibm.build_binMap(nBlocks,nThreads); 
+	filams.build_binMap(nBlocks,nThreads);
 		
 	// ----------------------------------------------		
 	// copy arrays from host to device: 
 	// ----------------------------------------------
 	
 	lbm.memcopy_host_to_device();
-	ibm.memcopy_host_to_device();
+	filams.memcopy_host_to_device();
 		
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
 	lbm.initial_equilibrium(nBlocks,nThreads);	
-	
-	// ----------------------------------------------
-	// calculate rest geometries for membrane: 
-	// ----------------------------------------------
-	
-	ibm.rest_geometries_skalak(nBlocks,nThreads);
-	
+		
 	// ----------------------------------------------
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	srand(time(NULL));
+	//srand(time(NULL));
 	
 	// ----------------------------------------------
-	// shrink and randomly disperse cells: 
+	// randomly disperse filaments: 
 	// ----------------------------------------------
-	
-	if (initRandom) {
-		float scale = 1.0;   // 0.7;
-		ibm.shrink_and_randomize_cells(scale,sepMin,sepWallY,sepWallZ);
-		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
-			
-		cout << " " << endl;
-		cout << "-----------------------------------------------" << endl;
-		cout << "Relaxing capsules..." << endl;
 		
-		scale = 1.0/scale;
-		ibm.relax_node_positions_skalak(90000,scale,0.1,nBlocks,nThreads);	
-		ibm.relax_node_positions_skalak(90000,1.0,0.1,nBlocks,nThreads);
+	//filams.randomize_filaments(Lfil+2.0);
+	filams.randomize_filaments_xdir_alligned(4.0);
 		
-		cout << "... done relaxing" << endl;
-		cout << "-----------------------------------------------" << endl;
-		cout << " " << endl;	
-		
-	}
-	
-	
-	// ----------------------------------------------
-	// line up cells in a single-file line: 
-	// ----------------------------------------------
-	
-	if (!initRandom) {
-		float cellSpacingX = inputParams("IBM/cellSpacingX",float(Nx));
-		float offsetY = inputParams("IBM/offsetY",0.0);
-		ibm.single_file_cells(Nx,Ny,Nz,cellSpacingX,offsetY);		
-	}
-	
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
 	
-	ibm.memcopy_device_to_host();
+	filams.memcopy_device_to_host();
 	writeOutput("macros",0);
 	
 	// ----------------------------------------------
 	// set IBM velocities & forces to zero: 
 	// ----------------------------------------------
 	
-	ibm.zero_velocities_forces(nBlocks,nThreads);
+	filams.zero_bead_velocities_forces(nBlocks,nThreads);
 	
+	// ----------------------------------------------
+	// initialize cuRand state for the thermal noise
+	// force:
+	// ----------------------------------------------
+	
+	filams.initialize_cuRand(nBlocks,nThreads);
+		
 }
 
 
@@ -284,7 +262,7 @@ void scsp_3D_capsules_duct_trains::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_capsules_duct_trains::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_filaments_duct::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -305,10 +283,10 @@ void scsp_3D_capsules_duct_trains::cycleForward(int stepsPerCycle, int currentCy
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			ibm.stepIBM(lbm,nBlocks,nThreads);
+			filams.stepIBM_Euler(lbm,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
-			cudaDeviceSynchronize();					
+			lbm.stream_collide_save_forcing(nBlocks,nThreads);
+			cudaDeviceSynchronize();
 		}
 		cout << " " << endl;
 		cout << "... done equilibrating!" << endl;
@@ -322,14 +300,10 @@ void scsp_3D_capsules_duct_trains::cycleForward(int stepsPerCycle, int currentCy
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		// if pulsatile flow, calculate bodyforce:
-		float bodyForxPul = bodyForx;
-		if (pulsatile) bodyForxPul *= sin(2*M_PI*float(cummulativeSteps)/wavelength) + pulsatile_shift_updown;
-		// update IBM & LBM:
-		ibm.stepIBM(lbm,nBlocks,nThreads);
-		lbm.add_body_force(bodyForxPul,0.0,0.0,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
-		cudaDeviceSynchronize();				
+		filams.stepIBM_Euler(lbm,nBlocks,nThreads);
+		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		cudaDeviceSynchronize();
 	}
 	
 	cout << cummulativeSteps << endl;	
@@ -339,7 +313,7 @@ void scsp_3D_capsules_duct_trains::cycleForward(int stepsPerCycle, int currentCy
 	// ----------------------------------------------
 	
 	lbm.memcopy_device_to_host();
-	ibm.memcopy_device_to_host();    
+	filams.memcopy_device_to_host();    
 	
 	// ----------------------------------------------
 	// write output from this cycle:
@@ -355,99 +329,24 @@ void scsp_3D_capsules_duct_trains::cycleForward(int stepsPerCycle, int currentCy
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_capsules_duct_trains::writeOutput(std::string tagname, int step)
+void scsp_3D_filaments_duct::writeOutput(std::string tagname, int step)
 {				
-	
-	float h = float(Nz)/2.0;
-	float scale = 1.0/umax;
 	
 	if (step == 0) {
 		// only print out vtk files
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
-		ibm.write_output("ibm",step);
+		filams.write_output("filaments",step);
 	}
 	
-	if (step > 0) { 
-		// analyze membrane geometry:
-		ibm.capsule_geometry_analysis(step);
-		ibm.capsule_train_fraction(trainRij*a,trainAng,step);
-		ibm.output_capsule_data();
-	
-		// calculate relative viscosity:
-		//lbm.calculate_relative_viscosity("relative_viscosity_thru_time",Q0,step);
-		
+	if (step > 0) { 					
 		// write vtk output for LBM and IBM:
 		int intervalVTK = nSteps/nVTKOutputs;
 		if (nVTKOutputs == 0) intervalVTK = nSteps;
 		if (step%intervalVTK == 0) {
 			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
-			ibm.write_output("ibm",step);
+			filams.write_output("filaments",step);
 		}
-		
-		// print out final averaged flow profile:
-		//if (step == nSteps) {
-		//	lbm.print_flow_rate_xdir("flow_data",step);			
-		//}
 	}	
-}
-
-
-
-// --------------------------------------------------------
-// Calculate membrane elastic parameters.  Here, we
-// calculate the appropriate values of nu, ks, and bodyForx
-// that satisfy the given Re and Ca subject to the 
-// conditions that maximum u < umax and ks < ksmax:
-// --------------------------------------------------------
-
-void scsp_3D_capsules_duct_trains::calcMembraneParams(float Re, float Ca, float Ksmax)
-{
-	// 'GetPot' object containing input parameters:
-	GetPot inputParams("input.dat");
-	cellProps = inputParams("IBM/cellProps","uniform");
-	float stddevCa = inputParams("IBM/stddevCa",0.0);
-	float Kv = inputParams("IBM/kv",0.0);
-	float C = inputParams("IBM/C",2.0);
-	float rho = 1.0;
-	float h = float(Nz)/2.0;
-	float w = float(Ny)/2.0;
-	
-	// calculate umax and required body force:
-	float Dh = 4.0*(4.0*w*h)/(4.0*(w+h));
-	float infsum = calcInfSum(w,h);	
-	umax = 2.0*Re*nu/Dh;      //Re*nu/h;
-	// modify if umax is too high due to high Re:
-	if (umax > 0.03) {
-		umax = 0.03;
-		nu = umax*Dh/(2.0*Re);
-		lbm.setNu(nu);
-		cout << "  " << endl;
-		cout << "nu = " << nu << endl;	
-	}
-	bodyForx = umax*nu*M_PI*M_PI*M_PI/(16.0*w*w*infsum);
-		
-	// set the mechanical properties:
-	ibm.calculate_cell_membrane_props(Re,Ca,stddevCa,a,h,rho,umax,Kv,C,cellProps);
-}
-
-
-
-// --------------------------------------------------------
-// Calculate reference flux for the chosen values of w, h,
-// bodyForx, and nu:
-// --------------------------------------------------------
-
-void scsp_3D_capsules_duct_trains::calcRefFlux()
-{
-	// parameters:
-	float w = float(Ny);   // PBC's in y-dir
-	//float h = float(Nz-1)/2.0;
-	float h = float(Nz)/2.0;
-	Q0 = 2.0*bodyForx*h*h*h*w/3.0/nu;
-		
-	// output the results:
-	cout << "reference flux = " << Q0 << endl;
-	cout << "  " << endl;		
 }
 
 
@@ -457,7 +356,7 @@ void scsp_3D_capsules_duct_trains::calcRefFlux()
 // to velocity profile in rectanglular channel:
 // --------------------------------------------------------
 
-float scsp_3D_capsules_duct_trains::calcInfSum(float w, float h)
+float scsp_3D_filaments_duct::calcInfSum(float w, float h)
 {
 	float outval = 0.0;
 	// take first 40 terms of infinite sum
@@ -469,3 +368,10 @@ float scsp_3D_capsules_duct_trains::calcInfSum(float w, float h)
 	}
 	return outval;
 }
+
+
+
+
+
+
+

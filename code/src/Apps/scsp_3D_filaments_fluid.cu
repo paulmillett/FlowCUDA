@@ -57,7 +57,7 @@ scsp_3D_filaments_fluid::scsp_3D_filaments_fluid() : lbm(),filams()
 	shearVel = inputParams("LBM/shearVel",0.0);
 	float Re = inputParams("LBM/Re",2.0);
 	shearVel = 2.0*Re*nu/float(Nz);
-	shearVel = 0.0;
+	//shearVel = 0.0;
 	
 	// ----------------------------------------------
 	// Filaments Immersed-Boundary parameters:
@@ -66,7 +66,7 @@ scsp_3D_filaments_fluid::scsp_3D_filaments_fluid() : lbm(),filams()
 	int nBeadsPerFilam = inputParams("IBM_FILAMS/nBeadsPerFilam",0);
 	nFilams = inputParams("IBM_FILAMS/nFilams",1);
 	ks = inputParams("IBM_FILAMS/ks",0.1);
-	kb = inputParams("IBM_FILAMS/kb",0.1);
+	kb = inputParams("IBM_FILAMS/kb",0.0);
 	fp = inputParams("IBM_FILAMS/fp",0.0);
 	L0 = inputParams("IBM_FILAMS/L0",0.5);
 	Pe = inputParams("IBM_FILAMS/Pe",0.0);
@@ -168,7 +168,7 @@ void scsp_3D_filaments_fluid::initSystem()
 	filams.assign_filamIDs_to_beads();
 	
 	fp = Pe*kT/Lfil/Lfil;
-	kb = PL*kT;
+	//kb = PL*kT;
 	up = fp*L0/gam;  // active velocity per bead
 	filams.set_ks(ks);
 	filams.set_kb(kb);
@@ -205,7 +205,7 @@ void scsp_3D_filaments_fluid::initSystem()
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	srand(time(NULL));
+	//srand(time(NULL));
 	
 	// ----------------------------------------------
 	// randomly disperse filaments: 

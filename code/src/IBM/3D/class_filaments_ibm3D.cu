@@ -401,6 +401,31 @@ void class_filaments_ibm3D::randomize_filaments(float sepWall)
 
 
 // --------------------------------------------------------
+// randomize cell positions, but all oriented in x-dir:
+// --------------------------------------------------------
+
+void class_filaments_ibm3D::randomize_filaments_xdir_alligned(float sepWall)
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(bead)*nBeads, cudaMemcpyDeviceToHost);
+	
+	// assign random position and orientation to each filament:
+	for (int f=0; f<nFilams; f++) {
+		float3 shift = make_float3(0.0,0.0,0.0);
+		// get random position
+		shift.x = (float)rand()/RAND_MAX*Box.x;
+		shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
+		shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
+		shift_bead_positions(f,shift.x,shift.y,shift.z);
+	}
+	
+	// copy node positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(bead)*nBeads, cudaMemcpyHostToDevice);	
+}
+
+
+
+// --------------------------------------------------------
 // randomize cell positions and orientations:
 // --------------------------------------------------------
 
@@ -1235,11 +1260,11 @@ void class_filaments_ibm3D::compute_bead_forces_spring(int nBlocks, int nThreads
 	<<<nBlocks,nThreads>>> (beads,filams,nBeads);
 	
 	// Forth, compute propulsion and thermal forces:
-	compute_propulsion_force_IBM3D
-	<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
+	//compute_propulsion_force_IBM3D
+	//<<<nBlocks,nThreads>>> (beads,edges,filams,nEdges);
 	
-	compute_thermal_force_IBM3D
-	<<<nBlocks,nThreads>>> (beads,rngState,noisekT,nBeads);
+	//compute_thermal_force_IBM3D
+	//<<<nBlocks,nThreads>>> (beads,rngState,noisekT,nBeads);
 	
 	// Fifth, re-wrap bead coordinates:
 	wrap_bead_coordinates_IBM3D

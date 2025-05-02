@@ -926,7 +926,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 		int offst = binID*bins.binMax;
 		int occup = bins.binOccupancy[binID];
 		if (occup > bins.binMax) {
-			printf("occup = %i \n", occup);
+			printf("occup = %i, binID = %i \n", occup, binID);
 			occup = bins.binMax;
 		}
 								

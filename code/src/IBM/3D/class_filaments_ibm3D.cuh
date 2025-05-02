@@ -83,6 +83,7 @@ class class_filaments_ibm3D {
 	void shift_bead_positions(int,float,float,float);
 	void rotate_and_shift_bead_positions(int,float,float,float);
 	void randomize_filaments(float);
+	void randomize_filaments_xdir_alligned(float);
 	void randomize_filaments_inside_sphere(float,float,float,float,float);
 	float calc_separation_pbc(float3,float3);
 	void initialize_cuRand(int,int);

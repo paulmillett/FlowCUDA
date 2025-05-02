@@ -32,6 +32,7 @@ private:
 	float tau;
 	float nu;
 	float bodyForx;
+	float pulsatile_shift_updown;
 	float umax;
 	float a;
 	float gam;
