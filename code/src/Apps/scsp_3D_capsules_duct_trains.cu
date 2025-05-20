@@ -52,7 +52,7 @@ scsp_3D_capsules_duct_trains::scsp_3D_capsules_duct_trains() : lbm(),ibm()
 	bodyForx = inputParams("LBM/bodyForx",0.0);
 	float Re = inputParams("LBM/Re",2.0);
 	pulsatile_shift_updown = inputParams("LBM/pulsatile_shift_updown",0.0);  // = 0 (oscillatory flow); = 1 (shifts upward 1 amplitude)
-	umax = inputParams("LBM/umax",0.1);
+	umax = inputParams("LBM/umax",0.01);
 	pulsatile = inputParams("LBM/pulsatile",0);
 	wavelength = inputParams("LBM/wavelength",100000.0);  // for pulsatile flow
 	
