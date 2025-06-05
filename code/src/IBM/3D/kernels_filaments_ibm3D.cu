@@ -285,7 +285,7 @@ __global__ void compute_bead_force_bending_IBM3D(
 	filament* filams,
 	int nBeads)
 {		
-	// define edge:
+	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nBeads) {
