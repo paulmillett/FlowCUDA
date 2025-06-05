@@ -8,12 +8,23 @@
 # include "../../Utils/helper_math.h"
 
 
+__global__ void zero_bead_forces_fibers_IBM3D(
+	beadfiber*,	
+	int);
+
+
+__global__ void calculate_bead_velocity_fibers_IBM3D(
+	beadfiber*,	
+	float,
+	int);
+
+
 __global__ void update_rstar_fibers_IBM3D(
 	beadfiber*,
 	int);
 
 
-__global__ void update_rstar_fibers_IBM3D(
+__global__ void update_bead_positions_fibers_IBM3D(
 	beadfiber*,
 	float*,
 	float*,

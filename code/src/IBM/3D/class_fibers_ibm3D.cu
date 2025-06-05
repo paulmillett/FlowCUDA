@@ -16,6 +16,21 @@ using namespace std;
 
 
 
+// --------------------------------------------------------
+//
+// This class implements the implicit finite-difference
+// model for a flexible filament given by:
+//
+// Huang WX, Shin SJ, Sung HJ.  Simulation of flexible 
+// filaments in a uniform flow by the immersed boundary
+// method.  Journal of Computational Physics 226 (2007)
+// 2206-2228.
+// 
+// --------------------------------------------------------
+
+
+
+
 
 
 

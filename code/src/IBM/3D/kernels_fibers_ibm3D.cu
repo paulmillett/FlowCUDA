@@ -3,6 +3,57 @@
 # include <stdio.h>
 
 
+// --------------------------------------------------------
+//
+// These kernels implement the implicit finite-difference
+// model for a flexible filament given by:
+//
+// Huang WX, Shin SJ, Sung HJ.  Simulation of flexible 
+// filaments in a uniform flow by the immersed boundary
+// method.  Journal of Computational Physics 226 (2007)
+// 2206-2228.
+// 
+// --------------------------------------------------------
+
+
+
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to zero bead forces:
+// --------------------------------------------------------
+
+__global__ void zero_bead_forces_fibers_IBM3D(
+	beadfiber* beads,	
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		beads[i].f = make_float3(0.0f,0.0f,0.0f);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to zero bead forces:
+// --------------------------------------------------------
+
+__global__ void calculate_bead_velocity_fibers_IBM3D(
+	beadfiber* beads,	
+	float dt,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		beads[i].v = (beads[i].r - beads[i].rm1)/dt;
+	}
+}
+
+
 
 // --------------------------------------------------------
 // IBM3D kernel to update rstar
@@ -25,7 +76,7 @@ __global__ void update_rstar_fibers_IBM3D(
 // IBM3D kernel to update bead positions
 // --------------------------------------------------------
 
-__global__ void update_rstar_fibers_IBM3D(
+__global__ void update_bead_positions_fibers_IBM3D(
 	beadfiber* beads,
 	float* xp1,
 	float* yp1,
