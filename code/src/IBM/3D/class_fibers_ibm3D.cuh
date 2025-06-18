@@ -12,6 +12,7 @@
 # include <cuda.h>
 # include <curand.h>
 # include <curand_kernel.h>
+# include <cusparse.h>
 # include <string>
 
 
@@ -37,17 +38,34 @@ class class_fibers_ibm3D {
 	int3 pbcFlag;
 	bool binsFlag;
 	bindata bins;
+	cusparseHandle_t handle;
+	size_t bufferSizeTen;
+	size_t bufferSize;
 			
 	// host arrays:
 	beadfiber* beadsH;
 	edgefiber* edgesH;
 	fiber* fibersH;
+	float* x_h;
 		
 	// device arrays:
 	beadfiber* beads;
 	edgefiber* edges;
 	fiber* fibers;
 	curandState* rngState;
+	float* xp1;
+	float* yp1;
+	float* zp1;
+	float* AuTen;
+	float* AcTen;
+	float* AlTen;
+	float* T;
+	float* Au;
+	float* Ac;
+	float* Al;
+	void* bufferTen;
+	void* buffer;
+	
 	
 	// methods:
 	class_fibers_ibm3D();
@@ -56,6 +74,7 @@ class class_fibers_ibm3D {
 	void deallocate();	
 	void memcopy_host_to_device();
 	void memcopy_device_to_host();
+	void cuSparse_buffer_sizes();
 	void create_first_fiber();
 	void set_pbcFlag(int,int,int);
 	void set_gamma(float);
@@ -68,9 +87,18 @@ class class_fibers_ibm3D {
 	void randomize_fibers(float);
 	void randomize_fibers_xdir_alligned(float);
 	float calc_separation_pbc(float3,float3);
+	void initialize_fiber_curved();
 	void compute_wall_forces(int,int);
-	void zero_bead_velocities_forces(int,int);
+	void stepIBM(int,int);
 	void zero_bead_forces(int,int);
+	void calculate_bead_velocity(int,int);
+	void update_rstar(int,int);
+	void update_bead_positions(int,int);
+	void compute_Laplacian(int,int);
+	void compute_bending_force(int,int);
+	void compute_tension_RHS(int,int);
+	void compute_tension_tridiag(int,int);
+	void compute_bead_update_matrices(int,int);	
 	void enforce_max_bead_force(int,int);
 	void unwrap_bead_coordinates(int,int);
 	void wrap_bead_coordinates(int,int);
@@ -81,6 +109,8 @@ class class_fibers_ibm3D {
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
+	void solve_tridiagonal_tension();
+	void solve_tridiagonal_positions();
 	void write_output(std::string,int);
 	void unwrap_bead_coordinates();
 	

@@ -125,7 +125,6 @@ __global__ void compute_Laplacian_fibers_IBM3D(
 
 __global__ void compute_bending_force_fibers_IBM3D(
 	beadfiber* beads,
-	fiber* filams,
 	float dS,
 	float gam,
 	int nBeads)
@@ -188,8 +187,7 @@ __global__ void compute_tension_RHS_fibers_IBM3D(
 		float RHS3 = dot(d1rstar,d1f);
 		
 		// assign values to RHS vector for tension:
-		B[i] = RHS1 - RHS2 - RHS3;
-		
+		B[i] = RHS1 - RHS2 - RHS3;		
 	}
 }
 
@@ -284,9 +282,8 @@ __global__ void compute_tension_tridiag_fibers_IBM3D(
 // IBM3D kernel to compute bead update matrices 
 // --------------------------------------------------------
 
-__global__ void compute_bead_update_matrices_IBM3D(
+__global__ void compute_bead_update_matrices_fibers_IBM3D(
 	beadfiber* beads,
-	fiber* filams,
 	float* T,
 	float* Bx,
 	float* By,
@@ -320,10 +317,10 @@ __global__ void compute_bead_update_matrices_IBM3D(
 			Ac[i] = 1.0 + (T[e1] + T[e0])*dtdS2;
 			
 			// upper diagonal term:
-			Au[i] = -2.0*T[e1]*dtdS2;
+			Au[i] = -T[e1]*dtdS2;
 			
 			// lower diagonal term:
-			Al[i] = -2.0*T[e0]*dtdS2;
+			Al[i] = -T[e0]*dtdS2;
 		}
 				
 		// left-most bead:

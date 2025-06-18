@@ -83,7 +83,10 @@ class_fibers_ibm3D::class_fibers_ibm3D()
 	Box.y = float(N.y);
 	Box.z = float(N.z);
 	pbcFlag = make_int3(1,1,1);
-			
+	
+	// initialize cuSparse handle
+	cusparseCreate(&handle);	
+	
 	// if we need bins, do some calculations:
 	binsFlag = false;
 	if (nFibers > 1) binsFlag = true;
@@ -121,12 +124,25 @@ void class_fibers_ibm3D::allocate()
 	beadsH = (beadfiber*)malloc(nBeads*sizeof(beadfiber));
 	edgesH = (edgefiber*)malloc(nEdges*sizeof(edgefiber));
 	fibersH = (fiber*)malloc(nFibers*sizeof(fiber));
+	x_h = (float*)malloc(nBeads*sizeof(float));
 							
 	// allocate array memory (device):	
 	cudaMalloc((void **) &beads, nBeads*sizeof(beadfiber));
 	cudaMalloc((void **) &edges, nEdges*sizeof(edgefiber));
 	cudaMalloc((void **) &fibers, nFibers*sizeof(fiber));
 	cudaMalloc((void **) &rngState, nBeads*sizeof(curandState));
+	cudaMalloc((void **) &xp1, nBeads*sizeof(float));
+	cudaMalloc((void **) &yp1, nBeads*sizeof(float));
+	cudaMalloc((void **) &zp1, nBeads*sizeof(float));
+	cudaMalloc((void **) &AuTen, nEdges*sizeof(float));
+	cudaMalloc((void **) &AcTen, nEdges*sizeof(float));
+	cudaMalloc((void **) &AlTen, nEdges*sizeof(float));
+	cudaMalloc((void **) &T, nEdges*sizeof(float));
+	cudaMalloc((void **) &Au, nBeads*sizeof(float));
+	cudaMalloc((void **) &Ac, nBeads*sizeof(float));
+	cudaMalloc((void **) &Al, nBeads*sizeof(float));
+	
+	
 	if (binsFlag) {		
 		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
 		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
@@ -152,6 +168,18 @@ void class_fibers_ibm3D::deallocate()
 	cudaFree(edges);
 	cudaFree(fibers);
 	cudaFree(rngState);
+	cudaFree(xp1);
+	cudaFree(yp1);
+	cudaFree(zp1);
+	cudaFree(AuTen);
+	cudaFree(AcTen);
+	cudaFree(AlTen);
+	cudaFree(T);
+	cudaFree(Au);
+	cudaFree(Ac);
+	cudaFree(Al);
+	cudaFree(bufferTen);
+	cusparseDestroy(handle);
 	if (binsFlag) {		
 		cudaFree(bins.binMembers);
 		cudaFree(bins.binOccupancy);
@@ -185,6 +213,27 @@ void class_fibers_ibm3D::memcopy_device_to_host()
 	
 	// unwrap coordinate positions:
 	unwrap_bead_coordinates(); 
+}
+
+
+
+// --------------------------------------------------------
+// Determine cuSparse buffer sizes for tridiagonal solves:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::cuSparse_buffer_sizes()
+{
+	// buffer for tension solve:
+	int m = nEdges;
+	int n = 1;
+	cusparseStatus_t Status = cusparseSgtsv2_bufferSizeExt(handle,m,n,AlTen,AcTen,AuTen,T,m,&bufferSizeTen);
+    cudaMalloc(&bufferTen, bufferSizeTen);
+	
+	// buffer for position solve:
+	m = nBeads;
+	n = 1;
+	cusparseStatus_t Status2 = cusparseSgtsv2_bufferSizeExt(handle,m,n,Al,Ac,Au,xp1,m,&bufferSize);
+    cudaMalloc(&buffer, bufferSize);
 }
 
 
@@ -360,7 +409,7 @@ void class_fibers_ibm3D::randomize_fibers(float sepWall)
 		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
 	}
 	
-	// copy node positions from host to device:
+	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beadfiber)*nBeads, cudaMemcpyHostToDevice);	
 }
 
@@ -385,7 +434,7 @@ void class_fibers_ibm3D::randomize_fibers_xdir_alligned(float sepWall)
 		shift_bead_positions(f,shift.x,shift.y,shift.z);
 	}
 	
-	// copy node positions from host to device:
+	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beadfiber)*nBeads, cudaMemcpyHostToDevice);	
 }
 
@@ -452,6 +501,34 @@ void class_fibers_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, flo
 
 
 // --------------------------------------------------------
+// Initialize fiber with curved profile:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::initialize_fiber_curved()
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(beadfiber)*nBeads, cudaMemcpyDeviceToHost);
+	
+	// initialize fiber (if there is only one) with a curved profile:
+	if (nFibers == 1) {
+		float theta = -15.0f*M_PI/180.0f;
+		float deltatheta = -2.0f*theta/(nBeadsPerFiber - 2);
+		for (int i=1; i<nBeadsPerFiber; i++) {
+			beadsH[i].r.x = beadsH[i-1].r.x + dS*cos(theta);
+			beadsH[i].r.y = beadsH[i-1].r.y + dS*sin(theta);
+			beadsH[i].r.z = 0.0f;
+			beadsH[i].rm1 = beadsH[i].r;
+			theta += deltatheta;
+		}
+	}
+	
+	// copy bead positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(beadfiber)*nBeads, cudaMemcpyHostToDevice);
+}
+
+
+
+// --------------------------------------------------------
 // Calculate wall forces:
 // --------------------------------------------------------
 
@@ -461,6 +538,42 @@ void class_fibers_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 	if (pbcFlag.y==1 && pbcFlag.z==0) wall_forces_zdir(nBlocks,nThreads);
 	if (pbcFlag.y==0 && pbcFlag.z==0) wall_forces_ydir_zdir(nBlocks,nThreads);
 } 
+
+
+
+// --------------------------------------------------------
+// Step forward in time:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::stepIBM(int nBlocks, int nThreads)
+{
+	// zero bead forces:
+	zero_bead_forces(nBlocks,nThreads);
+	
+	// calculate r-star: 2r(n) - r(n-1):
+	update_rstar(nBlocks,nThreads);
+	
+	// calculate bead velocity:
+	calculate_bead_velocity(nBlocks,nThreads);
+	
+	// calculate bending forces:
+	compute_Laplacian(nBlocks,nThreads);
+	compute_bending_force(nBlocks,nThreads);
+	
+	// calculate tension in fibers:
+	compute_tension_RHS(nBlocks,nThreads);
+	compute_tension_tridiag(nBlocks,nThreads);
+	solve_tridiagonal_tension();
+		
+	// calculate node positions at step n+1:
+	compute_bead_update_matrices(nBlocks,nThreads);
+	solve_tridiagonal_positions();
+	
+	// update bead positions:
+	update_bead_positions(nBlocks,nThreads); 
+	
+} 
+
 
 
 
@@ -490,25 +603,25 @@ void class_fibers_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
-// Call to "zero_bead_velocities_forces_IBM3D" kernel:
+// Call to "zero_bead_forces_fibers_IBM3D" kernel:
 // --------------------------------------------------------
 
-void class_fibers_ibm3D::zero_bead_velocities_forces(int nBlocks, int nThreads)
+void class_fibers_ibm3D::zero_bead_forces(int nBlocks, int nThreads)
 {
-	//zero_bead_velocities_forces_IBM3D
-	//<<<nBlocks,nThreads>>> (beads,nBeads);
+	zero_bead_forces_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,nBeads);
 }
 
 
 
 // --------------------------------------------------------
-// Call to "zero_bead_forces_IBM3D" kernel:
+// Call to "calculate_bead_velocity_fibers_IBM3D" kernel:
 // --------------------------------------------------------
 
-void class_fibers_ibm3D::zero_bead_forces(int nBlocks, int nThreads)
+void class_fibers_ibm3D::calculate_bead_velocity(int nBlocks, int nThreads)
 {
-	//zero_bead_forces_IBM3D
-	//<<<nBlocks,nThreads>>> (beads,nBeads);
+	calculate_bead_velocity_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,dt,nBeads);
 }
 
 
@@ -517,10 +630,88 @@ void class_fibers_ibm3D::zero_bead_forces(int nBlocks, int nThreads)
 // Call to "enforce_max_node_force_IBM3D" kernel:
 // --------------------------------------------------------
 
-void class_fibers_ibm3D::enforce_max_bead_force(int nBlocks, int nThreads)
+void class_fibers_ibm3D::update_rstar(int nBlocks, int nThreads)
 {
-	//enforce_max_bead_force_IBM3D
-	//<<<nBlocks,nThreads>>> (beads,beadFmax,nBeads);
+	update_rstar_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_bead_positions_fibers_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::update_bead_positions(int nBlocks, int nThreads)
+{
+	update_bead_positions_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,xp1,yp1,zp1,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "compute_Laplacian_fibers_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::compute_Laplacian(int nBlocks, int nThreads)
+{
+	compute_Laplacian_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,dS,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "compute_bending_force_fibers_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::compute_bending_force(int nBlocks, int nThreads)
+{
+	compute_bending_force_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,dS,gam,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "compute_tension_RHS_fibers_IBM3D" kernel:
+// {Notice that we are sending the array 'T' to store the
+// RHS values of the tension equation.  This is because
+// cuSparse replaces the solution with the RHS array}
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::compute_tension_RHS(int nBlocks, int nThreads)
+{
+	compute_tension_RHS_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,edges,T,dS,dt,nEdges);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "compute_tension_tridiag_fibers_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::compute_tension_tridiag(int nBlocks, int nThreads)
+{
+	compute_tension_tridiag_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,edges,AuTen,AcTen,AlTen,dS,dt,nEdges);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "compute_bead_update_matrices_fibers_IBM3D" kernel:
+// {Notice that we are sending the arrays 'xp1', 'yp1', and 'zp1'
+// to store the RHS values of the position equation.  This is because
+// cuSparse replaces the solution with the RHS array}
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::compute_bead_update_matrices(int nBlocks, int nThreads)
+{
+	compute_bead_update_matrices_fibers_IBM3D
+	<<<nBlocks,nThreads>>> (beads,T,xp1,yp1,zp1,Au,Ac,Al,dS,dt,nBeads);
 }
 
 
@@ -661,6 +852,62 @@ void class_fibers_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 
 
 
+// **********************************************************************************************
+// Calls to CUSPARSE to solve for fiber tension and updated bead positions
+// **********************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+// --------------------------------------------------------
+// tridiagonal solve for tension in fiber:
+// {note that the solution is returned in the array 'T'
+//  which stores the RHS values before the solve}
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::solve_tridiagonal_tension()
+{
+	int m = nEdges;
+	int n = 1;
+	cusparseStatus_t Status = cusparseSgtsv2(handle,m,n,AlTen,AcTen,AuTen,T,m,bufferTen);
+	//cudaDeviceSynchronize();
+}
+
+
+
+// --------------------------------------------------------
+// tridiagonal solve for bead positions at step n+1:
+// {note that the solution is returned in the arrays 'xp1', 
+//  'yp1', and 'zp1' which store the RHS values before the solve}
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::solve_tridiagonal_positions()
+{
+	int m = nBeads;
+	int n = 1;
+	cusparseStatus_t StatusX = cusparseSgtsv2(handle,m,n,Al,Ac,Au,xp1,m,buffer);
+	cusparseStatus_t StatusY = cusparseSgtsv2(handle,m,n,Al,Ac,Au,yp1,m,buffer);
+	cusparseStatus_t StatusZ = cusparseSgtsv2(handle,m,n,Al,Ac,Au,zp1,m,buffer);
+	//cudaDeviceSynchronize();
+}
+
+
+
+
+
+
+
+
+
+
+
 
 // **********************************************************************************************
 // Analysis and Geometry calculations done by the host (CPU)
@@ -683,8 +930,8 @@ void class_fibers_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::write_output(std::string tagname, int tagnum)
 {
-	//write_vtk_immersed_boundary_3D_filaments(tagname,tagnum,
-	//nBeads,nEdges,beadsH,edgesH);
+	write_vtk_immersed_boundary_3D_fibers(tagname,tagnum,
+	nBeads,nEdges,beadsH,edgesH);
 }
 
 

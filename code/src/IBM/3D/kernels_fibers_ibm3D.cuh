@@ -40,7 +40,6 @@ __global__ void compute_Laplacian_fibers_IBM3D(
 
 __global__ void compute_bending_force_fibers_IBM3D(
 	beadfiber*,
-	fiber*,
 	float,
 	float,
 	int);
@@ -66,9 +65,8 @@ __global__ void compute_tension_tridiag_fibers_IBM3D(
 	int);
 	
 	
-__global__ void compute_bead_update_matrices_IBM3D(
+__global__ void compute_bead_update_matrices_fibers_IBM3D(
 	beadfiber*,
-	fiber*,
 	float*,
 	float*,
 	float*,
