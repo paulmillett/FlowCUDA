@@ -55,6 +55,7 @@ scsp_3D_fibers_duct::scsp_3D_fibers_duct() : lbm(),fibers()
 	
 	nu = inputParams("LBM/nu",0.1666666);
 	float Re = inputParams("LBM/Re",2.0);
+	umax = inputParams("LBM/umax",0.1);
 		
 	// ----------------------------------------------
 	// Fibers Immersed-Boundary parameters:
@@ -98,6 +99,30 @@ scsp_3D_fibers_duct::scsp_3D_fibers_duct() : lbm(),fibers()
 	fibers.allocate();	
 	
 	// ----------------------------------------------
+	// calculate body-force depending on Re:
+	// ----------------------------------------------
+	
+	float w = float(Ny)/2.0;
+	float h = float(Nz)/2.0;	
+	float Dh = 4.0*(4.0*w*h)/(4.0*(w+h));
+	float infsum = calcInfSum(w,h);	
+	umax = 2.0*Re*nu/Dh;      //Re*nu/h;
+	// modify if umax is too high due to high Re:
+	if (umax > 0.03) {
+		umax = 0.03;
+		nu = umax*Dh/(2.0*Re);
+		lbm.setNu(nu);
+		cout << "  " << endl;
+		cout << "nu = " << nu << endl;	
+	}
+	bodyForx = umax*nu*M_PI*M_PI*M_PI/(16.0*w*w*infsum);
+	cout << "  " << endl;
+	cout << "Re = " << Re << endl;
+	cout << "Body Force X-dir = " << bodyForx << endl;
+	cout << "nu = " << nu << endl;
+	cout << "  " << endl;	
+	
+	// ----------------------------------------------
 	// set up buffer sizes for cuSparse:
 	// ----------------------------------------------
 	
@@ -134,10 +159,10 @@ void scsp_3D_fibers_duct::initSystem()
 	string latticeSource = inputParams("Lattice/source","box");	
 	
 	// ----------------------------------------------
-	// create the lattice assuming shear flow.
-	// ----------------------------------------------	
+	// create the lattice for channel flow:
+	// ----------------------------------------------		
 	
-	lbm.create_lattice_box_shear();
+	lbm.create_lattice_box_channel();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -162,6 +187,7 @@ void scsp_3D_fibers_duct::initSystem()
 	
 	fibers.create_first_fiber();
 	fibers.duplicate_fibers();
+	fibers.assign_fiberIDs_to_beads();
 		
 	fibers.set_gamma(gam);
 	cout << "  " << endl;
@@ -195,9 +221,10 @@ void scsp_3D_fibers_duct::initSystem()
 	// ----------------------------------------------
 	// randomly disperse filaments: 
 	// ----------------------------------------------
-		
+	
+	fibers.randomize_fibers_xdir_alligned(4.0);	
 	//fibers.randomize_fibers(Lfib+2.0);
-	fibers.initialize_fiber_curved();
+	//fibers.initialize_fiber_curved();
 		
 	// ----------------------------------------------
 	// write initial output file:
@@ -237,7 +264,9 @@ void scsp_3D_fibers_duct::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			fibers.stepIBM(nBlocks,nThreads);
+			fibers.stepIBM(lbm,nBlocks,nThreads);
+			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+			lbm.stream_collide_save_forcing(nBlocks,nThreads);
 			cudaDeviceSynchronize();
 		}
 		cout << " " << endl;
@@ -252,7 +281,9 @@ void scsp_3D_fibers_duct::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		fibers.stepIBM(nBlocks,nThreads);
+		fibers.stepIBM(lbm,nBlocks,nThreads);
+		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+		lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
 	
@@ -285,7 +316,7 @@ void scsp_3D_fibers_duct::writeOutput(std::string tagname, int step)
 	if (step == 0) {
 		// only print out vtk files
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
-		fibers.write_output("filaments",step);
+		fibers.write_output("fibers",step);
 	}
 	
 	if (step > 0) { 					
@@ -294,12 +325,30 @@ void scsp_3D_fibers_duct::writeOutput(std::string tagname, int step)
 		if (nVTKOutputs == 0) intervalVTK = nSteps;
 		if (step%intervalVTK == 0) {
 			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
-			fibers.write_output("filaments",step);
+			fibers.write_output("fibers",step);
 		}
 	}	
 }
 
 
+
+// --------------------------------------------------------
+// Calculate infinite sum associated with solution
+// to velocity profile in rectanglular channel:
+// --------------------------------------------------------
+
+float scsp_3D_fibers_duct::calcInfSum(float w, float h)
+{
+	float outval = 0.0;
+	// take first 40 terms of infinite sum
+	for (int n = 1; n<80; n=n+2) {
+		float nf = float(n);
+		float pref = pow(-1.0,(nf-1.0)/2)/(nf*nf*nf);
+		float term = pref*(1 - 1/cosh(nf*M_PI*h/2.0/w));
+		outval += term;
+	}
+	return outval;
+}
 
 
 

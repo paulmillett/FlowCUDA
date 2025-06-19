@@ -29,7 +29,9 @@ private:
 	int iskip,jskip,kskip;
 	int precision;
 	float tau;
-	float nu;	
+	float nu;
+	float bodyForx;
+	float umax;	
 	float gam;
 	float dS;
 	float Lfib;
@@ -46,6 +48,7 @@ public:
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
+	float calcInfSum(float,float);
 	
 };
 

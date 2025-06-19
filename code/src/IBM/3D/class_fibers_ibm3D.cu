@@ -124,7 +124,6 @@ void class_fibers_ibm3D::allocate()
 	beadsH = (beadfiber*)malloc(nBeads*sizeof(beadfiber));
 	edgesH = (edgefiber*)malloc(nEdges*sizeof(edgefiber));
 	fibersH = (fiber*)malloc(nFibers*sizeof(fiber));
-	x_h = (float*)malloc(nBeads*sizeof(float));
 							
 	// allocate array memory (device):	
 	cudaMalloc((void **) &beads, nBeads*sizeof(beadfiber));
@@ -545,11 +544,15 @@ void class_fibers_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 // Step forward in time:
 // --------------------------------------------------------
 
-void class_fibers_ibm3D::stepIBM(int nBlocks, int nThreads)
+void class_fibers_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThreads)
 {
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+		
 	// zero bead forces:
 	zero_bead_forces(nBlocks,nThreads);
-	
+		
 	// calculate r-star: 2r(n) - r(n-1):
 	update_rstar(nBlocks,nThreads);
 	
@@ -559,6 +562,12 @@ void class_fibers_ibm3D::stepIBM(int nBlocks, int nThreads)
 	// calculate bending forces:
 	compute_Laplacian(nBlocks,nThreads);
 	compute_bending_force(nBlocks,nThreads);
+	
+	// calculate hydrodynamic fluid forces:
+	lbm.hydrodynamic_forces_fibers_IBM_LBM(nBlocks,nThreads,beads,nBeads); 
+	
+	// compute wall forces:
+	compute_wall_forces(nBlocks,nThreads);
 	
 	// calculate tension in fibers:
 	compute_tension_RHS(nBlocks,nThreads);
@@ -571,7 +580,7 @@ void class_fibers_ibm3D::stepIBM(int nBlocks, int nThreads)
 	
 	// update bead positions:
 	update_bead_positions(nBlocks,nThreads); 
-	
+			
 } 
 
 
@@ -722,8 +731,8 @@ void class_fibers_ibm3D::compute_bead_update_matrices(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::unwrap_bead_coordinates(int nBlocks, int nThreads)
 {
-	//unwrap_bead_coordinates_IBM3D
-	//<<<nBlocks,nThreads>>> (beads,filams,Box,pbcFlag,nBeads);
+	unwrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,fibers,Box,pbcFlag,nBeads);
 }
 
 
@@ -734,8 +743,8 @@ void class_fibers_ibm3D::unwrap_bead_coordinates(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::wrap_bead_coordinates(int nBlocks, int nThreads)
 {
-	//wrap_bead_coordinates_IBM3D
-	//<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);
+	wrap_bead_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,pbcFlag,nBeads);
 }
 
 
@@ -814,8 +823,8 @@ void class_fibers_ibm3D::nonbonded_bead_interactions(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)
 {
-	//bead_wall_forces_ydir_IBM3D
-	//<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
+	bead_wall_forces_ydir_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
 }
 
 
@@ -826,8 +835,8 @@ void class_fibers_ibm3D::wall_forces_ydir(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::wall_forces_zdir(int nBlocks, int nThreads)
 {
-	//bead_wall_forces_zdir_IBM3D
-	//<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
+	bead_wall_forces_zdir_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
 }
 
 
@@ -839,8 +848,8 @@ void class_fibers_ibm3D::wall_forces_zdir(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 {
-	//bead_wall_forces_ydir_zdir_IBM3D
-	//<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
+	bead_wall_forces_ydir_zdir_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
 }
 
 

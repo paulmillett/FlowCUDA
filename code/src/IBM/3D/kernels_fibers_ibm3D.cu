@@ -358,5 +358,298 @@ __global__ void compute_bead_update_matrices_fibers_IBM3D(
 
 
 
+// --------------------------------------------------------
+// IBM3D kernel to calculate hydrodynamic force between
+// IBM fiber bead and LBM fluid
+// --------------------------------------------------------
+
+__global__ void hydrodynamic_force_bead_fluid_IBM3D(
+	beadfiber* beads,
+	float* fxLBM,
+	float* fyLBM,
+	float* fzLBM,
+	float* uLBM,
+	float* vLBM,
+	float* wLBM,
+	float dt,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nBeads) {
+				
+		// --------------------------------------
+		// find nearest LBM voxel (rounded down)
+		// --------------------------------------
+		
+		int i0 = int(floor(beads[i].r.x));
+		int j0 = int(floor(beads[i].r.y));
+		int k0 = int(floor(beads[i].r.z));
+		
+		// --------------------------------------
+		// loop over footprint to get 
+		// interpolated LBM velocity:
+		// --------------------------------------
+				
+		float vxLBMi = 0.0;
+		float vyLBMi = 0.0;
+		float vzLBMi = 0.0;		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = bead_fiber_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = beads[i].r.x - float(ii);
+					float ry = beads[i].r.y - float(jj);
+					float rz = beads[i].r.z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					vxLBMi += del*uLBM[ndx];
+					vyLBMi += del*vLBM[ndx];
+					vzLBMi += del*wLBM[ndx];				
+				}
+			}
+		}
+		
+		// --------------------------------------
+		// calculate hydrodynamic forces & add them
+		// to IBM bead forces:
+		// --------------------------------------
+				
+		float vfx = (vxLBMi - beads[i].v.x)/dt;
+		float vfy = (vyLBMi - beads[i].v.y)/dt;
+		float vfz = (vzLBMi - beads[i].v.z)/dt;
+		beads[i].f.x += vfx;
+		beads[i].f.y += vfy;
+		beads[i].f.z += vfz;
+		
+		if (i == 0) printf("fxf = %f, fyf = %f, fzf = %f \n", vfx, vfy, vfz);
+		
+		// --------------------------------------
+		// distribute the !negative! of the 
+		// hydrodynamic bead force to the LBM
+		// fluid (it is assumed that the thermal and
+		// the propulsion forces have already been 
+		// calculated):
+		// --------------------------------------
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = bead_fiber_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = beads[i].r.x - float(ii);
+					float ry = beads[i].r.y - float(jj);
+					float rz = beads[i].r.z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],-del*vfx);
+					atomicAdd(&fyLBM[ndx],-del*vfy);
+					atomicAdd(&fzLBM[ndx],-del*vfz);				
+				}
+			}
+		}
+				
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to determine 1D index from 3D indices:
+// --------------------------------------------------------
+
+__device__ inline int bead_fiber_voxel_ndx(
+	int i,
+	int j,
+	int k,
+	int Nx,
+	int Ny,
+	int Nz)
+{
+    if (i < 0) i += Nx;
+    if (i >= Nx) i -= Nx;
+    if (j < 0) j += Ny;
+    if (j >= Ny) j -= Ny;
+    if (k < 0) k += Nz;
+    if (k >= Nz) k -= Nz;
+    return k*Nx*Ny + j*Nx + i;	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to unwrap bead coordinates.  Here, the
+// beads of a filament are brought back close to the bead's 
+// headBead.  This is done to avoid complications with
+// PBCs:
+// --------------------------------------------------------
+
+__global__ void unwrap_bead_coordinates_IBM3D(
+	beadfiber* beads,
+	fiber* fibers,
+	float3 Box,
+	int3 pbcFlag,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		int f = beads[i].fiberID;
+		int j = fibers[f].headBead;
+		float3 rij = beads[j].r - beads[i].r;		
+		beads[i].r = beads[i].r + roundf(rij/Box)*Box*pbcFlag; // PBC's
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to wrap bead coordinates for PBCs:
+// --------------------------------------------------------
+
+__global__ void wrap_bead_coordinates_IBM3D(
+	beadfiber* beads,
+	float3 Box,
+	int3 pbcFlag,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {	
+		beads[i].r = beads[i].r - floorf(beads[i].r/Box)*Box*pbcFlag;		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void bead_wall_forces_ydir_IBM3D(
+	beadfiber* beads,
+	float3 Box,
+	float repA,
+	float repD,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float yi = beads[i].r.y;
+		// bottom wall
+		if (yi < d) {
+			const float force = A/pow(yi,2) - A/pow(d,2);
+			beads[i].f.y += force;
+			if (yi < 0.0001) beads[i].r.y = 0.0001;
+		}
+		// top wall
+		else if (yi > (Box.y-1.0)-d) {
+			const float bmyi = (Box.y-1.0) - yi;
+			const float force = A/pow(bmyi,2) - A/pow(d,2);
+			beads[i].f.y -= force;
+			if (yi > Box.y-1.0001) beads[i].r.y = Box.y-1.0001;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void bead_wall_forces_zdir_IBM3D(
+	beadfiber* beads,
+	float3 Box,
+	float repA,
+	float repD,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float zi = beads[i].r.z;
+		// bottom wall
+		if (zi < d) {
+			const float force = A/pow(zi,2) - A/pow(d,2);
+			beads[i].f.z += force;
+			if (zi < 0.0001) beads[i].r.z = 0.0001;
+		}
+		// top wall
+		else if (zi > (Box.z-1.0)-d) {
+			const float bmzi = (Box.z-1.0) - zi;
+			const float force = A/pow(bmzi,2) - A/pow(d,2);
+			beads[i].f.z -= force;
+			if (zi > Box.z-1.0001) beads[i].r.z = Box.z-1.0001;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void bead_wall_forces_ydir_zdir_IBM3D(
+	beadfiber* beads,
+	float3 Box,
+	float repA,
+	float repD,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float yi = beads[i].r.y;
+		const float zi = beads[i].r.z;
+		// bottom wall
+		if (yi < d) {
+			const float force = A/pow(yi,2) - A/pow(d,2);
+			beads[i].f.y += force;
+			if (yi < 0.0001) beads[i].r.y = 0.0001;
+		}
+		// top wall
+		else if (yi > (Box.y-1.0)-d) {
+			const float bmyi = (Box.y-1.0) - yi;
+			const float force = A/pow(bmyi,2) - A/pow(d,2);
+			beads[i].f.y -= force;
+			if (yi > Box.y-1.0001) beads[i].r.y = Box.y-1.0001;
+		}
+		// back wall
+		if (zi < d) {
+			const float force = A/pow(zi,2) - A/pow(d,2);
+			beads[i].f.z += force;
+			if (zi < 0.0001) beads[i].r.z = 0.0001;
+		}
+		// front wall
+		else if (zi > (Box.z-1.0)-d) {
+			const float bmzi = (Box.z-1.0) - zi;
+			const float force = A/pow(bmzi,2) - A/pow(d,2);
+			beads[i].f.z -= force;
+			if (zi > Box.z-1.0001) beads[i].r.z = Box.z-1.0001;
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 

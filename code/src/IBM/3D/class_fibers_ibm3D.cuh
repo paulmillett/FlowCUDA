@@ -46,7 +46,6 @@ class class_fibers_ibm3D {
 	beadfiber* beadsH;
 	edgefiber* edgesH;
 	fiber* fibersH;
-	float* x_h;
 		
 	// device arrays:
 	beadfiber* beads;
@@ -89,7 +88,7 @@ class class_fibers_ibm3D {
 	float calc_separation_pbc(float3,float3);
 	void initialize_fiber_curved();
 	void compute_wall_forces(int,int);
-	void stepIBM(int,int);
+	void stepIBM(class_scsp_D3Q19&,int,int);
 	void zero_bead_forces(int,int);
 	void calculate_bead_velocity(int,int);
 	void update_rstar(int,int);

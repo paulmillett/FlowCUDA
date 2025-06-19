@@ -78,6 +78,69 @@ __global__ void compute_bead_update_matrices_fibers_IBM3D(
 	float,
 	int);
 		
+
+__global__ void hydrodynamic_force_bead_fluid_IBM3D(
+	beadfiber*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float,
+	int,
+	int,
+	int,
+	int);
+	
+	
+__device__ inline int bead_fiber_voxel_ndx(
+	int,
+	int,
+	int,
+	int,
+	int,
+	int);
 		
+
+__global__ void unwrap_bead_coordinates_IBM3D(
+	beadfiber*,
+	fiber*,
+	float3,
+	int3,
+	int);
+
+
+__global__ void wrap_bead_coordinates_IBM3D(
+	beadfiber*,	
+	float3,
+	int3,
+	int);
+
+
+__global__ void bead_wall_forces_ydir_IBM3D(
+	beadfiber*,
+	float3,
+	float,
+	float,
+	int);
+
+
+__global__ void bead_wall_forces_zdir_IBM3D(
+	beadfiber*,
+	float3,
+	float,
+	float,
+	int);
+
+
+__global__ void bead_wall_forces_ydir_zdir_IBM3D(
+	beadfiber*,
+	float3,
+	float,
+	float,
+	int);
+
+	
 
 # endif  // KERNELS_FIBERS_IBM3D_H
