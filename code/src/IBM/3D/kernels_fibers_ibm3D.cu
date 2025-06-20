@@ -66,7 +66,7 @@ __global__ void update_rstar_fibers_IBM3D(
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
-		beads[i].rstar = 2*beads[i].r - beads[i].rm1;		
+		beads[i].rstar = 2*beads[i].r - beads[i].rm1;			
 	}
 }
 
@@ -418,14 +418,12 @@ __global__ void hydrodynamic_force_bead_fluid_IBM3D(
 		// to IBM bead forces:
 		// --------------------------------------
 				
-		float vfx = (vxLBMi - beads[i].v.x)/dt;
-		float vfy = (vyLBMi - beads[i].v.y)/dt;
-		float vfz = (vzLBMi - beads[i].v.z)/dt;
+		float vfx = 0.01*(vxLBMi - beads[i].v.x)/dt;
+		float vfy = 0.01*(vyLBMi - beads[i].v.y)/dt;
+		float vfz = 0.01*(vzLBMi - beads[i].v.z)/dt;
 		beads[i].f.x += vfx;
 		beads[i].f.y += vfy;
 		beads[i].f.z += vfz;
-		
-		if (i == 0) printf("fxf = %f, fyf = %f, fzf = %f \n", vfx, vfy, vfz);
 		
 		// --------------------------------------
 		// distribute the !negative! of the 
@@ -497,8 +495,10 @@ __global__ void unwrap_bead_coordinates_IBM3D(
 	if (i < nBeads) {
 		int f = beads[i].fiberID;
 		int j = fibers[f].headBead;
-		float3 rij = beads[j].r - beads[i].r;		
-		beads[i].r = beads[i].r + roundf(rij/Box)*Box*pbcFlag; // PBC's
+		float3 rij = beads[j].r - beads[i].r;
+		float3 adjust = roundf(rij/Box)*Box*pbcFlag;
+		beads[i].r = beads[i].r +  adjust;    // PBC's
+		beads[i].rm1 = beads[i].rm1 + adjust; // PBC's
 	}
 }
 
@@ -516,8 +516,10 @@ __global__ void wrap_bead_coordinates_IBM3D(
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nBeads) {	
-		beads[i].r = beads[i].r - floorf(beads[i].r/Box)*Box*pbcFlag;		
+	if (i < nBeads) {
+		float3 adjust = floorf(beads[i].r/Box)*Box*pbcFlag;
+		beads[i].r = beads[i].r - adjust;      // PBC's
+		beads[i].rm1 = beads[i].rm1 - adjust;  // PBC's 
 	}
 }
 

@@ -512,13 +512,44 @@ void class_fibers_ibm3D::initialize_fiber_curved()
 	if (nFibers == 1) {
 		float theta = -15.0f*M_PI/180.0f;
 		float deltatheta = -2.0f*theta/(nBeadsPerFiber - 2);
+		
+		beadsH[0].r = make_float3(100.0,7.5,7.5);
+		beadsH[0].rm1 = beadsH[0].r;
+		
 		for (int i=1; i<nBeadsPerFiber; i++) {
 			beadsH[i].r.x = beadsH[i-1].r.x + dS*cos(theta);
 			beadsH[i].r.y = beadsH[i-1].r.y + dS*sin(theta);
-			beadsH[i].r.z = 0.0f;
+			beadsH[i].r.z = beadsH[i-1].r.z;
 			beadsH[i].rm1 = beadsH[i].r;
 			theta += deltatheta;
 		}
+	}
+	
+	// initialize fiber (if there is only one) with a curved profile:
+	if (nFibers == 2) {
+		float theta = -15.0f*M_PI/180.0f;
+		float deltatheta = -2.0f*theta/(nBeadsPerFiber - 2);
+		
+		beadsH[0].r = make_float3(100.0,7.5,7.5);
+		beadsH[0].rm1 = beadsH[0].r;
+		
+		// first filament:		
+		for (int i=1; i<nBeadsPerFiber; i++) {
+			beadsH[i].r.x = beadsH[i-1].r.x + dS*cos(theta);
+			beadsH[i].r.y = beadsH[i-1].r.y + dS*sin(theta);
+			beadsH[i].r.z = beadsH[i-1].r.z;
+			beadsH[i].rm1 = beadsH[i].r;
+			theta += deltatheta;
+		}
+		
+		// make a copy for the second filament:
+		for (int i=nBeadsPerFiber; i<nBeads; i++) {
+			beadsH[i].r.x = beadsH[i-nBeadsPerFiber].r.x + 50.0;
+			beadsH[i].r.y = beadsH[i-nBeadsPerFiber].r.y;
+			beadsH[i].r.z = beadsH[i-nBeadsPerFiber].r.z;
+			beadsH[i].rm1 = beadsH[i].r;
+		}
+		
 	}
 	
 	// copy bead positions from host to device:
@@ -545,43 +576,51 @@ void class_fibers_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 // --------------------------------------------------------
 
 void class_fibers_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThreads)
-{
-	
+{	
 	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
-		
+	
 	// zero bead forces:
-	zero_bead_forces(nBlocks,nThreads);
-		
-	// calculate r-star: 2r(n) - r(n-1):
-	update_rstar(nBlocks,nThreads);
+	zero_bead_forces(nBlocks,nThreads);	
 	
-	// calculate bead velocity:
+	// calculate bead velocity: (r(n) - r(n-1))/dt
 	calculate_bead_velocity(nBlocks,nThreads);
-	
-	// calculate bending forces:
-	compute_Laplacian(nBlocks,nThreads);
-	compute_bending_force(nBlocks,nThreads);
-	
+		
 	// calculate hydrodynamic fluid forces:
 	lbm.hydrodynamic_forces_fibers_IBM_LBM(nBlocks,nThreads,beads,nBeads); 
 	
 	// compute wall forces:
 	compute_wall_forces(nBlocks,nThreads);
 	
+	// compute non-bonded forces:
+	// ---------------------------
+	
+	// unwrap bead coordinates:
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	
+	// calculate r-star: 2r(n) - r(n-1)
+	update_rstar(nBlocks,nThreads);
+	
+	// calculate bending forces:
+	compute_Laplacian(nBlocks,nThreads);
+	compute_bending_force(nBlocks,nThreads);
+	
 	// calculate tension in fibers:
 	compute_tension_RHS(nBlocks,nThreads);
 	compute_tension_tridiag(nBlocks,nThreads);
 	solve_tridiagonal_tension();
-		
+	
 	// calculate node positions at step n+1:
 	compute_bead_update_matrices(nBlocks,nThreads);
 	solve_tridiagonal_positions();
 	
 	// update bead positions:
 	update_bead_positions(nBlocks,nThreads); 
-			
+	
+	// re-wrap bead coordinates: 
+	wrap_bead_coordinates(nBlocks,nThreads);			
 } 
+
 
 
 
@@ -956,7 +995,8 @@ void class_fibers_ibm3D::unwrap_bead_coordinates()
 		int f = beadsH[i].fiberID;
 		int j = fibersH[f].headBead;
 		float3 rij = beadsH[j].r - beadsH[i].r;
-		beadsH[i].r = beadsH[i].r + roundf(rij/Box)*Box*pbcFlag; // PBC's		
+		beadsH[i].r = beadsH[i].r + roundf(rij/Box)*Box*pbcFlag; // PBC's
+		beadsH[i].rm1 = beadsH[i].rm1 + roundf(rij/Box)*Box*pbcFlag; // PBC's
 	}	
 }
 
