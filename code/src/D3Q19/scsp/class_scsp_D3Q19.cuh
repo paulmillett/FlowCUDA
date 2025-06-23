@@ -148,7 +148,7 @@ public:
 	void viscous_force_IBM_LBM(int,int,float,node*,int);
 	void viscous_force_filaments_IBM_LBM(int,int,float,bead*,int);
 	void hydrodynamic_forces_filaments_IBM_LBM(int,int,float,bead*,int);
-	void hydrodynamic_forces_fibers_IBM_LBM(int,int,beadfiber*,int);
+	void hydrodynamic_forces_fibers_IBM_LBM(int,int,float,beadfiber*,int);
 	void interpolate_gradient_of_velocity_rod(int,int,rod*,int);
 	void extrapolate_rod_pusher_force(int,int,rod*,beadrod*,int);
 	void extrapolate_rod_rotlet_forces(int,int,rod*,beadrod*,int);

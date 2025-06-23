@@ -371,7 +371,7 @@ __global__ void hydrodynamic_force_bead_fluid_IBM3D(
 	float* uLBM,
 	float* vLBM,
 	float* wLBM,
-	float dt,
+	float mob,
 	int Nx,
 	int Ny,
 	int Nz,
@@ -418,9 +418,9 @@ __global__ void hydrodynamic_force_bead_fluid_IBM3D(
 		// to IBM bead forces:
 		// --------------------------------------
 				
-		float vfx = 0.01*(vxLBMi - beads[i].v.x)/dt;
-		float vfy = 0.01*(vyLBMi - beads[i].v.y)/dt;
-		float vfz = 0.01*(vzLBMi - beads[i].v.z)/dt;
+		float vfx = mob*(vxLBMi - beads[i].v.x);
+		float vfy = mob*(vyLBMi - beads[i].v.y);
+		float vfz = mob*(vzLBMi - beads[i].v.z);
 		beads[i].f.x += vfx;
 		beads[i].f.y += vfy;
 		beads[i].f.z += vfz;
@@ -644,9 +644,259 @@ __global__ void bead_wall_forces_ydir_zdir_IBM3D(
 
 
 
+// --------------------------------------------------------
+// IBM3D kernel to build the binMap array:
+// --------------------------------------------------------
+
+__global__ void build_binMap_for_beads_fibers_IBM3D(
+	bindata bins)
+{
+	// define bin:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < bins.nBins) {
+	
+		// -------------------------------
+		// calculate bin's x,y,z coordinates:
+		// -------------------------------
+				
+		int binx = i/(bins.numBins.y*bins.numBins.z);
+		int biny = (i/bins.numBins.z)%bins.numBins.y;
+		int binz = i%bins.numBins.z;
+		
+		// -------------------------------
+		// determine neighboring bins:
+		// -------------------------------
+		
+		int cnt = 0;
+		int offst = i*bins.nnbins;
+		
+		for (int bx = binx-1; bx < binx+2; bx++) {
+			for (int by = biny-1; by < biny+2; by++) {
+				for (int bz = binz-1; bz < binz+2; bz++) {
+					// do not include current bin
+					if (bx==binx && by==biny && bz==binz) continue;
+					// bin index of neighbor
+					bins.binMap[offst+cnt] = bin_index_for_beads_fibers(bx,by,bz,bins.numBins);
+					// update counter
+					cnt++;
+				}
+			}
+		}		
+		
+	}	
+}
 
 
 
+// --------------------------------------------------------
+// IBM3D kernel to reset bin arrays:
+// --------------------------------------------------------
+
+__global__ void reset_bin_lists_for_beads_fibers_IBM3D(
+	bindata bins)
+{
+	// define bin:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < bins.nBins) {
+		
+		// -------------------------------
+		// reset binOccupancy[] to zero,
+		// and binMembers[] array to -1:
+		// -------------------------------
+		
+		bins.binOccupancy[i] = 0;
+		int offst = i*bins.binMax;
+		for (int k=offst; k<offst+bins.binMax; k++) {
+			bins.binMembers[k] = -1;
+		}
+		
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to assign beads to bins:
+// --------------------------------------------------------
+
+__global__ void build_bin_lists_for_beads_fibers_IBM3D(
+	beadfiber* beads,
+	bindata bins,
+	int nBeads)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {		
+		
+		// -------------------------------
+		// calculate bin ID:
+		// -------------------------------
+		
+		int binID = int(floor(beads[i].r.x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(beads[i].r.y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(beads[i].r.z/bins.sizeBins));		
+						
+		// -------------------------------
+		// update the lists:
+		// -------------------------------
+		
+		if (binID >= 0 && binID < bins.nBins) {
+			atomicAdd(&bins.binOccupancy[binID],1);
+			int offst = binID*bins.binMax;
+			for (int k=offst; k<offst+bins.binMax; k++) {
+				int flag = atomicCAS(&bins.binMembers[k],-1,i); 
+				if (flag == -1) break;  
+			}
+		}
+		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate nonbonded bead interactions
+// using the bin lists:
+// --------------------------------------------------------
+
+__global__ void nonbonded_bead_interactions_IBM3D(
+	beadfiber* beads,
+	bindata bins,
+	float repA,
+	float repD,
+	int nBeads,
+	float3 Box,	
+	int3 pbcFlag)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {		
+		
+		// -------------------------------
+		// calculate bin ID:
+		// -------------------------------
+		
+		int binID = int(floor(beads[i].r.x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(beads[i].r.y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(beads[i].r.z/bins.sizeBins));		
+		
+		// -------------------------------
+		// loop over beads in the same bin:
+		// -------------------------------
+				
+		int offst = binID*bins.binMax;
+		int occup = bins.binOccupancy[binID];
+		if (occup > bins.binMax) {
+			printf("occup = %i, binID = %i \n", occup, binID);
+			occup = bins.binMax;
+		}
+								
+		for (int k=offst; k<offst+occup; k++) {
+			int j = bins.binMembers[k];
+			if (i==j) continue;
+			if (beads[i].fiberID == beads[j].fiberID) continue;
+			//pairwise_bead_interaction_forces_WCA(i,j,repA,repD,beads,Box,pbcFlag);
+			pairwise_bead_interaction_forces(i,j,repA,repD,beads,Box,pbcFlag);		
+		}
+		
+		// -------------------------------
+		// loop over neighboring bins:
+		// -------------------------------
+		
+        for (int b=0; b<bins.nnbins; b++) {
+            // get neighboring bin ID
+			int naborbinID = bins.binMap[binID*bins.nnbins + b];
+			offst = naborbinID*bins.binMax;
+			occup = bins.binOccupancy[naborbinID];
+			if (occup > bins.binMax) occup = bins.binMax;
+			// loop over beads in this bin:
+			for (int k=offst; k<offst+occup; k++) {
+				int j = bins.binMembers[k];
+				if (beads[i].fiberID == beads[j].fiberID) continue;				
+				//pairwise_bead_interaction_forces_WCA(i,j,repA,repD,beads,Box,pbcFlag);
+				pairwise_bead_interaction_forces(i,j,repA,repD,beads,Box,pbcFlag);		
+			}
+		}
+				
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j force:
+// --------------------------------------------------------
+
+__device__ inline void pairwise_bead_interaction_forces(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	beadfiber* beads,
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = beads[i].r - beads[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	if (r < repD) {
+		// linear force repulsion
+		float force = repA - (repA/repD)*r;
+		float3 fij = force*(rij/r);
+		beads[i].f += fij;
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j force:
+// Weeks-Chandler-Anderson potential
+// --------------------------------------------------------
+
+__device__ inline void pairwise_bead_interaction_forces_WCA(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	beadfiber* beads,
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = beads[i].r - beads[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	if (r < repD) {
+		float sig = 0.8909*repD;  // this ensures F=0 is at cutoff
+		float eps = 0.001;
+		float sigor = sig/r;
+		float sigor6 = sigor*sigor*sigor*sigor*sigor*sigor;
+		float sigor12 = sigor6*sigor6;
+		float force = 24.0*eps*(2*sigor12 - sigor6)/r/r;
+		beads[i].f += force*rij;
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j force:
+// --------------------------------------------------------
+
+__device__ inline int bin_index_for_beads_fibers(
+	int i, 
+	int j,
+	int k, 
+	const int3 size)
+{
+    if (i < 0) i += size.x;
+    if (i >= size.x) i -= size.x;
+    if (j < 0) j += size.y;
+    if (j >= size.y) j -= size.y;
+    if (k < 0) k += size.z;
+    if (k >= size.z) k -= size.z;
+    return i*size.z*size.y + j*size.z + k;
+}
 
 
 

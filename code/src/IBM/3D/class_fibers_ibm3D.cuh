@@ -34,6 +34,7 @@ class class_fibers_ibm3D {
 	float repD;
 	float beadFmax;
 	float fricBead;
+	float beadMob;
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;

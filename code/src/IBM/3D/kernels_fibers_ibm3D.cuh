@@ -141,6 +141,56 @@ __global__ void bead_wall_forces_ydir_zdir_IBM3D(
 	float,
 	int);
 
+
+__global__ void build_binMap_for_beads_fibers_IBM3D(
+	bindata);
+
+
+__global__ void reset_bin_lists_for_beads_fibers_IBM3D(
+	bindata);
+
+
+__global__ void build_bin_lists_for_beads_fibers_IBM3D(
+	beadfiber*,
+	bindata,
+	int);
+
+
+__global__ void nonbonded_bead_interactions_IBM3D(
+	beadfiber*,
+	bindata,
+	float,
+	float,
+	int,
+	float3,	
+	int3);
+
+
+__device__ inline void pairwise_bead_interaction_forces(
+	const int, 
+	const int,
+	const float,
+	const float,
+	beadfiber*,
+	float3,
+	int3);
+
+
+__device__ inline void pairwise_bead_interaction_forces_WCA(
+	const int, 
+	const int,
+	const float,
+	const float,
+	beadfiber*,
+	float3,
+	int3);
+
+
+__device__ inline int bin_index_for_beads_fibers(
+	int, 
+	int,
+	int, 
+	const int3);
 	
 
 # endif  // KERNELS_FIBERS_IBM3D_H

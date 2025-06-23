@@ -222,9 +222,9 @@ void scsp_3D_fibers_duct::initSystem()
 	// randomly disperse filaments: 
 	// ----------------------------------------------
 		
-	//fibers.randomize_fibers_xdir_alligned(4.0);	
+	fibers.randomize_fibers_xdir_alligned(4.0);	
 	//fibers.randomize_fibers(Lfib+2.0);
-	fibers.initialize_fiber_curved();
+	//fibers.initialize_fiber_curved();
 		
 	// ----------------------------------------------
 	// write initial output file:

@@ -73,6 +73,7 @@ class_fibers_ibm3D::class_fibers_ibm3D()
 	repD = inputParams("IBM_FIBERS/repD",0.0);
 	beadFmax = inputParams("IBM_FIBERS/beadFmax",1000.0);
 	gam = inputParams("IBM_FIBERS/gamma",0.1);
+	beadMob = inputParams("IBM_FIBERS/beadMob",0.001);
 	fricBead = 6.0*M_PI*(1.0/6.0)*repD;  // friction coefficient per bead (assume visc=1/6)
 	
 	// domain attributes
@@ -139,8 +140,7 @@ void class_fibers_ibm3D::allocate()
 	cudaMalloc((void **) &T, nEdges*sizeof(float));
 	cudaMalloc((void **) &Au, nBeads*sizeof(float));
 	cudaMalloc((void **) &Ac, nBeads*sizeof(float));
-	cudaMalloc((void **) &Al, nBeads*sizeof(float));
-	
+	cudaMalloc((void **) &Al, nBeads*sizeof(float));	
 	
 	if (binsFlag) {		
 		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
@@ -587,13 +587,15 @@ void class_fibers_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThread
 	calculate_bead_velocity(nBlocks,nThreads);
 		
 	// calculate hydrodynamic fluid forces:
-	lbm.hydrodynamic_forces_fibers_IBM_LBM(nBlocks,nThreads,beads,nBeads); 
+	lbm.hydrodynamic_forces_fibers_IBM_LBM(nBlocks,nThreads,beadMob,beads,nBeads); 
 	
 	// compute wall forces:
 	compute_wall_forces(nBlocks,nThreads);
 	
 	// compute non-bonded forces:
-	// ---------------------------
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+	nonbonded_bead_interactions(nBlocks,nThreads);	
 	
 	// unwrap bead coordinates:
 	unwrap_bead_coordinates(nBlocks,nThreads);
@@ -794,13 +796,11 @@ void class_fibers_ibm3D::wrap_bead_coordinates(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::build_binMap(int nBlocks, int nThreads)
 {
-	/*
 	if (nFibers > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;	
-		build_binMap_for_beads_IBM3D
+		build_binMap_for_beads_fibers_IBM3D
 		<<<nBlocks,nThreads>>> (bins);		
-	}
-	*/	
+	}	
 }
 
 
@@ -811,13 +811,11 @@ void class_fibers_ibm3D::build_binMap(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 {
-	/*
 	if (nFibers > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;		
-		reset_bin_lists_for_beads_IBM3D
+		reset_bin_lists_for_beads_fibers_IBM3D
 		<<<nBlocks,nThreads>>> (bins);
 	}
-	*/	
 }
 
 
@@ -828,13 +826,11 @@ void class_fibers_ibm3D::reset_bin_lists(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 {
-	/*
 	if (nFibers > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;		
-		build_bin_lists_for_beads_IBM3D
+		build_bin_lists_for_beads_fibers_IBM3D
 		<<<nBlocks,nThreads>>> (beads,bins,nBeads);		
 	}
-	*/	
 }
 
 
@@ -845,13 +841,11 @@ void class_fibers_ibm3D::build_bin_lists(int nBlocks, int nThreads)
 
 void class_fibers_ibm3D::nonbonded_bead_interactions(int nBlocks, int nThreads)
 {
-	/*
 	if (nFibers > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
 		nonbonded_bead_interactions_IBM3D
 		<<<nBlocks,nThreads>>> (beads,bins,repA,repD,nBeads,Box,pbcFlag);
 	}
-	*/	
 }
 
 

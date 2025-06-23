@@ -879,12 +879,12 @@ void class_scsp_D3Q19::hydrodynamic_forces_filaments_IBM_LBM(int nBlocks, int nT
 //       should use nBlocks as if calling an IBM kernel.
 // --------------------------------------------------------
 
-void class_scsp_D3Q19::hydrodynamic_forces_fibers_IBM_LBM(int nBlocks, int nThreads, 
+void class_scsp_D3Q19::hydrodynamic_forces_fibers_IBM_LBM(int nBlocks, int nThreads, float beadMob,
 	                                                      beadfiber* beads, int nBeads)
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
 	hydrodynamic_force_bead_fluid_IBM3D
-	<<<nBlocks,nThreads>>> (beads,Fx,Fy,Fz,u,v,w,dt,Nx,Ny,Nz,nBeads);	
+	<<<nBlocks,nThreads>>> (beads,Fx,Fy,Fz,u,v,w,beadMob,Nx,Ny,Nz,nBeads);	
 }
 
 
