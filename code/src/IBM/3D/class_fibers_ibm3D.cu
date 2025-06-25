@@ -500,6 +500,44 @@ void class_fibers_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, flo
 
 
 // --------------------------------------------------------
+// Shift IBM start positions by specified amount:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float ysh, float zsh, float a, float b, float g)
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(beadfiber)*nBeads, cudaMemcpyDeviceToHost);
+	
+	// convert angles to radians (assumed they are sent as degrees):
+	a *= M_PI/180.0;
+	b *= M_PI/180.0;
+	g *= M_PI/180.0;
+	
+	// update node positions:
+	int istr = fibersH[fID].indxB0;
+	int iend = istr + fibersH[fID].nBeads;
+	float3 com = (beadsH[iend-1].r + beadsH[istr].r)/2.0;
+		
+	for (int i=istr; i<iend; i++) {
+		// rotate:
+		float3 rzero = beadsH[i].r - com;
+		float xrot = rzero.x*(cos(a)*cos(b)) + rzero.y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + rzero.z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
+		float yrot = rzero.x*(sin(a)*cos(b)) + rzero.y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + rzero.z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
+		float zrot = rzero.x*(-sin(b))       + rzero.y*(cos(b)*sin(g))                      + rzero.z*(cos(b)*cos(g));
+		// shift:		 
+		beadsH[i].r.x = xrot + xsh;
+		beadsH[i].r.y = yrot + ysh - 0.5;  // subtract 1/2 to account for wall boundaries
+		beadsH[i].r.z = zrot + zsh - 0.5;  // "                                         "
+		beadsH[i].rm1 = beadsH[i].r;	
+	}
+	
+	// copy bead positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(beadfiber)*nBeads, cudaMemcpyHostToDevice);	
+}
+
+
+
+// --------------------------------------------------------
 // Initialize fiber with curved profile:
 // --------------------------------------------------------
 

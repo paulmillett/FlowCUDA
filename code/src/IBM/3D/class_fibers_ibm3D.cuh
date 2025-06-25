@@ -84,6 +84,7 @@ class class_fibers_ibm3D {
 	void duplicate_fibers();	
 	void shift_bead_positions(int,float,float,float);
 	void rotate_and_shift_bead_positions(int,float,float,float);
+	void rotate_and_shift_bead_positions(int,float,float,float,float,float,float);
 	void randomize_fibers(float);
 	void randomize_fibers_xdir_alligned(float);
 	float calc_separation_pbc(float3,float3);

@@ -62,7 +62,7 @@ scsp_3D_fibers_duct::scsp_3D_fibers_duct() : lbm(),fibers()
 	// ----------------------------------------------
 		
 	int nBeadsPerFiber = inputParams("IBM_FIBERS/nBeadsPerFilam",0);
-	nFibers = inputParams("IBM_FIBERS/nfibers",1);
+	nFibers = inputParams("IBM_FIBERS/nFibers",1);
 	gam = inputParams("IBM_FIBERS/gamma",0.1);
 	dS = inputParams("IBM_FIBERS/dS",1.0);
 	nBeads = nBeadsPerFiber*nFibers;
@@ -222,10 +222,22 @@ void scsp_3D_fibers_duct::initSystem()
 	// randomly disperse filaments: 
 	// ----------------------------------------------
 		
-	fibers.randomize_fibers_xdir_alligned(4.0);	
-	//fibers.randomize_fibers(Lfib+2.0);
-	//fibers.initialize_fiber_curved();
-		
+	if (nFibers == 1) {
+		float xsh = inputParams("IBM_FIBERS/xsh",float(Nx)/2.0);
+		float ysh = inputParams("IBM_FIBERS/ysh",float(Ny)/2.0);
+		float zsh = inputParams("IBM_FIBERS/zsh",float(Nz)/2.0);
+		float alpha = inputParams("IBM_FIBERS/alpha",0.0);
+		float beta = inputParams("IBM_FIBERS/beta",0.0);
+		float gammarot = inputParams("IBM_FIBERS/gammarot",0.0);
+		fibers.rotate_and_shift_bead_positions(0,xsh,ysh,zsh,alpha,beta,gammarot);
+		//fibers.initialize_fiber_curved();
+	}
+	
+	if (nFibers > 1) {
+		fibers.randomize_fibers_xdir_alligned(4.0);	
+		//fibers.randomize_fibers(Lfib+2.0);
+	}
+			
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
