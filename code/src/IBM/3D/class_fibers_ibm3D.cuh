@@ -87,10 +87,12 @@ class class_fibers_ibm3D {
 	void rotate_and_shift_bead_positions(int,float,float,float,float,float,float);
 	void randomize_fibers(float);
 	void randomize_fibers_xdir_alligned(float);
+	void randomize_fibers_xdir_alligned_cylinder(float,float);
 	float calc_separation_pbc(float3,float3);
 	void initialize_fiber_curved();
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
+	void stepIBM_cylindrical_channel(class_scsp_D3Q19&,float,int,int);
 	void zero_bead_forces(int,int);
 	void calculate_bead_velocity(int,int);
 	void update_rstar(int,int);
@@ -110,6 +112,7 @@ class class_fibers_ibm3D {
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
+	void wall_forces_cylinder(float,int,int);
 	void solve_tridiagonal_tension();
 	void solve_tridiagonal_positions();
 	void write_output(std::string,int);

@@ -79,7 +79,7 @@ class_fibers_ibm3D::class_fibers_ibm3D()
 	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
 	N.y = inputParams("Lattice/Ny",1);
-	N.z = inputParams("Lattice/Nz",1);	
+	N.z = inputParams("Lattice/Nz",1);
 	Box.x = float(N.x);   // assume dx=1
 	Box.y = float(N.y);
 	Box.z = float(N.z);
@@ -440,6 +440,33 @@ void class_fibers_ibm3D::randomize_fibers_xdir_alligned(float sepWall)
 
 
 // --------------------------------------------------------
+// randomize fiber positions, but all oriented in x-dir:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::randomize_fibers_xdir_alligned_cylinder(float chRad, float sepWall)
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(beadfiber)*nBeads, cudaMemcpyDeviceToHost);
+	
+	// assign random position and orientation to each filament:
+	for (int f=0; f<nFibers; f++) {
+		float3 shift = make_float3(0.0,0.0,0.0);
+		// get random position
+		float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
+		float ang = (float)rand()/RAND_MAX*(2*M_PI);
+		shift.x = (float)rand()/RAND_MAX*Box.x;		
+		shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
+		shift_bead_positions(f,shift.x,shift.y,shift.z);
+	}
+	
+	// copy bead positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(beadfiber)*nBeads, cudaMemcpyHostToDevice);	
+}
+
+
+
+// --------------------------------------------------------
 // calculate separation distance using PBCs:
 // --------------------------------------------------------
 
@@ -629,6 +656,60 @@ void class_fibers_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThread
 	
 	// compute wall forces:
 	compute_wall_forces(nBlocks,nThreads);
+	
+	// compute non-bonded forces:
+	reset_bin_lists(nBlocks,nThreads);
+	build_bin_lists(nBlocks,nThreads);
+	nonbonded_bead_interactions(nBlocks,nThreads);	
+	
+	// unwrap bead coordinates:
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	
+	// calculate r-star: 2r(n) - r(n-1)
+	update_rstar(nBlocks,nThreads);
+	
+	// calculate bending forces:
+	compute_Laplacian(nBlocks,nThreads);
+	compute_bending_force(nBlocks,nThreads);
+	
+	// calculate tension in fibers:
+	compute_tension_RHS(nBlocks,nThreads);
+	compute_tension_tridiag(nBlocks,nThreads);
+	solve_tridiagonal_tension();
+	
+	// calculate node positions at step n+1:
+	compute_bead_update_matrices(nBlocks,nThreads);
+	solve_tridiagonal_positions();
+	
+	// update bead positions:
+	update_bead_positions(nBlocks,nThreads); 
+	
+	// re-wrap bead coordinates: 
+	wrap_bead_coordinates(nBlocks,nThreads);			
+} 
+
+
+
+// --------------------------------------------------------
+// Step forward in time:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::stepIBM_cylindrical_channel(class_scsp_D3Q19& lbm, float chRad, int nBlocks, int nThreads)
+{	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// zero bead forces:
+	zero_bead_forces(nBlocks,nThreads);	
+	
+	// calculate bead velocity: (r(n) - r(n-1))/dt
+	calculate_bead_velocity(nBlocks,nThreads);
+		
+	// calculate hydrodynamic fluid forces:
+	lbm.hydrodynamic_forces_fibers_IBM_LBM(nBlocks,nThreads,beadMob,beads,nBeads); 
+	
+	// compute wall forces:
+	wall_forces_cylinder(chRad,nBlocks,nThreads);
 	
 	// compute non-bonded forces:
 	reset_bin_lists(nBlocks,nThreads);
@@ -923,6 +1004,18 @@ void class_fibers_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 	<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
 }
 
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates wall forces in radial
+// direction for cylindrical channel:
+// --------------------------------------------------------
+
+void class_fibers_ibm3D::wall_forces_cylinder(float chRad, int nBlocks, int nThreads)
+{
+	bead_wall_forces_cylinder_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,chRad,repA,repD/2.0,nBeads);
+}
 
 
 

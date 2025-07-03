@@ -142,6 +142,15 @@ __global__ void bead_wall_forces_ydir_zdir_IBM3D(
 	int);
 
 
+__global__ void bead_wall_forces_cylinder_IBM3D(
+	beadfiber*,
+	float3,
+	float,
+	float,
+	float,
+	int);
+
+
 __global__ void build_binMap_for_beads_fibers_IBM3D(
 	bindata);
 

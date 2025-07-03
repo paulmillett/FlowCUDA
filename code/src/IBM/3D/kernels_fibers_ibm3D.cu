@@ -645,6 +645,48 @@ __global__ void bead_wall_forces_ydir_zdir_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void bead_wall_forces_cylinder_IBM3D(
+	beadfiber* beads,
+	float3 Box,
+	float Rad,
+	float repA,
+	float repD,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float ymid = (Box.y-1.0)/2.0;
+		const float zmid = (Box.z-1.0)/2.0;
+		const float yi = beads[i].r.y - ymid;  // distance to channel centerline
+		const float zi = beads[i].r.z - zmid;  // "                            "
+		const float ri = sqrt(yi*yi + zi*zi);
+		// radial wall		
+		if (ri > Rad - d) {
+			const float bmri = Rad - ri;
+			const float force = A/pow(bmri,2) - A/pow(d,2);
+			beads[i].f.y -= force*(yi/ri);
+			beads[i].f.z -= force*(zi/ri);
+			// if bead is too close to wall, correct it's position
+			const float RadLimit = Rad - 0.0001; 
+			if (ri > RadLimit) {
+				const float theta = atan2(zi,yi);
+				beads[i].r.y = RadLimit*cos(theta) + ymid;
+				beads[i].r.z = RadLimit*sin(theta) + zmid;
+			}
+		}				
+	}
+}
+
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to build the binMap array:
 // --------------------------------------------------------
 
