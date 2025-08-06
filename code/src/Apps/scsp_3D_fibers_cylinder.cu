@@ -123,8 +123,7 @@ scsp_3D_fibers_cylinder::scsp_3D_fibers_cylinder() : lbm(),fibers()
 	cout << "nu = " << nu << endl;
 	cout << "umax = " << umax << endl;
 	cout << "  " << endl;	
-	
-	
+		
 	// ----------------------------------------------
 	// set up buffer sizes for cuSparse:
 	// ----------------------------------------------

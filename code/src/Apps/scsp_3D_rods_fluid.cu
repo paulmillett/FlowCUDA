@@ -166,8 +166,6 @@ void scsp_3D_rods_fluid::initSystem()
 	
 	fp = Pe*kT/Lrod;
 	up = fp/gam;
-	rods.set_fp(fp);
-	rods.set_up(up);
 	rods.set_rods_radii(Drod/2.0);
 	cout << "  " << endl;
 	cout << "Rod kT = " << kT << endl;
@@ -190,7 +188,6 @@ void scsp_3D_rods_fluid::initSystem()
 	float fricT = kT/DT;
 	float noiseT = sqrt(2.0*fricT*kT);
 	rods.set_friction_coefficient_translational(fricT);
-	rods.set_noise_strength_translational(noiseT);
 	cout << "Rod fricT = " << fricT << endl;
 	cout << "Rod noiseT = " << noiseT << endl;	
 	
@@ -202,7 +199,6 @@ void scsp_3D_rods_fluid::initSystem()
 	float fricR = kT/DR;
 	float noiseR = sqrt(2.0*fricR*kT);
 	rods.set_friction_coefficient_rotational(fricR);
-	rods.set_noise_strength_rotational(noiseR);
 	cout << "Rod fricR = " << fricR << endl;
 	cout << "Rod noiseR = " << noiseR << endl;	
 	
@@ -211,10 +207,7 @@ void scsp_3D_rods_fluid::initSystem()
 	// ----------------------------------------------
 	
 	rods.build_binMap(nBlocks,nThreads);	
-	rods.shift_bead_positions(0,32.0,30.0,41.5);
-	rods.shift_bead_positions(1,32.0,35.0,41.5);	
-	
-	
+		
 	// ----------------------------------------------		
 	// copy arrays from host to device: 
 	// ----------------------------------------------
@@ -239,6 +232,7 @@ void scsp_3D_rods_fluid::initSystem()
 	// ----------------------------------------------
 		
 	//rods.randomize_rods(Lrod+2.0);
+	rods.randomize_rods_xdir_alligned_cylinder(10.0,1.0);
 	rods.set_rod_position_orientation(nBlocks,nThreads);
 		
 	// ----------------------------------------------
@@ -253,14 +247,7 @@ void scsp_3D_rods_fluid::initSystem()
 	// ----------------------------------------------
 	
 	rods.zero_bead_forces(nBlocks,nThreads);
-	
-	// ----------------------------------------------
-	// initialize cuRand state for the thermal noise
-	// force:
-	// ----------------------------------------------
-	
-	rods.initialize_cuRand(nBlocks,nThreads);
-		
+			
 }
 
 

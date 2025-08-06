@@ -791,7 +791,7 @@ __global__ void build_binMap_for_beads_IBM3D(
 	bindata bins)
 {
 	// define bin:
-	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i < bins.nBins) {
 	
 		// -------------------------------
@@ -808,7 +808,7 @@ __global__ void build_binMap_for_beads_IBM3D(
 		
 		int cnt = 0;
 		int offst = i*bins.nnbins;
-		
+			
 		for (int bx = binx-1; bx < binx+2; bx++) {
 			for (int by = biny-1; by < biny+2; by++) {
 				for (int bz = binz-1; bz < binz+2; bz++) {

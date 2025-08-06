@@ -150,8 +150,6 @@ public:
 	void hydrodynamic_forces_filaments_IBM_LBM(int,int,float,bead*,int);
 	void hydrodynamic_forces_fibers_IBM_LBM(int,int,float,beadfiber*,int);
 	void interpolate_gradient_of_velocity_rod(int,int,rod*,int);
-	void extrapolate_rod_pusher_force(int,int,rod*,beadrod*,int);
-	void extrapolate_rod_rotlet_forces(int,int,rod*,beadrod*,int);
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);
 	void calculate_relative_viscosity(std::string,float,int);

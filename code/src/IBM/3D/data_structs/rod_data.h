@@ -29,8 +29,6 @@ struct rod {
 	int nBeads;
 	int indxB0;   // starting bead index for filament
 	float rad;    // radius of bead 
-	float fp;     // propulsion force
-	float up;     // propulsion velocity
 	float3 r;     // position
 	float3 v;     // velocity
 	float3 f;     // force	

@@ -1,5 +1,5 @@
 
-# include "scsp_3D_rods_fluid_spinners.cuh"
+# include "scsp_3D_rods_cylinder.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_rods_fluid_spinners::scsp_3D_rods_fluid_spinners() : lbm(),rods()
+scsp_3D_rods_cylinder::scsp_3D_rods_cylinder() : lbm(),rods()
 {		
 	
 	// ----------------------------------------------
@@ -28,7 +28,8 @@ scsp_3D_rods_fluid_spinners::scsp_3D_rods_fluid_spinners() : lbm(),rods()
 	Q = inputParams("Lattice/Q",19);
 	Nx = inputParams("Lattice/Nx",1);
 	Ny = inputParams("Lattice/Ny",1);
-	Nz = inputParams("Lattice/Nz",1);	
+	Nz = inputParams("Lattice/Nz",1);
+	chRad = inputParams("Lattice/chRad",float(Nz-1)/2.0);	
 	
 	// ----------------------------------------------
 	// GPU parameters:
@@ -48,37 +49,32 @@ scsp_3D_rods_fluid_spinners::scsp_3D_rods_fluid_spinners() : lbm(),rods()
 	
 	nSteps = inputParams("Time/nSteps",0);
 	nStepsEquilibrate = inputParams("Time/nStepsEquilibrate",0);
-	
+		
 	// ----------------------------------------------
 	// Lattice Boltzmann parameters:
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-	shearVel = inputParams("LBM/shearVel",0.0);
 	float Re = inputParams("LBM/Re",2.0);
-	shearVel = 2.0*Re*nu/float(Nz);
-	
+	umax = inputParams("LBM/umax",0.1);
+		
 	// ----------------------------------------------
 	// Rods Immersed-Boundary parameters:
 	// ----------------------------------------------
 		
-	int nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",1);
+	int nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);
 	nRods = inputParams("IBM_RODS/nRods",1);
-	fp = inputParams("IBM_RODS/fp",0.0);
 	L0 = inputParams("IBM_RODS/L0",0.5);
-	Pe = inputParams("IBM_RODS/Pe",0.0);
-	kT = inputParams("IBM_RODS/kT",0.0);
 	gam = inputParams("IBM_RODS/gamma",0.1);
 	Drod = inputParams("IBM_RODS/diam",1.0);
 	nBeads = nBeadsPerRod*nRods;
 	Lrod = float(nBeadsPerRod)*L0;
-	if (nBeadsPerRod == 1) Lrod = Drod;
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	rods.set_pbcFlag(1,1,1);
+	rods.set_pbcFlag(1,0,0);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -102,7 +98,32 @@ scsp_3D_rods_fluid_spinners::scsp_3D_rods_fluid_spinners() : lbm(),rods()
 	
 	lbm.allocate();
 	lbm.allocate_forces();
+	lbm.allocate_solid();
 	rods.allocate();	
+	
+	// ----------------------------------------------
+	// calculate body-force depending on Re:
+	// ----------------------------------------------
+	
+	float Dh = 2.0*chRad;
+	umax = Re*nu/Dh;
+	
+	// modify if umax is too high due to high Re:
+	if (umax > 0.03) {
+		umax = 0.03;
+		nu = umax*Dh/Re;
+		lbm.setNu(nu);
+		cout << "  " << endl;
+		cout << "nu = " << nu << endl;	
+	}
+	bodyForx = umax*(4*nu)/chRad/chRad;
+	
+	cout << "  " << endl;
+	cout << "Re = " << Re << endl;
+	cout << "Body Force X-dir = " << bodyForx << endl;
+	cout << "nu = " << nu << endl;
+	cout << "umax = " << umax << endl;
+	cout << "  " << endl;	
 	
 }
 
@@ -112,7 +133,7 @@ scsp_3D_rods_fluid_spinners::scsp_3D_rods_fluid_spinners() : lbm(),rods()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_rods_fluid_spinners::~scsp_3D_rods_fluid_spinners()
+scsp_3D_rods_cylinder::~scsp_3D_rods_cylinder()
 {
 	lbm.deallocate();
 	rods.deallocate();
@@ -124,7 +145,7 @@ scsp_3D_rods_fluid_spinners::~scsp_3D_rods_fluid_spinners()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_rods_fluid_spinners::initSystem()
+void scsp_3D_rods_cylinder::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -135,10 +156,28 @@ void scsp_3D_rods_fluid_spinners::initSystem()
 	string latticeSource = inputParams("Lattice/source","box");	
 	
 	// ----------------------------------------------
-	// create the lattice assuming shear flow.
-	// ----------------------------------------------	
+	// define the solid walls:
+	// ----------------------------------------------
 	
-	lbm.create_lattice_box_periodic();
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = k*Nx*Ny + j*Nx + i;
+				int Si = 0;				
+				// set up solid walls
+				float y = float(j) - float(Ny-1)/2.0;
+				float z = float(k) - float(Nz-1)/2.0;
+				if ((y*y + z*z)/chRad/chRad > 1.0) Si = 1;				
+				lbm.setS(ndx,Si);
+			}
+		}
+	}
+	
+	// ----------------------------------------------
+	// create the lattice for channel flow:
+	// ----------------------------------------------		
+	
+	lbm.create_lattice_box_periodic_solid_walls();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -164,59 +203,59 @@ void scsp_3D_rods_fluid_spinners::initSystem()
 	rods.create_first_rod();
 	rods.duplicate_rods();
 	rods.assign_rodIDs_to_beads();
-	
-	fp = Pe*kT/Lrod;
-	up = 0.0;  //fp/gam;
-	rods.set_fp(fp);
-	rods.set_up(up);
 	rods.set_rods_radii(Drod/2.0);
-	cout << "  " << endl;
-	cout << "Rod kT = " << kT << endl;
-	cout << "Rod fp = " << fp << endl;
-	cout << "Rod up = " << up << endl;
-	
+		
 	// ----------------------------------------------			
-	// drag friction coefficients (assume spherical
-	// particle)
+	// drag friction coefficients using Broersma's
+	// relations.  See Tsay et al. J. Amer. Chem. Soc.
+	// 128:1639(2006)
 	// ----------------------------------------------
 	
 	// translational:
-	float DT = kT/(3.0*M_PI*nu*Lrod);  // diffusivity (assume fluid density = 1)
+	/*
+	float delt = log(2*Lrod/Drod);  // this is natural log
+	float g1 = 0.807 + 0.15/delt + 13.5/delt/delt - 37.0/delt/delt/delt + 22.0/delt/delt/delt/delt;
+	float g2 = -0.193 + 0.15/delt + 8.1/delt/delt - 18.0/delt/delt/delt + 9.0/delt/delt/delt/delt;
+	float pref = delt - 0.5*(g1 + g2);
+	if (pref < 1.0) pref = 1.0;
+	float DT = pref*kT/(3.0*M_PI*nu*Lrod);  // diffusivity (assume fluid density = 1)
 	float fricT = kT/DT;
-	float noiseT = sqrt(2.0*fricT*kT);
+	*/
+	float fricT = 3.37334;	 // will need to find a good approximation for this!
 	rods.set_friction_coefficient_translational(fricT);
-	rods.set_noise_strength_translational(noiseT);
 	cout << "Rod fricT = " << fricT << endl;
-	cout << "Rod noiseT = " << noiseT << endl;	
 	
 	// rotational:
-	float DR = kT/(M_PI*nu*Lrod*Lrod*Lrod);  // rotational diffusivity
+	/*
+	g1 = 1.14 + 0.2/delt + 16.0/delt/delt - 63.0/delt/delt/delt + 62.0/delt/delt/delt/delt;
+	pref = delt - g1;
+	if (pref < 0.5) pref = 0.5;
+	float DR = pref*3.0*kT/(M_PI*nu*Lrod*Lrod*Lrod);  // rotational diffusivity
 	float fricR = kT/DR;
-	float noiseR = sqrt(2.0*fricR*kT);
+	*/
+	float fricR = 12.193;   // will need to find a good approximation for this!
 	rods.set_friction_coefficient_rotational(fricR);
-	rods.set_noise_strength_rotational(noiseR);
 	cout << "Rod fricR = " << fricR << endl;
-	cout << "Rod noiseR = " << noiseR << endl;	
 	
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
-	
+		
 	rods.build_binMap(nBlocks,nThreads);	
 		
 	// ----------------------------------------------		
 	// copy arrays from host to device: 
 	// ----------------------------------------------
-	
-	lbm.memcopy_host_to_device();
+		
 	rods.memcopy_host_to_device();
+	lbm.memcopy_host_to_device();
 		
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
 	
 	lbm.initial_equilibrium(nBlocks,nThreads);	
-		
+			
 	// ----------------------------------------------
 	// set the random number seed: 
 	// ----------------------------------------------
@@ -227,7 +266,7 @@ void scsp_3D_rods_fluid_spinners::initSystem()
 	// randomly disperse filaments: 
 	// ----------------------------------------------
 		
-	rods.randomize_rods(0.0);
+	rods.randomize_rods_xdir_alligned_cylinder(chRad,1.0);
 	rods.set_rod_position_orientation(nBlocks,nThreads);
 		
 	// ----------------------------------------------
@@ -243,13 +282,9 @@ void scsp_3D_rods_fluid_spinners::initSystem()
 	
 	rods.zero_bead_forces(nBlocks,nThreads);
 	
-	// ----------------------------------------------
-	// initialize cuRand state for the thermal noise
-	// force:
-	// ----------------------------------------------
+	cout << "  " << endl;
+	cout << "Done with Initializtion" << endl;
 	
-	rods.initialize_cuRand(nBlocks,nThreads);
-		
 }
 
 
@@ -260,7 +295,7 @@ void scsp_3D_rods_fluid_spinners::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_rods_fluid_spinners::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_rods_cylinder::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -281,9 +316,10 @@ void scsp_3D_rods_fluid_spinners::cycleForward(int stepsPerCycle, int currentCyc
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler_Spinners(lbm,nBlocks,nThreads);
-			lbm.stream_collide_save_forcing(nBlocks,nThreads);
-			cudaDeviceSynchronize();	
+			rods.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
+			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
+			cudaDeviceSynchronize();
 		}
 		cout << " " << endl;
 		cout << "... done equilibrating!" << endl;
@@ -297,8 +333,9 @@ void scsp_3D_rods_fluid_spinners::cycleForward(int stepsPerCycle, int currentCyc
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		rods.stepIBM_Euler_Spinners(lbm,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing(nBlocks,nThreads);
+		rods.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
+		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 		cudaDeviceSynchronize();
 	}
 	
@@ -325,7 +362,7 @@ void scsp_3D_rods_fluid_spinners::cycleForward(int stepsPerCycle, int currentCyc
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_rods_fluid_spinners::writeOutput(std::string tagname, int step)
+void scsp_3D_rods_cylinder::writeOutput(std::string tagname, int step)
 {				
 	
 	if (step == 0) {
