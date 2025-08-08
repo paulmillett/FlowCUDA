@@ -145,6 +145,21 @@ __global__ void push_beads_into_sphere_IBM3D(
 	int);
 
 
+__global__ void hydrodynamic_force_bead_rod_IBM3D(
+	beadrod*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	float,
+	int,
+	int,
+	int,
+	int);
+
+
 __global__ void interpolate_gradient_of_velocity_rod_IBM3D(
 	rod*,
 	float*,
@@ -219,11 +234,6 @@ __device__ inline int rod_voxel_ndx(
 	int,
 	int,
 	int);
-							
-
-__device__ inline float3 fluid_torque(
-	const int,
-	rod*);
 
 
 __device__ inline float3 solve_angular_acceleration(

@@ -200,6 +200,7 @@ void class_rods_ibm3D::create_first_rod()
 		beadsH[i].r.x = 0.0 + float(i)*L0;
 		beadsH[i].r.y = 0.0;
 		beadsH[i].r.z = 0.0;
+		beadsH[i].rm1 = beadsH[i].r;
 		beadsH[i].f = make_float3(0.0f);
 		beadsH[i].rodID = 0;
 	}
@@ -304,6 +305,7 @@ void class_rods_ibm3D::duplicate_rods()
 				int ii = i + rodsH[r].indxB0;
 				beadsH[ii].r = beadsH[i].r;
 				beadsH[ii].f = beadsH[i].f;
+				beadsH[ii].rm1 = beadsH[i].rm1;
 				beadsH[ii].rodID = r;
 			}
 		}
@@ -420,6 +422,7 @@ void class_rods_ibm3D::shift_bead_positions(int fID, float xsh, float ysh, float
 		beadsH[i].r.x += xsh;
 		beadsH[i].r.y += ysh;
 		beadsH[i].r.z += zsh;
+		beadsH[i].rm1 = beadsH[i].r;
 	}
 }
 
@@ -447,7 +450,8 @@ void class_rods_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float
 		// shift:		 
 		beadsH[i].r.x = xrot + xsh;
 		beadsH[i].r.y = yrot + ysh;
-		beadsH[i].r.z = zrot + zsh;			
+		beadsH[i].r.z = zrot + zsh;
+		beadsH[i].rm1 = beadsH[i].r;		
 	}
 }
 
@@ -528,6 +532,7 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	// calculate IBM forces:
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
+	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads);
 	nonbonded_bead_interactions(nBlocks,nThreads);	
 	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);		
 	unwrap_bead_coordinates(nBlocks,nThreads);
@@ -911,7 +916,8 @@ void class_rods_ibm3D::unwrap_bead_coordinates()
 		int f = beadsH[i].rodID;
 		int j = rodsH[f].centerBead;
 		float3 rij = beadsH[j].r - beadsH[i].r;
-		beadsH[i].r = beadsH[i].r + roundf(rij/Box)*Box*pbcFlag; // PBC's		
+		beadsH[i].r = beadsH[i].r + roundf(rij/Box)*Box*pbcFlag; // PBC's
+		beadsH[i].rm1 = beadsH[i].rm1 + roundf(rij/Box)*Box*pbcFlag; // PBC's	
 	}	
 }
 

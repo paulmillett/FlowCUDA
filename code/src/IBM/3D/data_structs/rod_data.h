@@ -12,6 +12,7 @@
 struct beadrod {
 	float3 r;
 	float3 f;
+	float3 rm1;
 	int rodID;
 };
 

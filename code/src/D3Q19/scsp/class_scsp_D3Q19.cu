@@ -895,6 +895,21 @@ void class_scsp_D3Q19::hydrodynamic_forces_fibers_IBM_LBM(int nBlocks, int nThre
 //       should use nBlocks as if calling an IBM kernel.
 // --------------------------------------------------------
 
+void class_scsp_D3Q19::hydrodynamic_force_bead_rod(int nBlocks, int nThreads,
+	                                               beadrod* beads, int nBeads)
+{
+	hydrodynamic_force_bead_rod_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Fx,Fy,Fz,u,v,w,dt,Nx,Ny,Nz,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "interpolate_gradient_of_velocity_rod_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
 void class_scsp_D3Q19::interpolate_gradient_of_velocity_rod(int nBlocks, int nThreads,
 	                                                        rod* rods, int nRods)
 {
