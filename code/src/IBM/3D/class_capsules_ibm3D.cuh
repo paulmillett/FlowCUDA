@@ -38,11 +38,13 @@ class class_capsules_ibm3D {
 	float repFmax;
 	float nodeFmax;
 	float gam;
+	float chRad;
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;
 	std::string ibmUpdate;
 	std::string membraneModel;
+	std::string channelShape;
 	bindata bins;
 			
 	// host arrays:
@@ -98,6 +100,7 @@ class class_capsules_ibm3D {
 	void randomize_cells(float);
 	void shrink_and_randomize_cells(float,float,float,float);
 	void randomize_cells_above_plane(float,float,float,float);
+	void randomize_capsules_xdir_alligned_cylinder(float);
 	void define_Janus_capsule_geometry(float,float);
 	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);
@@ -119,6 +122,7 @@ class class_capsules_ibm3D {
 	void relax_node_positions_skalak(int,float,float,int,int);
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
+	void stepIBM_spring(class_scsp_D3Q19&,int,int);
 	void stepIBM_no_fluid(int,bool,int,int);
 	void stepIBM_force_one_capsule(class_scsp_D3Q19&,float3,int,int,int) ;
 	void stepIBM_sheets(class_scsp_D3Q19&,int,int);
@@ -140,6 +144,7 @@ class class_capsules_ibm3D {
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
+	void wall_forces_cylinder(float,int,int);
 	void change_cell_volume(float,int,int);
 	void scale_equilibrium_cell_size(float,int,int); 
 	void scale_edge_lengths(float,int,int);

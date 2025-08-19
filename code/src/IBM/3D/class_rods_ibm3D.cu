@@ -532,7 +532,7 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	// calculate IBM forces:
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
-	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads);
+	lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod);
 	nonbonded_bead_interactions(nBlocks,nThreads);	
 	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);		
 	unwrap_bead_coordinates(nBlocks,nThreads);

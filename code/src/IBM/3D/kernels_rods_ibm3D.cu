@@ -188,12 +188,13 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {		
-		rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
-		//rods[i].r += dt*(rods[i].f/fricT);
+		//rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
+		rods[i].r += dt*(rods[i].f/fricT);
 		tensor E = 0.5*(rods[i].gradu + transpose(rods[i].gradu));
 		tensor W = 0.5*(rods[i].gradu - transpose(rods[i].gradu));
 		float3 fltor = (identity() - dyadic(rods[i].p))*(0.88*E + W)*rods[i].p;
-		rods[i].p += dt*(fltor + cross(rods[i].t,rods[i].p)/fricR);
+		//rods[i].p += dt*(fltor + cross(rods[i].t,rods[i].p)/fricR);
+		rods[i].p += dt*(cross(rods[i].t,rods[i].p)/fricR);
 		rods[i].p = normalize(rods[i].p);			
 	}
 }
@@ -521,6 +522,7 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	float* vLBM,
 	float* wLBM,
 	float dt,
+	int nBeadsPerRod,
 	int Nx,
 	int Ny,
 	int Nz,
@@ -568,9 +570,9 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 		// --------------------------------------
 		
 		float3 velBead = (beads[i].r - beads[i].rm1)/dt;		
-		float fx = 0.1*(vxLBMi - velBead.x)/dt;
-		float fy = 0.1*(vyLBMi - velBead.y)/dt;
-		float fz = 0.1*(vzLBMi - velBead.z)/dt;
+		float fx = (vxLBMi - velBead.x)/dt/float(nBeadsPerRod);
+		float fy = (vyLBMi - velBead.y)/dt/float(nBeadsPerRod);
+		float fz = (vzLBMi - velBead.z)/dt/float(nBeadsPerRod);
 		beads[i].f.x += fx;
 		beads[i].f.y += fy;
 		beads[i].f.z += fz;

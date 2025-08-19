@@ -124,6 +124,15 @@ __global__ void wall_forces_ydir_zdir_IBM3D(
 	int);
 
 
+__global__ void wall_forces_cylinder_IBM3D(
+	node*,
+	float3,
+	float,
+	float,
+	float,
+	int);
+
+
 __device__ inline int bin_index(
 	const int, 
 	const int,

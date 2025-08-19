@@ -63,6 +63,8 @@ class_capsules_ibm3D::class_capsules_ibm3D()
 	gam = inputParams("IBM/gamma",0.1);
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	membraneModel = inputParams("IBM/membraneModel","skalak");
+	channelShape = inputParams("Lattice/channelShape","rectangle");
+	chRad = inputParams("Lattice/chRad",10.0);
 	
 	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
@@ -746,6 +748,34 @@ void class_capsules_ibm3D::randomize_cells_above_plane(float shrinkFactor, float
 
 
 // --------------------------------------------------------
+// randomize fiber positions, but all oriented in x-dir:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::randomize_capsules_xdir_alligned_cylinder(float sepWall)
+{
+	// copy node positions from device to host:
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);	
+	
+	// assign random position and orientation to each filament:
+	for (int f=0; f<nCells; f++) {
+		float3 shift = make_float3(0.0,0.0,0.0);
+		// get random position
+		float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
+		float ang = (float)rand()/RAND_MAX*(2*M_PI);
+		shift.x = (float)rand()/RAND_MAX*Box.x;		
+		shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
+		shift_node_positions(f,shift.x,shift.y,shift.z);
+	}
+	
+	// last, copy node positions from host to device:
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);
+}
+
+
+
+
+// --------------------------------------------------------
 // For Janus capsules, define the geometry by assigning
 // the faceType variable in the facesH[] array:
 // --------------------------------------------------------
@@ -956,9 +986,16 @@ void class_capsules_ibm3D::rest_geometries_FENE(int nBlocks, int nThreads)
 
 void class_capsules_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 {
-	if (pbcFlag.y==0 && pbcFlag.z==1) wall_forces_ydir(nBlocks,nThreads);
-	if (pbcFlag.y==1 && pbcFlag.z==0) wall_forces_zdir(nBlocks,nThreads);
-	if (pbcFlag.y==0 && pbcFlag.z==0) wall_forces_ydir_zdir(nBlocks,nThreads);
+	if (channelShape == "rectangle") {
+		if (pbcFlag.y==0 && pbcFlag.z==1) wall_forces_ydir(nBlocks,nThreads);
+		if (pbcFlag.y==1 && pbcFlag.z==0) wall_forces_zdir(nBlocks,nThreads);
+		if (pbcFlag.y==0 && pbcFlag.z==0) wall_forces_ydir_zdir(nBlocks,nThreads);
+	}
+	
+	if (channelShape == "cylinder") {
+		wall_forces_cylinder(chRad,nBlocks,nThreads);
+	}
+	
 } 
 
 
@@ -1090,6 +1127,77 @@ void class_capsules_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThre
 			
 		// update IBM:
 		compute_node_forces_skalak(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,nodes,nNodes);
+		update_node_positions_verlet_2(nBlocks,nThreads);
+		
+	}
+		
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::stepIBM_spring(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
+{
+	
+	// ----------------------------------------------------------
+	// the traditional IBM update, except here
+	// the forces on the IBM nodes are included to calculate the
+	// new node positions (see 'update_node_positions_verlet_1')
+	// ----------------------------------------------------------
+	
+	if (ibmUpdate == "ibm") {
+		
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+	
+		// re-build bin lists for IBM nodes:
+		if (nCells > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}		
+			
+		// update IBM:
+		compute_node_forces_spring(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_interactions(nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
+		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
+		
+	} 
+	
+	// ----------------------------------------------------------
+	//  here, the velocity-Verlet algorithm is used to update the 
+	//  node positions - using a viscous drag force proportional
+	//  to the difference between the node velocities and the 
+	//  fluid velocities
+	// ----------------------------------------------------------
+	
+	else if (ibmUpdate == "verlet") {
+	
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+	
+		// first step of IBM velocity verlet:
+		update_node_positions_verlet_1(nBlocks,nThreads);
+	
+		// re-build bin lists for IBM nodes:
+		if (nCells > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}
+			
+		// update IBM:
+		compute_node_forces_spring(nBlocks,nThreads);
 		if (nCells > 1) nonbonded_node_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
@@ -1641,6 +1749,7 @@ void class_capsules_ibm3D::compute_node_forces(int nBlocks, int nThreads)
 
 void class_capsules_ibm3D::compute_node_forces_spring(int nBlocks, int nThreads)
 {
+		
 	// First, zero the node forces and the cell volumes:
 	zero_node_forces_IBM3D
 	<<<nBlocks,nThreads>>> (nodes,nNodes);
@@ -1858,6 +1967,19 @@ void class_capsules_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 {
 	wall_forces_ydir_zdir_IBM3D
 	<<<nBlocks,nThreads>>> (nodes,Box,repA,repD,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates wall forces in y-dir
+// and z-dir:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::wall_forces_cylinder(float chRad, int nBlocks, int nThreads)
+{
+	wall_forces_cylinder_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,chRad,repA,repD,nNodes);
 }
 
 

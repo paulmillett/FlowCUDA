@@ -157,6 +157,7 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	int,
 	int,
 	int,
+	int,
 	int);
 
 

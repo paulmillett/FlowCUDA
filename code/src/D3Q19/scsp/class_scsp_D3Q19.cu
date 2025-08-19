@@ -896,10 +896,10 @@ void class_scsp_D3Q19::hydrodynamic_forces_fibers_IBM_LBM(int nBlocks, int nThre
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::hydrodynamic_force_bead_rod(int nBlocks, int nThreads,
-	                                               beadrod* beads, int nBeads)
+	                                               beadrod* beads, int nBeads, int nBeadsPerRod)
 {
 	hydrodynamic_force_bead_rod_IBM3D
-	<<<nBlocks,nThreads>>> (beads,Fx,Fy,Fz,u,v,w,dt,Nx,Ny,Nz,nBeads);	
+	<<<nBlocks,nThreads>>> (beads,Fx,Fy,Fz,u,v,w,dt,nBeadsPerRod,Nx,Ny,Nz,nBeads);	
 }
 
 
