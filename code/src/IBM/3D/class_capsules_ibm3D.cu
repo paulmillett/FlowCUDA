@@ -688,8 +688,7 @@ void class_capsules_ibm3D::shrink_and_randomize_cells(float shrinkFactor, float 
                     tooClose = true;
                     break;
                 }
-			}
-			
+			}			
 		}
 		cellCOM[c] = shift;		
 		rotate_and_shift_node_positions(c,shift.x,shift.y,shift.z);
@@ -748,24 +747,40 @@ void class_capsules_ibm3D::randomize_cells_above_plane(float shrinkFactor, float
 
 
 // --------------------------------------------------------
-// randomize fiber positions, but all oriented in x-dir:
+// randomize cylindrical capsules positions, but all oriented
+// in x-direction inside a cylindrical channel:
 // --------------------------------------------------------
 
-void class_capsules_ibm3D::randomize_capsules_xdir_alligned_cylinder(float sepWall)
+void class_capsules_ibm3D::randomize_capsules_xdir_alligned_cylinder(float L, float R, float sepWall, float sepMin)
 {
 	// copy node positions from device to host:
 	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);	
 	
 	// assign random position and orientation to each filament:
-	for (int f=0; f<nCells; f++) {
-		float3 shift = make_float3(0.0,0.0,0.0);
-		// get random position
-		float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
-		float ang = (float)rand()/RAND_MAX*(2*M_PI);
-		shift.x = (float)rand()/RAND_MAX*Box.x;		
-		shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
-		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
-		shift_node_positions(f,shift.x,shift.y,shift.z);
+	float3* cellCOM = (float3*)malloc(nCells*sizeof(float3));
+	for (int c=0; c<nCells; c++) {
+		cellCOM[c] = make_float3(0.0);
+		float3 shift = make_float3(0.0,0.0,0.0);	
+		bool tooClose = true;
+		while (tooClose) {
+			// reset tooClose to false
+			tooClose = false;
+			// get random position
+			float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
+			float ang = (float)rand()/RAND_MAX*(2*M_PI);
+			shift.x = (float)rand()/RAND_MAX*Box.x;		
+			shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+			shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
+			// check with other cells
+			for (int d=0; d<c; d++) {
+				if (cylinder_overlap(shift,cellCOM[d],L,R,sepMin)) {                    
+					tooClose = true;
+                    break;
+				}				
+			}			
+		}
+		cellCOM[c] = shift;		
+		shift_node_positions(c,shift.x,shift.y,shift.z);
 	}
 	
 	// last, copy node positions from host to device:
@@ -2642,6 +2657,37 @@ bool class_capsules_ibm3D::compare_nabor_trainIDs(int i, int j)
 	}
 	return flag;
 }
+
+
+
+// --------------------------------------------------------
+// Check if two cylindrically-shaped capsules are overlapping,
+// assuming their major axis is alligned in the x-direction.
+//
+// Also, assuming PBC's in the x-direction ONLY.
+//
+// --------------------------------------------------------
+
+bool class_capsules_ibm3D::cylinder_overlap(float3 iCOM, float3 jCOM, float L, float R, float sepMin)
+{
+	bool flag = false;
+		
+	// 1st: check how close cylinders are in the x-dir:
+	float3 dr = iCOM - jCOM;
+	dr -= roundf(dr/Box)*Box;	
+	if (abs(dr.x) > (L + sepMin)) {
+		return flag;  // (return if cylinders are not close enough in x-dir)
+	}
+	
+	// 2nd: check how close cylinders are in the yz-plane:
+	float ryz = sqrt(dr.y*dr.y + dr.z*dr.z);	
+	if (ryz < (2*R + sepMin)) {
+		flag = true;
+	}
+	
+	return flag;	
+}
+
 
 
 

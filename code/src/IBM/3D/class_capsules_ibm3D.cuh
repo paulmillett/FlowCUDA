@@ -100,7 +100,7 @@ class class_capsules_ibm3D {
 	void randomize_cells(float);
 	void shrink_and_randomize_cells(float,float,float,float);
 	void randomize_cells_above_plane(float,float,float,float);
-	void randomize_capsules_xdir_alligned_cylinder(float);
+	void randomize_capsules_xdir_alligned_cylinder(float,float,float,float);
 	void define_Janus_capsule_geometry(float,float);
 	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);
@@ -157,6 +157,7 @@ class class_capsules_ibm3D {
 	void capsule_train_fraction(float,float,int);
 	bool check_if_cells_are_nabors_in_train(int,int,float,float);
 	bool compare_nabor_trainIDs(int,int);
+	bool cylinder_overlap(float3,float3,float,float,float);
 	
 };
 

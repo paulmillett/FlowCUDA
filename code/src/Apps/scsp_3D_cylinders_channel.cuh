@@ -34,6 +34,8 @@ private:
 	float bodyForx;
 	float umax;
 	float a;
+	float L;
+	float R;
 	float gam;
 	float Q0;
 	float sepMin;

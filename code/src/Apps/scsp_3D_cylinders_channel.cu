@@ -66,6 +66,8 @@ scsp_3D_cylinders_channel::scsp_3D_cylinders_channel() : lbm(),ibm()
 	nCells = inputParams("IBM/nCells",1);
 	nNodes = nNodesPerCell*nCells;
 	a = inputParams("IBM/a",10.0);
+	L = inputParams("IBM/L",10.0);
+	R = inputParams("IBM/R",1.0);
 	float Ca = inputParams("IBM/Ca",1.0);
 	float ksmax = inputParams("IBM/ksmax",0.002);
 	gam = inputParams("IBM/gamma",0.1);
@@ -77,6 +79,15 @@ scsp_3D_cylinders_channel::scsp_3D_cylinders_channel() : lbm(),ibm()
 	sepWallZ = inputParams("IBM/sepWallZ",1.3);
 	sepWallY += a;
 	sepWallZ += a;
+	
+	// ----------------------------------------------
+	// calculate particle volume fraction:
+	// ----------------------------------------------
+	
+	float Vp = float(nCells)*(M_PI*R*R*L);
+	float V = M_PI*chRad*chRad*float(Nx);
+	float phi = Vp/V;
+	cout << "particle volume fraction = " << phi << endl;
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -136,6 +147,8 @@ scsp_3D_cylinders_channel::scsp_3D_cylinders_channel() : lbm(),ibm()
 	cout << "  " << endl;
 	cout << "Ca = " << Ca << endl;
 	cout << "  " << endl;
+	cout << "cylinder particle length = " << L << endl;
+	cout << "cylinder particle radius = " << R << endl;
 	
 	// ----------------------------------------------
 	// calculate body-force depending on Re:
@@ -292,7 +305,8 @@ void scsp_3D_cylinders_channel::initSystem()
 	// randomly disperse cells: 
 	// ----------------------------------------------
 	
-	ibm.randomize_capsules_xdir_alligned_cylinder(2.0);
+	float sepMin = inputParams("IBM/sepMin",2.0);	
+	ibm.randomize_capsules_xdir_alligned_cylinder(L,R,sepMin,sepMin);
 			
 	// ----------------------------------------------
 	// line up cells in a single-file line: 
