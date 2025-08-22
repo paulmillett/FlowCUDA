@@ -885,6 +885,18 @@ void class_capsules_ibm3D::write_output(std::string tagname, int tagnum)
 
 
 // --------------------------------------------------------
+// Write IBM output to file:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::write_output_cylinders(std::string tagname, int tagnum)
+{
+	write_vtk_immersed_boundary_3D_cellID_cylinders(tagname,tagnum,
+	nNodes,nFaces,nodesH,facesH,cellsH);
+}
+
+
+
+// --------------------------------------------------------
 // Write IBM output to file, including more information
 // (edge angles):
 // --------------------------------------------------------
@@ -2656,6 +2668,45 @@ bool class_capsules_ibm3D::compare_nabor_trainIDs(int i, int j)
 		flag = true;
 	}
 	return flag;
+}
+
+
+
+// --------------------------------------------------------
+// Calculate the orientation of the capsules (used for
+// cylindrically-shaped capsules).
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::capsule_orientation_cylinders(int nNodesLength, int step)
+{
+	
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "cylinder_orientation.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------
+	// Loop over the capsules  
+	// -----------------------------------------
+		
+	for (int c=0; c<nCells; c++) {		
+		// the first node (at one side of cylinder): 
+		int N0 = cellsH[c].indxN0;		
+		// the second node (at the other side of cylinder):
+		int N1 = N0 + nNodesLength - 1;
+		// orientation vector:
+		cellsH[c].p = normalize(nodesH[N0].r - nodesH[N1].r);
+		// print data:
+		outfile << fixed << setprecision(4) << step << "  " << c << "  " << cellsH[c].p.x << "  " 
+			                                                             << cellsH[c].p.y << "  " 
+																		 << cellsH[c].p.z << endl;		
+	}
+
 }
 
 

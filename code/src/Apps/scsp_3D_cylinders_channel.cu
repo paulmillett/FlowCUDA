@@ -68,6 +68,7 @@ scsp_3D_cylinders_channel::scsp_3D_cylinders_channel() : lbm(),ibm()
 	a = inputParams("IBM/a",10.0);
 	L = inputParams("IBM/L",10.0);
 	R = inputParams("IBM/R",1.0);
+	nNodesLength = inputParams("IBM/nNodesLength",10);
 	float Ca = inputParams("IBM/Ca",1.0);
 	float ksmax = inputParams("IBM/ksmax",0.002);
 	gam = inputParams("IBM/gamma",0.1);
@@ -417,13 +418,15 @@ void scsp_3D_cylinders_channel::writeOutput(std::string tagname, int step)
 	
 	if (step == 0) {
 		// only print out vtk files
+		ibm.capsule_orientation_cylinders(nNodesLength,step);
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
-		ibm.write_output("ibm",step);
+		ibm.write_output_cylinders("ibm",step);
 	}
 	
 	if (step > 0) { 
-		// analyze membrane geometry:
+		// analyze membrane geometry: 
 		ibm.capsule_geometry_analysis(step);
+		ibm.capsule_orientation_cylinders(nNodesLength,step);
 		ibm.output_capsule_data();
 			
 		// write vtk output for LBM and IBM:
@@ -431,7 +434,7 @@ void scsp_3D_cylinders_channel::writeOutput(std::string tagname, int step)
 		if (nVTKOutputs == 0) intervalVTK = nSteps;
 		if (step%intervalVTK == 0) {
 			lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision);
-			ibm.write_output("ibm",step);
+			ibm.write_output_cylinders("ibm",step);
 		}
 				
 	}	

@@ -1145,6 +1145,91 @@ void write_vtk_immersed_boundary_3D_cellID(std::string tagname, int tagnum, int 
 // Write IBM mesh to 'vtk' file:
 // -------------------------------------------------------------------------
 
+void write_vtk_immersed_boundary_3D_cellID_cylinders(std::string tagname, int tagnum, int nNodes, int nFaces,
+                                                     node* nodes, triangle* faces, cell* cells)
+{
+		
+	// -----------------------------------
+	//	Define the file location and name:
+	// -----------------------------------
+
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+
+	// -----------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------
+
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing IBM data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET POLYDATA" << endl;			
+	
+	// -----------------------------------
+	//	Write the node positions:
+	// -----------------------------------
+
+	outfile << " " << endl;	
+	outfile << "POINTS " << nNodes << " float" << endl;
+	for (int n=0; n<nNodes; n++) {
+		outfile << fixed << setprecision(3) << nodes[n].r.x << "  " << nodes[n].r.y << "  " << nodes[n].r.z << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the polygon information:
+	// -----------------------------------------------
+	
+	outfile << " " << endl;
+	outfile << "POLYGONS " << nFaces << " " << 4*nFaces << endl;
+	for (int i=0; i<nFaces; i++) {
+		outfile << 3 << " " << faces[i].v0 << " " << faces[i].v1 << " " << faces[i].v2 << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the orientation angle verses x-axis for each face:
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	outfile << "CELL_DATA " << nFaces << endl;
+	outfile << "SCALARS " << "theta " << "float" << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nFaces; i++) {
+		int cellID = faces[i].cellID;
+		float theta = acos(abs(cells[cellID].p.x));		
+		outfile << theta << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the cellID (bool 'intrain') for each face:
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	outfile << "SCALARS " << "cellID " << "int" << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nFaces; i++) {
+		int cellID = faces[i].cellID;
+		outfile << cellID << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+		
+	outfile.close();
+		
+}
+
+
+
+// -------------------------------------------------------------------------
+// Write IBM mesh to 'vtk' file:
+// -------------------------------------------------------------------------
+
 void write_vtk_immersed_boundary_normals_3D(std::string tagname, int tagnum, int nNodes, int nFaces,
                                             int nEdges, node* nodes, triangle* faces, edge* edges)
 {

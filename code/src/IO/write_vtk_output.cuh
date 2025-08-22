@@ -26,6 +26,8 @@ void write_vtk_immersed_boundary_3D(std::string,int,int,int,node*,triangle*);
 
 void write_vtk_immersed_boundary_3D_cellID(std::string,int,int,int,node*,triangle*,cell*);
 
+void write_vtk_immersed_boundary_3D_cellID_cylinders(std::string,int,int,int,node*,triangle*,cell*);
+
 void write_vtk_immersed_boundary_normals_3D(std::string,int,int,int,int,node*,triangle*,edge*);
 
 void write_vtk_structured_grid(std::string,int,int,int,int,float*,

@@ -29,6 +29,7 @@ private:
 	int nVTKOutputs;
 	int iskip,jskip,kskip;
 	int precision;
+	int nNodesLength;
 	float tau;
 	float nu;
 	float bodyForx;

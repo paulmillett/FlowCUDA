@@ -76,6 +76,7 @@ struct cell {
 	float D;
 	float3 com;
 	float3 vel;
+	float3 p;    // orientation vector
 };
 
 # endif  // MEMBRANE_DATA_H

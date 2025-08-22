@@ -104,6 +104,7 @@ class class_capsules_ibm3D {
 	void define_Janus_capsule_geometry(float,float);
 	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);
+	void write_output_cylinders(std::string,int);
 	void write_output_long(std::string,int);
 	void update_node_positions(int,int);
 	void update_node_positions_dt(int,int);
@@ -157,6 +158,7 @@ class class_capsules_ibm3D {
 	void capsule_train_fraction(float,float,int);
 	bool check_if_cells_are_nabors_in_train(int,int,float,float);
 	bool compare_nabor_trainIDs(int,int);
+	void capsule_orientation_cylinders(int,int);
 	bool cylinder_overlap(float3,float3,float,float,float);
 	
 };
