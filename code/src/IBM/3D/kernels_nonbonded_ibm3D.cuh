@@ -34,6 +34,19 @@ __global__ void nonbonded_node_interactions_IBM3D(
 	int3);
 
 
+__global__ void nonbonded_node_lubrication_interactions_IBM3D(
+	node*,
+	cell*,
+	bindata,
+	float,
+	float,
+	float,
+	float,
+	int,
+	float3,	
+	int3);
+		
+
 __global__ void nonbonded_node_bead_interactions_IBM3D(
 	node*,
 	bead*,
@@ -59,6 +72,19 @@ __global__ void nonbonded_node_bead_rod_interactions_IBM3D(
 __device__ inline void pairwise_interaction_forces(
 	const int, 
 	const int,
+	const float,
+	const float,
+	node*,
+	cell*,
+	float3,
+	int3);
+	
+	
+__device__ inline void pairwise_lubrication_forces(
+	const int, 
+	const int,
+	const float,
+	const float,
 	const float,
 	const float,
 	node*,
@@ -127,6 +153,16 @@ __global__ void wall_forces_ydir_zdir_IBM3D(
 __global__ void wall_forces_cylinder_IBM3D(
 	node*,
 	float3,
+	float,
+	float,
+	float,
+	int);
+
+
+__global__ void wall_lubrication_forces_cylinder_IBM3D(
+	node*,
+	float3,
+	float,
 	float,
 	float,
 	float,

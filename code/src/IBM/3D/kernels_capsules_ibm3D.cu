@@ -640,6 +640,13 @@ __global__ void compute_node_force_membrane_area_IBM3D(
 		float volFace = triangle_signed_volume(r0,r1,r2);
 		atomicAdd(&cells[cID].vol,volFace); 
 		atomicAdd(&cells[cID].area,area);
+				
+		// add to global cell center-of-mass:
+		int nF = cells[cID].nFaces;
+		float3 rr = centroid/float(nF);  // COM of face
+		atomicAdd(&cells[cID].com.x,rr.x);
+		atomicAdd(&cells[cID].com.y,rr.y);
+		atomicAdd(&cells[cID].com.z,rr.z);
 					
 	}	
 }

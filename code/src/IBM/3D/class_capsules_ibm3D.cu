@@ -1238,6 +1238,79 @@ void class_capsules_ibm3D::stepIBM_spring(class_scsp_D3Q19& lbm, int nBlocks, in
 
 
 // --------------------------------------------------------
+// Take step forward for IBM using LBM object:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::stepIBM_spring_cylinders(class_scsp_D3Q19& lbm, float Rad, float nu, int nBlocks, int nThreads) 
+{
+	
+	// ----------------------------------------------------------
+	// the traditional IBM update, except here
+	// the forces on the IBM nodes are included to calculate the
+	// new node positions (see 'update_node_positions_verlet_1')
+	// ----------------------------------------------------------
+	
+	if (ibmUpdate == "ibm") {
+		
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+	
+		// re-build bin lists for IBM nodes:
+		if (nCells > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}		
+			
+		// update IBM:
+		compute_node_forces_spring(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_lubrication_interactions(Rad,nu,nBlocks,nThreads);
+		//wall_lubrication_forces_cylinder(chRad,Rad,nu,nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
+		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
+		
+	} 
+	
+	// ----------------------------------------------------------
+	//  here, the velocity-Verlet algorithm is used to update the 
+	//  node positions - using a viscous drag force proportional
+	//  to the difference between the node velocities and the 
+	//  fluid velocities
+	// ----------------------------------------------------------
+	
+	else if (ibmUpdate == "verlet") {
+	
+		// zero fluid forces:
+		lbm.zero_forces(nBlocks,nThreads);
+	
+		// first step of IBM velocity verlet:
+		update_node_positions_verlet_1(nBlocks,nThreads);
+	
+		// re-build bin lists for IBM nodes:
+		if (nCells > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}
+			
+		// update IBM:
+		compute_node_forces_spring(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_lubrication_interactions(Rad,nu,nBlocks,nThreads);
+		//wall_lubrication_forces_cylinder(chRad,Rad,nu,nBlocks,nThreads);
+		compute_wall_forces(nBlocks,nThreads);
+		enforce_max_node_force(nBlocks,nThreads);
+		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,nodes,nNodes);
+		update_node_positions_verlet_2(nBlocks,nThreads);
+		
+	}
+		
+}
+
+
+
+// --------------------------------------------------------
 // Take step forward for IBM w/o fluid:
 // (note: this uses the velocity-Verlet algorithm)
 // --------------------------------------------------------
@@ -1717,6 +1790,22 @@ void class_capsules_ibm3D::nonbonded_node_interactions(int nBlocks, int nThreads
 // Call to kernel that calculates nonbonded forces:
 // --------------------------------------------------------
 
+void class_capsules_ibm3D::nonbonded_node_lubrication_interactions(float Rad, float nu, int nBlocks, int nThreads)
+{
+	if (binsFlag) {	
+		nonbonded_node_lubrication_interactions_IBM3D
+		<<<nBlocks,nThreads>>> (nodes,cells,bins,Rad,Rad,nu,repD,nNodes,Box,pbcFlag);		
+	} else {
+		cout << "IBM bin arrays have not been initialized" << endl;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces:
+// --------------------------------------------------------
+
 void class_capsules_ibm3D::nonbonded_node_bead_interactions(bead* beads, bindata binsFil, 
                                                             int nBlocks, int nThreads)
 {
@@ -1999,14 +2088,27 @@ void class_capsules_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
-// Call to kernel that calculates wall forces in y-dir
-// and z-dir:
+// Call to kernel that calculates wall forces in radial
+// direction (assuming channel cross section is yz-plane):
 // --------------------------------------------------------
 
 void class_capsules_ibm3D::wall_forces_cylinder(float chRad, int nBlocks, int nThreads)
 {
 	wall_forces_cylinder_IBM3D
 	<<<nBlocks,nThreads>>> (nodes,Box,chRad,repA,repD,nNodes);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates wall forces in radial
+// direction (assuming channel cross section is yz-plane):
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::wall_lubrication_forces_cylinder(float chRad, float cellRad, float nu, int nBlocks, int nThreads)
+{
+	wall_lubrication_forces_cylinder_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,chRad,cellRad,nu,repD,nNodes);
 }
 
 
@@ -2704,7 +2806,10 @@ void class_capsules_ibm3D::capsule_orientation_cylinders(int nNodesLength, int s
 		// print data:
 		outfile << fixed << setprecision(4) << step << "  " << c << "  " << cellsH[c].p.x << "  " 
 			                                                             << cellsH[c].p.y << "  " 
-																		 << cellsH[c].p.z << endl;		
+																		 << cellsH[c].p.z << "  "
+																		 << cellsH[c].com.x << "  "
+																		 << cellsH[c].com.y << "  " 
+																		 << cellsH[c].com.z << endl;		
 	}
 
 }

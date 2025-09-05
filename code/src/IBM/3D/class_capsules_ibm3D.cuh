@@ -124,6 +124,7 @@ class class_capsules_ibm3D {
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
 	void stepIBM_spring(class_scsp_D3Q19&,int,int);
+	void stepIBM_spring_cylinders(class_scsp_D3Q19&,float,float,int,int);
 	void stepIBM_no_fluid(int,bool,int,int);
 	void stepIBM_force_one_capsule(class_scsp_D3Q19&,float3,int,int,int) ;
 	void stepIBM_sheets(class_scsp_D3Q19&,int,int);
@@ -134,6 +135,7 @@ class class_capsules_ibm3D {
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);
 	void nonbonded_node_interactions(int,int);
+	void nonbonded_node_lubrication_interactions(float,float,int,int);
 	void nonbonded_node_bead_interactions(bead*,bindata,int,int);
 	void nonbonded_node_bead_rod_interactions(beadrod*,bindata,int,int);
 	void compute_node_forces(int,int);
@@ -146,6 +148,7 @@ class class_capsules_ibm3D {
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
 	void wall_forces_cylinder(float,int,int);
+	void wall_lubrication_forces_cylinder(float,float,float,int,int);
 	void change_cell_volume(float,int,int);
 	void scale_equilibrium_cell_size(float,int,int); 
 	void scale_edge_lengths(float,int,int);

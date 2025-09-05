@@ -363,7 +363,8 @@ void scsp_3D_cylinders_channel::cycleForward(int stepsPerCycle, int currentCycle
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			ibm.stepIBM_spring(lbm,nBlocks,nThreads);			
+			//ibm.stepIBM_spring(lbm,nBlocks,nThreads);	
+			ibm.stepIBM_spring_cylinders(lbm,R,nu,nBlocks,nThreads);		
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			cudaDeviceSynchronize();					
@@ -381,7 +382,8 @@ void scsp_3D_cylinders_channel::cycleForward(int stepsPerCycle, int currentCycle
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
 		// update IBM & LBM:
-		ibm.stepIBM_spring(lbm,nBlocks,nThreads);
+		//ibm.stepIBM_spring(lbm,nBlocks,nThreads);
+		ibm.stepIBM_spring_cylinders(lbm,R,nu,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 		cudaDeviceSynchronize();				

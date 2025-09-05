@@ -181,6 +181,73 @@ __global__ void nonbonded_node_interactions_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to calculate nonbonded node interactions
+// using the bin lists:
+// --------------------------------------------------------
+
+__global__ void nonbonded_node_lubrication_interactions_IBM3D(
+	node* nodes,
+	cell* cells,
+	bindata bins,
+	float Ri,
+	float Rj,
+	float nu,
+	float cutoff,
+	int nNodes,
+	float3 Box,	
+	int3 pbcFlag)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {		
+		
+		// -------------------------------
+		// calculate bin ID:
+		// -------------------------------
+		
+		int binID = int(floor(nodes[i].r.x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(nodes[i].r.y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(nodes[i].r.z/bins.sizeBins));
+		
+		// -------------------------------
+		// loop over nodes in the same bin:
+		// -------------------------------
+				
+		int offst = binID*bins.binMax;
+		int occup = bins.binOccupancy[binID];
+		if (occup > bins.binMax) occup = bins.binMax;
+								
+		for (int k=offst; k<offst+occup; k++) {
+			int j = bins.binMembers[k];
+			if (i==j) continue;
+			if (nodes[i].cellID == nodes[j].cellID) continue;
+			pairwise_lubrication_forces(i,j,Ri,Rj,cutoff,nu,nodes,cells,Box,pbcFlag);
+		}
+		
+		// -------------------------------
+		// loop over neighboring bins:
+		// -------------------------------
+		
+        for (int b=0; b<bins.nnbins; b++) {
+            // get neighboring bin ID
+			int naborbinID = bins.binMap[binID*bins.nnbins + b];
+			offst = naborbinID*bins.binMax;
+			occup = bins.binOccupancy[naborbinID];
+			if (occup > bins.binMax) occup = bins.binMax;
+			// loop over nodes in this bin:
+			for (int k=offst; k<offst+occup; k++) {
+				int j = bins.binMembers[k];
+				if (nodes[i].cellID == nodes[j].cellID) continue;			
+				pairwise_lubrication_forces(i,j,Ri,Rj,cutoff,nu,nodes,cells,Box,pbcFlag);			
+			}
+		}
+				
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to calculate nonbonded node-bead interactions
 // using the bin lists.  Here, the beads are from the 
 // 'class_filaments_ibm3D' class
@@ -327,10 +394,63 @@ __device__ inline void pairwise_interaction_forces(
 		// linear spring force repulsion
 		float force = repA - (repA/repD)*r;
 		float3 fij = force*(rij/r);
+		
 		// WCA force
 		//float force = 0.01*pow(0.85/r,12)/r;
 		//float3 fij = force*(rij/r);
+				
+		// check if fij is pushing node i away from the c.o.m.
+		// of it's cell...  if so, then set force to zero
+		// because there is likely cell-cell overlap here
+		int cID = nodes[i].cellID;
+		float3 ric = nodes[i].r - cells[cID].com;
+		ric -= roundf(ric/Box)*Box*pbcFlag;  // PBC's
+		float fdir = dot(fij,ric);
+		if (fdir > 0.0) fij = make_float3(0.0);
 		
+		// add force to node i
+		nodes[i].f += fij;
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j lubrication force.  The 
+// model comes from Ladd & Verberg, Journal of Statistical
+// Physics, 104 (2001) 1191.  See Eq. (74).
+// --------------------------------------------------------
+
+__device__ inline void pairwise_lubrication_forces(
+	const int i, 
+	const int j,
+	const float Ri,
+	const float Rj,
+	const float cutoff,
+	const float nu,
+	node* nodes,
+	cell* cells,	
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = nodes[i].r - nodes[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	if (r < cutoff) {
+		// lubrication force:
+		float3 uij = rij/r;
+		float3 vij = nodes[i].v - nodes[j].v;
+		float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);
+		float udotv = dot(uij,vij);
+		float surfsep = 1.0/r - 1.0/cutoff;  // note, here the ri and rj are not included, because nodes are on surface
+		float3 fij = -6.0*M_PI*nu*coeff*uij*udotv*surfsep;	
+		
+		// add Hertz contact force if separation is less than 0.5dx:
+		if (r < 0.5) {
+			float K = 0.01;  // assume coefficient value
+			float fcontact = 2.5*K*pow((0.5 - r),1.5);
+			fij += fcontact*uij;
+		}
 		
 		// check if fij is pushing node i away from the c.o.m.
 		// of it's cell...  if so, then set force to zero
@@ -340,7 +460,8 @@ __device__ inline void pairwise_interaction_forces(
 		ric -= roundf(ric/Box)*Box*pbcFlag;  // PBC's
 		float fdir = dot(fij,ric);
 		if (fdir > 0.0) fij = make_float3(0.0);
-		// add force to node i
+					
+		// add force to node i:
 		nodes[i].f += fij;
 	} 	
 }
@@ -575,7 +696,7 @@ __global__ void wall_forces_cylinder_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		const float d = repD;
+		const float d = 0.5; //repD;           // set this to 0.5dx
 		const float A = repA;
 		const float ymid = (Box.y-1.0)/2.0;
 		const float zmid = (Box.z-1.0)/2.0;
@@ -584,12 +705,75 @@ __global__ void wall_forces_cylinder_IBM3D(
 		const float ri = sqrt(yi*yi + zi*zi);
 		// radial wall		
 		if (ri > Rad - d) {
+			// Hertz contact force:
+			const float bmri = Rad - ri;
+			const float K = 0.01;  // assume coefficient value
+			const float force = 2.5*K*pow((d - bmri),1.5);
+			nodes[i].f.y -= force*(yi/ri);
+			nodes[i].f.z -= force*(zi/ri);
+			
+			// soft parabolic contact force:
+			/*
 			const float bmri = Rad - ri;
 			const float force = A/pow(bmri,2) - A/pow(d,2);
 			nodes[i].f.y -= force*(yi/ri);
 			nodes[i].f.z -= force*(zi/ri);
+			*/
+			
 			// if bead is too close to wall, correct it's position
 			const float RadLimit = Rad - 0.0001; 
+			if (ri > RadLimit) {
+				const float theta = atan2(zi,yi);
+				nodes[i].r.y = RadLimit*cos(theta) + ymid;
+				nodes[i].r.z = RadLimit*sin(theta) + zmid;
+			}
+		}				
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces using a 
+// lubrication model from Ladd & Verberg, Journal of Statistical
+// Physics, 104 (2001) 1191.  See Eq. (74).
+// Here, it is assumed that the wall radius is infinite, which
+// reduces the term (Ri*Rj)^2/(Ri+Rj)^2 to just Ri^2.  Also,
+// the wall velocity is assumed to be zero.  
+// --------------------------------------------------------
+
+__global__ void wall_lubrication_forces_cylinder_IBM3D(
+	node* nodes,
+	float3 Box,
+	float chRad,
+	float Ri,
+	float nu,
+	float cutoff,
+	int nNodes)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		const float ymid = (Box.y-1.0)/2.0;
+		const float zmid = (Box.z-1.0)/2.0;
+		const float yi = nodes[i].r.y - ymid;  // distance to channel centerline
+		const float zi = nodes[i].r.z - zmid;  // "                            "
+		const float ri = sqrt(yi*yi + zi*zi);
+		const float sep = chRad - ri;          // separation to wall
+		// radial wall		
+		if (sep < cutoff) {
+			// lubrication force:			
+			const float uy = sep*(yi/ri);   // y-comp of unit vector from node to wall 
+			const float uz = sep*(zi/ri);   // z-comp of unit vector from node to wall
+			const float vy = nodes[i].v.y;
+			const float vz = nodes[i].v.z;
+			const float udotv = uy*vy + uz*vz;
+			const float force = -6.0*M_PI*nu*Ri*Ri*udotv*(1.0/sep - 1.0/cutoff);
+			nodes[i].f.y += force*(yi/ri);
+			nodes[i].f.z += force*(zi/ri);	
+						
+			// if bead is too close to wall, correct it's position:
+			const float RadLimit = chRad - 0.0001; 
 			if (ri > RadLimit) {
 				const float theta = atan2(zi,yi);
 				nodes[i].r.y = RadLimit*cos(theta) + ymid;
