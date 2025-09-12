@@ -1,4 +1,4 @@
- 
+
 # include "class_capsules_ibm3D.cuh"
 # include "../../IO/GetPot"
 # include "../../Utils/eig3.cuh"
@@ -10,6 +10,7 @@
 # include <sstream>
 # include <stdlib.h>
 # include <time.h>
+# include <random>
 using namespace std;  
 
 
@@ -779,7 +780,8 @@ void class_capsules_ibm3D::randomize_capsules_xdir_alligned_cylinder(float L, fl
 				}				
 			}			
 		}
-		cellCOM[c] = shift;		
+		cellCOM[c] = shift;	
+		cellsH[c].com = shift;	
 		shift_node_positions(c,shift.x,shift.y,shift.z);
 	}
 	
@@ -838,6 +840,7 @@ void class_capsules_ibm3D::shift_node_positions(int cID, float xsh, float ysh, f
 		nodesH[i].r.y += ysh;
 		nodesH[i].r.z += zsh;
 	}
+	cellsH[cID].com = make_float3(xsh,ysh,zsh);
 }
 
 
@@ -866,6 +869,7 @@ void class_capsules_ibm3D::rotate_and_shift_node_positions(int cID, float xsh, f
 		nodesH[i].r.y = yrot + ysh;
 		nodesH[i].r.z = zrot + zsh;			
 	}
+	cellsH[cID].com = make_float3(xsh,ysh,zsh);
 }
 
 
@@ -2803,13 +2807,20 @@ void class_capsules_ibm3D::capsule_orientation_cylinders(int nNodesLength, int s
 		int N1 = N0 + nNodesLength - 1;
 		// orientation vector:
 		cellsH[c].p = normalize(nodesH[N0].r - nodesH[N1].r);
+		// radial distance to channel centerline:
+		float ymid = (Box.y-1.0)/2.0;
+		float zmid = (Box.z-1.0)/2.0;
+		float yi = cellsH[c].com.y - ymid;
+		float zi = cellsH[c].com.z - zmid;
+		float ri = sqrt(yi*yi + zi*zi);
 		// print data:
 		outfile << fixed << setprecision(4) << step << "  " << c << "  " << cellsH[c].p.x << "  " 
 			                                                             << cellsH[c].p.y << "  " 
 																		 << cellsH[c].p.z << "  "
 																		 << cellsH[c].com.x << "  "
 																		 << cellsH[c].com.y << "  " 
-																		 << cellsH[c].com.z << endl;		
+																		 << cellsH[c].com.z << "  "
+																		 << ri << endl;		
 	}
 
 }
