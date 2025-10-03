@@ -791,6 +791,70 @@ void class_capsules_ibm3D::randomize_capsules_xdir_alligned_cylinder(float L, fl
 
 
 
+// --------------------------------------------------------
+// randomize cylindrical capsules positions, but all oriented
+// in x-direction inside a cylindrical channel.  Here,
+// cylindrical capsules are put in groups with the same
+// x-position and random radial positions.
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::semi_randomize_capsules_xdir_alligned_cylinder(float L, float R, float sepWall, float sepMin)
+{
+	// copy node positions from device to host:
+	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);	
+	
+	// calculate 'group' parameters:
+	int nGroups = int(Box.x/(L+sepMin));
+	int nCells_per_group = nCells/nGroups;
+	if (nCells%nGroups > 0) nCells_per_group += 1;  // in case nCells/nGroups is not a round number
+	float groupLength = Box.x/float(nGroups);
+	
+	cout << "number of groups = " << nGroups << endl;
+	cout << "number of capsules per group = " << nCells_per_group << endl;
+	cout << "group length = " << groupLength << endl;
+	
+	// arrays needed for positioning cells:
+	float3* cellCOM = (float3*)malloc(nCells*sizeof(float3));
+	int* cellGroup = (int*)malloc(nCells*sizeof(int));
+	
+	// assign random position and orientation to each filament:
+	for (int c=0; c<nCells; c++) {
+		cellCOM[c] = make_float3(0.0);
+		cellGroup[c] = c/nCells_per_group;
+		float3 shift = make_float3(0.0,0.0,0.0);	
+		bool tooClose = true;
+		while (tooClose) {
+			// reset tooClose to false
+			tooClose = false;
+			// get random position
+			float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
+			float ang = (float)rand()/RAND_MAX*(2*M_PI);
+			shift.x = groupLength/2.0 + cellGroup[c]*groupLength;
+			
+			if (shift.x > Box.x) cout << shift.x << " " << cellGroup[c] << endl;
+			
+			shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+			shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
+			// check with other cells
+			for (int d=0; d<c; d++) {
+				// only check overlap for cells in the same group
+				if (cellGroup[d] != cellGroup[c]) continue;
+				if (cylinder_overlap(shift,cellCOM[d],L,R,sepMin)) {                    
+					tooClose = true;
+                    break;
+				}				
+			}			
+		}
+		cellCOM[c] = shift;	
+		cellsH[c].com = shift;	
+		shift_node_positions(c,shift.x,shift.y,shift.z);
+	}
+	
+	// last, copy node positions from host to device:
+	cudaMemcpy(nodes, nodesH, sizeof(node)*nNodes, cudaMemcpyHostToDevice);
+}
+
+
 
 // --------------------------------------------------------
 // For Janus capsules, define the geometry by assigning
@@ -849,6 +913,30 @@ void class_capsules_ibm3D::shift_node_positions(int cID, float xsh, float ysh, f
 // Shift IBM start positions by specified amount:
 // --------------------------------------------------------
 
+void class_capsules_ibm3D::rotate_and_shift_node_positions(int cID, float xsh, float ysh, float zsh, float a, float b, float g)
+{
+	// update node positions:
+	int istr = cellsH[cID].indxN0;
+	int iend = istr + cellsH[cID].nNodes;
+	for (int i=istr; i<iend; i++) {
+		// rotate:
+		float xrot = nodesH[i].r.x*(cos(a)*cos(b)) + nodesH[i].r.y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + nodesH[i].r.z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
+		float yrot = nodesH[i].r.x*(sin(a)*cos(b)) + nodesH[i].r.y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + nodesH[i].r.z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
+		float zrot = nodesH[i].r.x*(-sin(b))       + nodesH[i].r.y*(cos(b)*sin(g))                      + nodesH[i].r.z*(cos(b)*cos(g));
+		// shift:		 
+		nodesH[i].r.x = xrot + xsh;
+		nodesH[i].r.y = yrot + ysh;
+		nodesH[i].r.z = zrot + zsh;			
+	}
+	cellsH[cID].com = make_float3(xsh,ysh,zsh);
+}
+
+
+
+// --------------------------------------------------------
+// Shift IBM start positions by specified amount:
+// --------------------------------------------------------
+
 void class_capsules_ibm3D::rotate_and_shift_node_positions(int cID, float xsh, float ysh, float zsh)
 {
 	// random rotation angles:
@@ -895,7 +983,7 @@ void class_capsules_ibm3D::write_output(std::string tagname, int tagnum)
 void class_capsules_ibm3D::write_output_cylinders(std::string tagname, int tagnum)
 {
 	write_vtk_immersed_boundary_3D_cellID_cylinders(tagname,tagnum,
-	nNodes,nFaces,nodesH,facesH,cellsH);
+	nNodes,nFaces,nodesH,facesH,cellsH,Box);
 }
 
 

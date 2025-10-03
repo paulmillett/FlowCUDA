@@ -224,7 +224,12 @@ void scsp_3D_cylinder_shear::initSystem()
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();
 	
-	ibm.shift_node_positions(0,31.5,31.5,31.5);
+	if (nCells == 1) ibm.shift_node_positions(0,31.5,31.5,31.5);
+	if (nCells == 2) {
+		ibm.rotate_and_shift_node_positions(0,28.0,30.5,31.5,0.0,M_PI/2.0,0.0);
+		ibm.rotate_and_shift_node_positions(1,35.0,31.5,31.5,0.0,M_PI/2.0,0.0);
+	}
+		
 	
 	// ----------------------------------------------			
 	// rescale capsule sizes for normal distribution: 

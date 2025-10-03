@@ -93,6 +93,7 @@ class class_capsules_ibm3D {
 	void single_file_cells(int,int,int,float,float);
 	void shift_node_positions(int,float,float,float);
 	void rotate_and_shift_node_positions(int,float,float,float);
+	void rotate_and_shift_node_positions(int,float,float,float,float,float,float);
 	void rest_geometries(int,int);
 	void rest_geometries_spring(int,int);
 	void rest_geometries_skalak(int,int);
@@ -101,6 +102,7 @@ class class_capsules_ibm3D {
 	void shrink_and_randomize_cells(float,float,float,float);
 	void randomize_cells_above_plane(float,float,float,float);
 	void randomize_capsules_xdir_alligned_cylinder(float,float,float,float);
+	void semi_randomize_capsules_xdir_alligned_cylinder(float,float,float,float);
 	void define_Janus_capsule_geometry(float,float);
 	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);

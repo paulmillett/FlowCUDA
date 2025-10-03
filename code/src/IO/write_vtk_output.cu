@@ -1146,7 +1146,7 @@ void write_vtk_immersed_boundary_3D_cellID(std::string tagname, int tagnum, int 
 // -------------------------------------------------------------------------
 
 void write_vtk_immersed_boundary_3D_cellID_cylinders(std::string tagname, int tagnum, int nNodes, int nFaces,
-                                                     node* nodes, triangle* faces, cell* cells)
+                                                     node* nodes, triangle* faces, cell* cells, float3 Box)
 {
 		
 	// -----------------------------------
@@ -1205,9 +1205,28 @@ void write_vtk_immersed_boundary_3D_cellID_cylinders(std::string tagname, int ta
 	}
 	
 	// -----------------------------------------------
-	//	Write the cellID (bool 'intrain') for each face:
+	//	Write the radial position relative to the 
+	//  channel centerline:
 	// -----------------------------------------------
 		
+	outfile << " " << endl;
+	outfile << "SCALARS " << "radial " << "float" << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nFaces; i++) {
+		int cellID = faces[i].cellID;
+		float ymid = (Box.y-1.0)/2.0;
+		float zmid = (Box.z-1.0)/2.0;
+		float yi = cells[cellID].com.y - ymid;
+		float zi = cells[cellID].com.z - zmid;
+		float ri = sqrt(yi*yi + zi*zi);
+		outfile << ri << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write the cellID (bool 'intrain') for each face:
+	// -----------------------------------------------
+	
+	/*
 	outfile << " " << endl;
 	outfile << "SCALARS " << "cellID " << "int" << endl;
 	outfile << "LOOKUP_TABLE default" << endl;
@@ -1215,6 +1234,7 @@ void write_vtk_immersed_boundary_3D_cellID_cylinders(std::string tagname, int ta
 		int cellID = faces[i].cellID;
 		outfile << cellID << endl;
 	}
+	*/
 	
 	// -----------------------------------------------
 	//	Close the file:

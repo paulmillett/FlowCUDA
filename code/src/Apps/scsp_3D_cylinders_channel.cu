@@ -307,7 +307,8 @@ void scsp_3D_cylinders_channel::initSystem()
 	// ----------------------------------------------
 	
 	float sepMin = inputParams("IBM/sepMin",2.0);	
-	ibm.randomize_capsules_xdir_alligned_cylinder(L,R,sepMin,sepMin);
+	ibm.semi_randomize_capsules_xdir_alligned_cylinder(L,R,sepMin,sepMin);
+	//ibm.randomize_capsules_xdir_alligned_cylinder(L,R,sepMin,sepMin);	
 			
 	// ----------------------------------------------
 	// line up cells in a single-file line: 

@@ -446,23 +446,42 @@ __device__ inline void pairwise_lubrication_forces(
 		float3 fij = -6.0*M_PI*nu*coeff*uij*udotv*surfsep;	
 		
 		// add Hertz contact force if separation is less than 0.5dx:
+		/*
 		if (r < 0.5) {
 			float K = 0.01;  // assume coefficient value
 			float fcontact = 2.5*K*pow((0.5 - r),1.5);
 			fij += fcontact*uij;
 		}
+		*/
+		
+			
+		// add linear contact force if separation is less than 0.5dx:
+		if (r < 0.5) {
+			float repA = 0.01;
+			float fcontact = repA - (repA/0.5)*r;
+			fij += fcontact*uij;			
+		}
+		
+		// if separation goes below 0.05, adjust node i position:
+		if (r < 0.05) {
+			printf("separation = %f \n", r);
+			nodes[i].r = nodes[j].r + 0.05*uij;
+		}		
 		
 		// check if fij is pushing node i away from the c.o.m.
 		// of it's cell...  if so, then set force to zero
 		// because there is likely cell-cell overlap here
+		/*
 		int cID = nodes[i].cellID;
 		float3 ric = nodes[i].r - cells[cID].com;
 		ric -= roundf(ric/Box)*Box*pbcFlag;  // PBC's
 		float fdir = dot(fij,ric);
 		if (fdir > 0.0) fij = make_float3(0.0);
+		*/
 					
 		// add force to node i:
 		nodes[i].f += fij;
+	
 	} 	
 }
 
