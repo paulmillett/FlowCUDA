@@ -5,7 +5,7 @@
 # include "../../Utils/helper_math.h"
 # include "../../IO/write_vtk_output.cuh"
 # include "kernels_poisson_ibm3D.cuh"
-# include "data_structs/membrane_data.h"
+# include "data_structs/cell_data.h"
 # include <cuda.h>
 # include <cufft.h>
 # include <string>

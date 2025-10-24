@@ -151,6 +151,7 @@ scsp_3D_cylinder_shear::scsp_3D_cylinder_shear() : lbm(),ibm()
 	cout << "cylinder particle length = " << L << endl;
 	cout << "cylinder particle radius = " << R << endl;
 	cout << "  " << endl;
+	cout << "wall velocity = " << shearVel << endl;
 	cout << "shear rate = " << 2.0*shearVel/float(Nz-1) << endl;
 	cout << "  " << endl;
 		

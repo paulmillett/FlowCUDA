@@ -1,7 +1,7 @@
 # ifndef WRITE_VTK_OUTPUT_H
 # define WRITE_VTK_OUTPUT_H
 
-# include "../IBM/3D/data_structs/membrane_data.h"
+# include "../IBM/3D/data_structs/cell_data.h"
 # include "../IBM/3D/data_structs/filament_data.h"
 # include "../IBM/3D/data_structs/fiber_data.h"
 # include "../IBM/3D/data_structs/rod_data.h"

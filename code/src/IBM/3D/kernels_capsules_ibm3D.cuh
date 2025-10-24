@@ -1,7 +1,7 @@
 # ifndef KERNELS_CAPSULE_IBM3D_H
 # define KERNELS_CAPSULE_IBM3D_H
 # include "../../Utils/helper_math.h"
-# include "data_structs/membrane_data.h"
+# include "data_structs/cell_data.h"
 # include <cuda.h>
 
 

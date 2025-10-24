@@ -9,7 +9,7 @@
 # include "kernels_ibm3D.cuh"
 # include "kernels_capsules_ibm3D.cuh"
 # include "kernels_nonbonded_ibm3D.cuh"
-# include "data_structs/membrane_data.h"
+# include "data_structs/cell_data.h"
 # include "data_structs/neighbor_bins_data.h"
 # include "data_structs/filament_data.h"
 # include "data_structs/rod_data.h"

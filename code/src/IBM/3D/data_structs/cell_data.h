@@ -1,5 +1,6 @@
-# ifndef MEMBRANE_DATA_H
-# define MEMBRANE_DATA_H
+# ifndef CELL_DATA_H
+# define CELL_DATA_H
+
 
 
 // --------------------------------------------------------
@@ -48,7 +49,8 @@ struct edge {
 
 
 // --------------------------------------------------------
-// struct that defines a vertex in an IBM mesh:
+// struct that defines a cell (or capsule) consisting of
+// an enclosed IBM mesh:
 // --------------------------------------------------------
 
 struct cell {
@@ -79,5 +81,7 @@ struct cell {
 	float3 p;    // orientation vector
 };
 
-# endif  // MEMBRANE_DATA_H
+
+
+# endif  // CELL_DATA_H
 

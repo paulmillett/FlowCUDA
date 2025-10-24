@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 # include "../../Utils/helper_math.h"
-# include "data_structs/membrane_data.h"
+# include "data_structs/cell_data.h"
 
 class class_ibm3D {
 	

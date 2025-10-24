@@ -2,7 +2,7 @@
 # define KERNELS_IBM3D_H
 # include <cuda.h>
 # include "../../Utils/helper_math.h"
-# include "data_structs/membrane_data.h"
+# include "data_structs/cell_data.h"
 
 
 __global__ void update_node_position_IBM3D(

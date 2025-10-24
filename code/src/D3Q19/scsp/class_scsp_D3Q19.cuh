@@ -13,7 +13,7 @@
 # include "../../IBM/3D/kernels_filaments_ibm3D.cuh"
 # include "../../IBM/3D/kernels_fibers_ibm3D.cuh"
 # include "../../IBM/3D/kernels_rods_ibm3D.cuh"
-# include "../../IBM/3D/data_structs/membrane_data.h"
+# include "../../IBM/3D/data_structs/cell_data.h"
 # include "../../IBM/3D/data_structs/filament_data.h"
 # include "../../IBM/3D/data_structs/fiber_data.h"
 # include "../../IBM/3D/data_structs/rod_data.h"

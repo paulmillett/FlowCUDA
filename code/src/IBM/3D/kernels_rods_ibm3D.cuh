@@ -4,7 +4,7 @@
 # include <curand.h>
 # include <curand_kernel.h>
 # include "data_structs/rod_data.h"
-# include "data_structs/membrane_data.h"
+# include "data_structs/cell_data.h"
 # include "data_structs/neighbor_bins_data.h"
 # include "../../Utils/helper_math.h"
 
