@@ -3,10 +3,16 @@
 # include <cuda.h>
 # include <curand.h>
 # include <curand_kernel.h>
+# include "data_structs/quaternion.h"
 # include "data_structs/rigid_data.h"
 # include "data_structs/neighbor_bins_data.h"
 # include "../../Utils/helper_math.h"
 
+
+__global__ void zero_node_forces_rigid_IBM3D(
+	rigidnode*,	
+	int);
+	
 
 __global__ void zero_rigid_forces_torques_IBM3D(
 	rigid*,	
@@ -20,7 +26,7 @@ __global__ void enforce_max_rigid_force_torque_IBM3D(
 	int);
 
 
-__global__ void update_node_positions_rigids_IBM3D(
+__global__ void update_node_positions_velocities_rigids_IBM3D(
 	rigidnode*,
 	rigid*,
 	int);

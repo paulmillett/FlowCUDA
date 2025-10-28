@@ -4,18 +4,35 @@
 
 
 // --------------------------------------------------------
+// IBM3D kernel to zero node forces on a rigid-body:
+// --------------------------------------------------------
+
+__global__ void zero_node_forces_rigid_IBM3D(
+	rigidnode* nodes,	
+	int nNodes)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		nodes[i].f = make_float3(0.0f,0.0f,0.0f);
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to zero rigid-body forces, torques:
 // --------------------------------------------------------
 
 __global__ void zero_rigid_forces_torques_IBM3D(
-	rigid* rigids,	
-	int nRigids)
+	rigid* bodies,	
+	int nBodies)
 {
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nRigids) {
-		rigids[i].f = make_float3(0.0f,0.0f,0.0f);
-		rigids[i].t = make_float3(0.0f,0.0f,0.0f);
+	if (i < nBodies) {
+		bodies[i].f = make_float3(0.0f,0.0f,0.0f);
+		bodies[i].t = make_float3(0.0f,0.0f,0.0f);
 	}
 }
 
@@ -26,18 +43,18 @@ __global__ void zero_rigid_forces_torques_IBM3D(
 // --------------------------------------------------------
 
 __global__ void enforce_max_rigid_force_torque_IBM3D(
-	rigid* rigids,
+	rigid* bodies,
 	float fmax,
 	float tmax,
-	int nRigids)
+	int nBodies)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nRigids) {
-		float fi = length(rigids[i].f);
-		float ti = length(rigids[i].t);
-		if (fi > fmax) rigids[i].f *= (fmax/fi);
-		if (ti > tmax) rigids[i].t *= (tmax/ti);
+	if (i < nBodies) {
+		float fi = length(bodies[i].f);
+		float ti = length(bodies[i].t);
+		if (fi > fmax) bodies[i].f *= (fmax/fi);
+		if (ti > tmax) bodies[i].t *= (tmax/ti);
 	}
 }
 
@@ -47,17 +64,18 @@ __global__ void enforce_max_rigid_force_torque_IBM3D(
 // IBM3D rigid-node update position kernel:
 // --------------------------------------------------------
 
-__global__ void update_node_positions_rigids_IBM3D(
+__global__ void update_node_positions_velocities_rigids_IBM3D(
 	rigidnode* nodes,
-	rigid* rigids,
+	rigid* bodies,
 	int nNodes)
 {
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		int rigidID = nodes[i].cellID;
-		tensor R = rigids[rigidID].q.get_rot_matrix();
-		nodes[i].r = rigids[rigidID].com + R*nodes[i].delta;   // need to check rotation matrix calculation!!!!!!
+		int cID = nodes[i].cellID;
+		tensor R = bodies[cID].q.get_rot_matrix();
+		nodes[i].r = bodies[cID].com + R*nodes[i].delta;   // need to check rotation matrix calculation!!!!!!
+		nodes[i].v = bodies[cID].vel + cross(bodies[cID].omega,nodes[i].delta);
 	}
 }
 
@@ -68,19 +86,61 @@ __global__ void update_node_positions_rigids_IBM3D(
 // --------------------------------------------------------
 
 __global__ void update_rigid_position_orientation_IBM3D(
-	rigid* rigids,
+	rigid* bodies,
 	float dt,
-	int nRigids)
+	int nBodies)
 {
 	// define bead:
-	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nRigids) {
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
 		
+	if (i < nBodies) {
 		
+		// update translational position and velocity to time "t + dt":
 		
-		// need to add stuff here....
+		float dtm = dt/bodies[i].mass;
+		bodies[i].vel += dtm*bodies[i].f;
+		bodies[i].com += dt*bodies[i].vel;
 		
+		// update angular momentum to time "t" (just a placeholder value):
 		
+		float dt2 = dt/2.0;
+		float3 Li = bodies[i].L + dt2*bodies[i].t;
+		
+		// obtain rotation matrix at time "t":
+		
+		tensor A = bodies[i].q.get_rot_matrix();
+		
+		// convert angular momentum to angular velocity in body-fixed frame:
+		
+		float3 omegaB = (A*Li)/bodies[i].I;
+		
+		// update quaternion to time "t + dt/2":
+		
+		quaternion q_half = bodies[i].q;
+		q_half.update(dt2,omegaB);
+		q_half.normalize();
+				
+		// obtain rotation matrix at time "t + dt/2":
+		
+		A = q_half.get_rot_matrix();
+		
+		// update angular momentum from time "t - dt/2" to time "t + dt/2":
+		
+		bodies[i].L += dt*bodies[i].t;
+		
+		// convert angular momentum to angular velocity in body-fixed frame:
+		
+		omegaB = (A*bodies[i].L)/bodies[i].I;
+		
+		// update quaternion to time "t + dt":
+		
+		bodies[i].q.update(dt,omegaB);
+		bodies[i].q.normalize();
+		
+		// update rigid-body angular velocity in space frame at time "t + dt/2":
+		
+		bodies[i].omega = transpose(A)*omegaB;
+				
 	}
 }
 
@@ -93,7 +153,7 @@ __global__ void update_rigid_position_orientation_IBM3D(
 
 __global__ void sum_rigid_forces_torques_IBM3D(
 	rigidnode* nodes,
-	rigid* rigids,
+	rigid* bodies,
 	int nNodes)
 {
 	// define bead:
@@ -103,13 +163,19 @@ __global__ void sum_rigid_forces_torques_IBM3D(
 		float3 force = nodes[i].f;
 		float3 torque = cross(nodes[i].delta,nodes[i].f);
 		// add up forces
-		atomicAdd(&rigids[rigidID].f.x,force.x);
-		atomicAdd(&rigids[rigidID].f.y,force.y);
-		atomicAdd(&rigids[rigidID].f.z,force.z);
+		atomicAdd(&bodies[rigidID].f.x,force.x);
+		atomicAdd(&bodies[rigidID].f.y,force.y);
+		atomicAdd(&bodies[rigidID].f.z,force.z);
 		// add up torques
-		atomicAdd(&rigids[rigidID].t.x,torque.x);
-		atomicAdd(&rigids[rigidID].t.y,torque.y);
-		atomicAdd(&rigids[rigidID].t.z,torque.z);			
+		atomicAdd(&bodies[rigidID].t.x,torque.x);
+		atomicAdd(&bodies[rigidID].t.y,torque.y);
+		atomicAdd(&bodies[rigidID].t.z,torque.z);
+		
+		
+		
+		// Do I need to AVERAGE these forces/torques....?
+		
+			
 	}
 }
 
@@ -124,7 +190,7 @@ __global__ void sum_rigid_forces_torques_IBM3D(
 
 __global__ void unwrap_node_coordinates_rigid_IBM3D(
 	rigidnode* nodes,
-	rigid* rigids,
+	rigid* bodies,
 	float3 Box,
 	int3 pbcFlag,
 	int nNodes)
@@ -133,7 +199,7 @@ __global__ void unwrap_node_coordinates_rigid_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
 		int rigidID = nodes[i].cellID;
-		float3 rij = rigids[rigidID].com - nodes[i].r;
+		float3 rij = bodies[rigidID].com - nodes[i].r;
 		float3 adjust = roundf(rij/Box)*Box*pbcFlag;
 		nodes[i].r = nodes[i].r + adjust;   // PBC's
 	}
@@ -162,19 +228,19 @@ __global__ void wrap_node_coordinates_rigid_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to wrap bead coordinates for PBCs:
+// IBM3D kernel to wrap rigid-body COM coordinates for PBCs:
 // --------------------------------------------------------
 
 __global__ void wrap_rigid_coordinates_IBM3D(
-	rigid* rigids,
+	rigid* bodies,
 	float3 Box,
 	int3 pbcFlag,
-	int nRigids)
+	int nBodies)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nRigids) {	
-		rigids[i].com = rigids[i].com - floorf(rigids[i].com/Box)*Box*pbcFlag;		
+	if (i < nBodies) {	
+		bodies[i].com = bodies[i].com - floorf(bodies[i].com/Box)*Box*pbcFlag;		
 	}
 }
 
@@ -429,7 +495,7 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to assign beads to bins:
+// IBM3D kernel to assign nodes to bins:
 // --------------------------------------------------------
 
 __global__ void build_bin_lists_for_rigid_nodes_IBM3D(
@@ -468,7 +534,7 @@ __global__ void build_bin_lists_for_rigid_nodes_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to calculate nonbonded bead interactions
+// IBM3D kernel to calculate nonbonded node interactions
 // using the bin lists:
 // --------------------------------------------------------
 

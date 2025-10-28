@@ -145,3 +145,49 @@ void read_ibm_information_long(std::string fname, int nNodes, int nFaces, int nE
 	infile.close();
 	
 }
+
+
+
+// --------------------------------------------------------
+// Read IBM mesh information from file:
+// This includes only the node information
+// --------------------------------------------------------
+
+void read_ibm_information_just_nodes(std::string fname, int nNodes, rigidnode* nodes)
+{
+	
+	// -----------------------------------------------
+	// variables for reading:
+	// -----------------------------------------------
+	
+	int nN, nF, nE;
+		
+	// -----------------------------------------------
+	// open file:
+	// -----------------------------------------------
+	
+	ifstream infile;
+	infile.open(fname, ios::in);
+	
+	// -----------------------------------------------
+	// read header:
+	// -----------------------------------------------
+		
+	infile >> nN >> nF >> nE; 
+	if (nN != nNodes) cout << "number of IBM nodes is not consistent with ibm input file = " << nN << endl;
+	
+	// -----------------------------------------------
+	// read node positions:
+	// -----------------------------------------------
+	
+	for (int i=0; i<nNodes; i++) {
+		infile >> nodes[i].r.x >> nodes[i].r.y >> nodes[i].r.z;
+	}
+		
+	// -----------------------------------------------
+	// close file:
+	// -----------------------------------------------
+	
+	infile.close();
+	
+}
