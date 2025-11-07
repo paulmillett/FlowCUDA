@@ -50,7 +50,8 @@ class_rigids_ibm3D::class_rigids_ibm3D()
 	repA = inputParams("IBM/repA",0.0);
 	repD = inputParams("IBM/repD",0.0);
 	repFmax = inputParams("IBM/repFmax",1000.0);
-	nodeFmax = inputParams("IBM/nodeFmax",1000.0);
+	bodyFmax = inputParams("IBM/bodyFmax",1000.0);
+	bodyTmax = inputParams("IBM/bodyTmax",1000.0);
 	channelShape = inputParams("Lattice/channelShape","rectangle");
 	chRad = inputParams("Lattice/chRad",10.0);
 	
@@ -331,6 +332,50 @@ void class_rigids_ibm3D::duplicate_cells()
 
 
 // --------------------------------------------------------
+// Calculate a node's position relative to it's rigid-body
+// center-of-mass.  It is assumed that at this point, the
+// body center-of-mass is at the origin (from the read-file):
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::relative_node_position_versus_com()
+{
+	for (int i=0; i<nNodes; i++) {
+		nodesH[i].delta = nodesH[i].r;
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Calculate a cylindrical rigid-body's mass and 
+// principal moments of inertia:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::cell_mass_moment_of_inertia_cylinder(float L, float R)
+{
+	for (int c=0; c<nBodies; c++) {
+		// assume body density = fluid density
+		float rho = 1.0;   // LBM fluid density
+		float vol = L*(M_PI*R*R);
+		float mass = rho*vol;
+		bodiesH[c].mass = mass;
+		// assume cylinder is aligned with the x-axis
+		bodiesH[c].I.x = (mass*R*R)/2.0;
+		bodiesH[c].I.y = (mass*(3.0*R*R + L*L))/12.0;
+		bodiesH[c].I.z = (mass*(3.0*R*R + L*L))/12.0;
+		// initialize other parameters to zero
+		bodiesH[c].L = make_float3(0.0f,0.0f,0.0f);
+		bodiesH[c].f = make_float3(0.0f,0.0f,0.0f);
+		bodiesH[c].t = make_float3(0.0f,0.0f,0.0f);
+		bodiesH[c].vel = make_float3(0.0f,0.0f,0.0f);
+		bodiesH[c].omega = make_float3(0.0f,0.0f,0.0f);
+		bodiesH[c].q.set_values(1.0f,0.0f,0.0f,0.0f);
+	}
+}
+
+
+
+// --------------------------------------------------------
 // randomize cell positions and orientations:
 // --------------------------------------------------------
 
@@ -547,44 +592,15 @@ void class_rigids_ibm3D::rotate_and_shift_node_positions(int cID, float xsh, flo
 }
 
 
-/*
+
 // --------------------------------------------------------
 // Write IBM output to file:
 // --------------------------------------------------------
 
 void class_rigids_ibm3D::write_output(std::string tagname, int tagnum)
 {
-	//write_vtk_immersed_boundary_3D(tagname,tagnum,
-	//nNodes,nFaces,nodesH,facesH);
-	write_vtk_immersed_boundary_3D_cellID(tagname,tagnum,
-	nNodes,nFaces,nodesH,facesH,bodiesH);
+	write_vtk_immersed_boundary_3D_rigid_bodies(tagname,tagnum,nNodes,nodesH);
 }
-
-
-
-// --------------------------------------------------------
-// Write IBM output to file:
-// --------------------------------------------------------
-
-void class_rigids_ibm3D::write_output_cylinders(std::string tagname, int tagnum)
-{
-	write_vtk_immersed_boundary_3D_cellID_cylinders(tagname,tagnum,
-	nNodes,nFaces,nodesH,facesH,bodiesH,Box);
-}
-
-
-
-// --------------------------------------------------------
-// Write IBM output to file, including more information
-// (edge angles):
-// --------------------------------------------------------
-
-void class_rigids_ibm3D::write_output_long(std::string tagname, int tagnum)
-{
-	write_vtk_immersed_boundary_normals_3D(tagname,tagnum,
-	nNodes,nFaces,nEdges,nodesH,facesH,edgesH);
-}
-*/
 
 
 
@@ -614,7 +630,7 @@ void class_rigids_ibm3D::compute_wall_forces(int nBlocks, int nThreads)
 
 void class_rigids_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
 {
-	/*		
+			
 	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
 
@@ -624,18 +640,24 @@ void class_rigids_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThread
 		build_bin_lists(nBlocks,nThreads);
 	}		
 		
-	// update IBM:
-	compute_node_forces_skalak(nBlocks,nThreads);
+	// zero forces/torques for nodes and rigid bodies:
+	zero_node_forces(nBlocks,nThreads);
+	zero_rigid_body_forces_torques(nBlocks,nThreads);
+	
+	// calculate forces on nodes (hydrodynamic, interactive, wall, etc.):
+	lbm.hydrodynamic_force_rigid_node(nBlocks,nThreads,nodes,nNodes);
 	if (nBodies > 1) nonbonded_node_interactions(nBlocks,nThreads);
 	compute_wall_forces(nBlocks,nThreads);
-	enforce_max_node_force(nBlocks,nThreads);
-	lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
-	lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
-	update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
-	//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
 	
-	*/
-		
+	// sum node forces/torques on rigid-bodies:
+	sum_rigid_forces_torques(nBlocks,nThreads);
+	
+	// update rigid-body positions and orientations:
+	update_rigid_body(nBlocks,nThreads);
+	
+	// update node positions & velocities based on new rigid-body data:
+	update_node_positions_velocities(nBlocks,nThreads);
+			
 }
 
 
@@ -663,17 +685,114 @@ void class_rigids_ibm3D::stepIBM(class_scsp_D3Q19& lbm, int nBlocks, int nThread
 
 
 
+
 // --------------------------------------------------------
-// Call to "update_node_position_IBM3D" kernel:
+// Call to "zero_node_forces_rigid_IBM3D" kernel:
 // --------------------------------------------------------
 
-void class_rigids_ibm3D::update_node_positions(int nBlocks, int nThreads)
+void class_rigids_ibm3D::zero_node_forces(int nBlocks, int nThreads)
+{
+	zero_node_forces_rigid_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "zero_rigid_forces_torques_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::zero_rigid_body_forces_torques(int nBlocks, int nThreads)
+{
+	zero_rigid_forces_torques_IBM3D
+	<<<nBlocks,nThreads>>> (bodies,nBodies);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "enforce_max_rigid_force_torque_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::enforce_rigid_body_max_forces_torques(int nBlocks, int nThreads)
+{
+	enforce_max_rigid_force_torque_IBM3D
+	<<<nBlocks,nThreads>>> (bodies,bodyFmax,bodyTmax,nBodies);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_node_positions_velocities_rigids_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::update_node_positions_velocities(int nBlocks, int nThreads)
 {
 	update_node_positions_velocities_rigids_IBM3D
 	<<<nBlocks,nThreads>>> (nodes,bodies,nNodes);
 	
 	wrap_node_coordinates_rigid_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);		
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_rigid_position_orientation_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::update_rigid_body(int nBlocks, int nThreads)
+{
+	update_rigid_position_orientation_IBM3D
+	<<<nBlocks,nThreads>>> (bodies,dt,nBodies);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "sum_rigid_forces_torques_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::sum_rigid_forces_torques(int nBlocks, int nThreads)
+{
+	sum_rigid_forces_torques_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,bodies,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "unwrap_node_coordinates_rigid_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::unwrap_node_coordinates(int nBlocks, int nThreads)
+{
+	unwrap_node_coordinates_rigid_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,bodies,Box,pbcFlag,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "wrap_node_coordinates_rigid_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::wrap_node_coordinates(int nBlocks, int nThreads)
+{
+	wrap_node_coordinates_rigid_IBM3D
 	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "wrap_rigid_coordinates_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rigids_ibm3D::wrap_rigid_body_coordinates(int nBlocks, int nThreads)
+{
+	wrap_rigid_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (bodies,Box,pbcFlag,nBodies);	
 }
 
 

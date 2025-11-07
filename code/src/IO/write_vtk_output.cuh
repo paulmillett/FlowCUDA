@@ -5,6 +5,7 @@
 # include "../IBM/3D/data_structs/filament_data.h"
 # include "../IBM/3D/data_structs/fiber_data.h"
 # include "../IBM/3D/data_structs/rod_data.h"
+# include "../IBM/3D/data_structs/rigid_data.h"
 # include "../D3Q19/mcmp_SC_bb/kernels_mcmp_SC_bb_D3Q19.cuh"
 # include <string>
 
@@ -59,6 +60,8 @@ void write_vtk_immersed_boundary_3D_fibers(std::string,int,int,int,
                                            beadfiber*,edgefiber*);
 																							
 void write_vtk_immersed_boundary_3D_rods(std::string,int,int,int,beadrod*);
+
+void write_vtk_immersed_boundary_3D_rigid_bodies(std::string,int,int,rigidnode*);
 
 void write_vtk_unstructured_grid(std::string,int,int,int*,int*,int*);
 

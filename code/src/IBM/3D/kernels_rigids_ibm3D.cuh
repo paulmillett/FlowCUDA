@@ -1,5 +1,7 @@
+
 # ifndef KERNELS_RIGIDS_IBM3D_H
 # define KERNELS_RIGIDS_IBM3D_H
+
 # include <cuda.h>
 # include <curand.h>
 # include <curand_kernel.h>
@@ -98,9 +100,9 @@ __global__ void rigid_node_wall_forces_cylinder_IBM3D(
 	float,
 	int);
 
-/*
-__global__ void hydrodynamic_force_bead_rod_IBM3D(
-	beadrod*,
+
+__global__ void hydrodynamic_force_rigid_node_IBM3D(
+	rigidnode*,
 	float*,
 	float*,
 	float*,
@@ -111,9 +113,7 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	int,
 	int,
 	int,
-	int,
 	int);
-*/
 			
 		
 __global__ void build_bin_lists_for_rigid_nodes_IBM3D(
@@ -141,5 +141,14 @@ __device__ inline void pairwise_rigid_node_interaction_forces_WCA(
 	float3,
 	int3);
 
+
+__device__ inline int rigid_voxel_ndx(
+	int,
+	int,
+	int,
+	int,
+	int,
+	int);
+	
 
 # endif  // KERNELS_RIGIDS_IBM3D_H

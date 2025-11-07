@@ -1532,6 +1532,54 @@ void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nB
 
 
 
+// -------------------------------------------------------------------------
+// Write IBM mesh to 'vtk' file:
+// -------------------------------------------------------------------------
+
+void write_vtk_immersed_boundary_3D_rigid_bodies(std::string tagname, int tagnum, int nNodes, rigidnode* nodes)
+{
+		
+	// -----------------------------------
+	//	Define the file location and name:
+	// -----------------------------------
+
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << "_" << tagnum << ".vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+
+	// -----------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------
+
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing IBM data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET POLYDATA" << endl;			
+	
+	// -----------------------------------
+	//	Write the bead positions:
+	// -----------------------------------
+
+	outfile << " " << endl;	
+	outfile << "POINTS " << nNodes << " float" << endl;
+	for (int i=0; i<nNodes; i++) {
+		outfile << fixed << setprecision(3) << nodes[i].r.x << "  " << nodes[i].r.y << "  " << nodes[i].r.z << endl;
+	}
+			
+	// -----------------------------------------------
+	//	Close the file:
+	// -----------------------------------------------
+		
+	outfile.close();
+		
+}
+
+
+
 // -----------------------------------------------------------------------------------------
 // Write output in a VTK Unstructured Grid format:
 // -----------------------------------------------------------------------------------------

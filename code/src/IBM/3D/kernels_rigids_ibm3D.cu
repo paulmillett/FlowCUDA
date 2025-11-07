@@ -39,6 +39,35 @@ __global__ void zero_rigid_forces_torques_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to sum the forces, torques, and moments of
+// inertia for the rigid-body particles:
+// --------------------------------------------------------
+
+__global__ void sum_rigid_forces_torques_IBM3D(
+	rigidnode* nodes,
+	rigid* bodies,
+	int nNodes)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {
+		int rigidID = nodes[i].cellID;
+		float3 force = nodes[i].f;
+		float3 torque = cross(nodes[i].delta,nodes[i].f);
+		// add up forces
+		atomicAdd(&bodies[rigidID].f.x,force.x);
+		atomicAdd(&bodies[rigidID].f.y,force.y);
+		atomicAdd(&bodies[rigidID].f.z,force.z);
+		// add up torques
+		atomicAdd(&bodies[rigidID].t.x,torque.x);
+		atomicAdd(&bodies[rigidID].t.y,torque.y);
+		atomicAdd(&bodies[rigidID].t.z,torque.z);
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D enforce a maximum rigid-body force & torque:
 // --------------------------------------------------------
 
@@ -55,27 +84,6 @@ __global__ void enforce_max_rigid_force_torque_IBM3D(
 		float ti = length(bodies[i].t);
 		if (fi > fmax) bodies[i].f *= (fmax/fi);
 		if (ti > tmax) bodies[i].t *= (tmax/ti);
-	}
-}
-
-
-
-// --------------------------------------------------------
-// IBM3D rigid-node update position kernel:
-// --------------------------------------------------------
-
-__global__ void update_node_positions_velocities_rigids_IBM3D(
-	rigidnode* nodes,
-	rigid* bodies,
-	int nNodes)
-{
-	// define bead:
-	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nNodes) {
-		int cID = nodes[i].cellID;
-		tensor R = bodies[cID].q.get_rot_matrix();
-		nodes[i].r = bodies[cID].com + R*nodes[i].delta;   // need to check rotation matrix calculation!!!!!!
-		nodes[i].v = bodies[cID].vel + cross(bodies[cID].omega,nodes[i].delta);
 	}
 }
 
@@ -100,7 +108,7 @@ __global__ void update_rigid_position_orientation_IBM3D(
 		float dtm = dt/bodies[i].mass;
 		bodies[i].vel += dtm*bodies[i].f;
 		bodies[i].com += dt*bodies[i].vel;
-		
+				
 		// update angular momentum to time "t" (just a placeholder value):
 		
 		float dt2 = dt/2.0;
@@ -147,11 +155,10 @@ __global__ void update_rigid_position_orientation_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to sum the forces, torques, and moments of
-// inertia for the rigid-body particles:
+// IBM3D rigid-node update position kernel:
 // --------------------------------------------------------
 
-__global__ void sum_rigid_forces_torques_IBM3D(
+__global__ void update_node_positions_velocities_rigids_IBM3D(
 	rigidnode* nodes,
 	rigid* bodies,
 	int nNodes)
@@ -159,23 +166,10 @@ __global__ void sum_rigid_forces_torques_IBM3D(
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nNodes) {
-		int rigidID = nodes[i].cellID;
-		float3 force = nodes[i].f;
-		float3 torque = cross(nodes[i].delta,nodes[i].f);
-		// add up forces
-		atomicAdd(&bodies[rigidID].f.x,force.x);
-		atomicAdd(&bodies[rigidID].f.y,force.y);
-		atomicAdd(&bodies[rigidID].f.z,force.z);
-		// add up torques
-		atomicAdd(&bodies[rigidID].t.x,torque.x);
-		atomicAdd(&bodies[rigidID].t.y,torque.y);
-		atomicAdd(&bodies[rigidID].t.z,torque.z);
-		
-		
-		
-		// Do I need to AVERAGE these forces/torques....?
-		
-			
+		int cID = nodes[i].cellID;
+		tensor R = bodies[cID].q.get_rot_matrix();
+		nodes[i].r = bodies[cID].com + R*nodes[i].delta;   // need to check rotation matrix calculation!!!!!!
+		nodes[i].v = bodies[cID].vel + cross(bodies[cID].omega,nodes[i].delta);
 	}
 }
 
@@ -398,14 +392,14 @@ __global__ void rigid_node_wall_forces_cylinder_IBM3D(
 }
 
 
-/*
+
 // --------------------------------------------------------
 // IBM3D kernel to interpolate the gradient of the velocity
 // field at the rod position. 
 // --------------------------------------------------------
 
-__global__ void hydrodynamic_force_bead_rod_IBM3D(
-	beadrod* beads,
+__global__ void hydrodynamic_force_rigid_node_IBM3D(
+	rigidnode* nodes,
 	float* fxLBM,
 	float* fyLBM,
 	float* fzLBM,
@@ -413,24 +407,23 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	float* vLBM,
 	float* wLBM,
 	float dt,
-	int nBeadsPerRod,
 	int Nx,
 	int Ny,
 	int Nz,
-	int nBeads)
+	int nNodes)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
-	if (i < nBeads) {
+	if (i < nNodes) {
 				
 		// --------------------------------------
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
 		
-		int i0 = int(floor(beads[i].r.x));
-		int j0 = int(floor(beads[i].r.y));
-		int k0 = int(floor(beads[i].r.z));
+		int i0 = int(floor(nodes[i].r.x));
+		int j0 = int(floor(nodes[i].r.y));
+		int k0 = int(floor(nodes[i].r.z));
 		
 		// --------------------------------------
 		// loop over footprint to get 
@@ -443,10 +436,10 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 		for (int kk=k0; kk<=k0+1; kk++) {
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {				
-					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
-					float rx = beads[i].r.x - float(ii);
-					float ry = beads[i].r.y - float(jj);
-					float rz = beads[i].r.z - float(kk);
+					int ndx = rigid_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = nodes[i].r.x - float(ii);
+					float ry = nodes[i].r.y - float(jj);
+					float rz = nodes[i].r.z - float(kk);
 					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
 					vxLBMi += del*uLBM[ndx];
 					vyLBMi += del*vLBM[ndx];
@@ -457,16 +450,15 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 		
 		// --------------------------------------
 		// calculate hydrodynamic forces & add them
-		// to IBM bead forces:
+		// to IBM node forces:
 		// --------------------------------------
-		
-		float3 velBead = (beads[i].r - beads[i].rm1)/dt;		
-		float fx = (vxLBMi - velBead.x)/dt/float(nBeadsPerRod);
-		float fy = (vyLBMi - velBead.y)/dt/float(nBeadsPerRod);
-		float fz = (vzLBMi - velBead.z)/dt/float(nBeadsPerRod);
-		beads[i].f.x += fx;
-		beads[i].f.y += fy;
-		beads[i].f.z += fz;
+						
+		float fx = 0.01*(vxLBMi - nodes[i].v.x)/dt;
+		float fy = 0.01*(vyLBMi - nodes[i].v.y)/dt;
+		float fz = 0.01*(vzLBMi - nodes[i].v.z)/dt;
+		nodes[i].f.x += fx;
+		nodes[i].f.y += fy;
+		nodes[i].f.z += fz;
 		
 		// --------------------------------------
 		// distribute the !negative! of the 
@@ -477,10 +469,10 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 		for (int kk=k0; kk<=k0+1; kk++) {
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {				
-					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
-					float rx = beads[i].r.x - float(ii);
-					float ry = beads[i].r.y - float(jj);
-					float rz = beads[i].r.z - float(kk);
+					int ndx = rigid_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = nodes[i].r.x - float(ii);
+					float ry = nodes[i].r.y - float(jj);
+					float rz = nodes[i].r.z - float(kk);
 					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
 					atomicAdd(&fxLBM[ndx],-del*fx);
 					atomicAdd(&fyLBM[ndx],-del*fy);
@@ -490,7 +482,6 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 		}		
 	}	
 }
-*/
 
 
 
@@ -656,6 +647,26 @@ __device__ inline void pairwise_rigid_node_interaction_forces_WCA(
 
 
 
+// --------------------------------------------------------
+// IBM3D kernel to determine 1D index from 3D indices:
+// --------------------------------------------------------
+
+__device__ inline int rigid_voxel_ndx(
+	int i,
+	int j,
+	int k,
+	int Nx,
+	int Ny,
+	int Nz)
+{
+    if (i < 0) i += Nx;
+    if (i >= Nx) i -= Nx;
+    if (j < 0) j += Ny;
+    if (j >= Ny) j -= Ny;
+    if (k < 0) k += Nz;
+    if (k >= Nz) k -= Nz;
+    return k*Nx*Ny + j*Nx + i;	
+}
 
 
 

@@ -27,7 +27,8 @@ class class_rigids_ibm3D {
 	float repA;
 	float repD;
 	float repFmax;
-	float nodeFmax;
+	float bodyFmax;
+	float bodyTmax;
 	float chRad;
 	float3 Box;
 	int3 pbcFlag;
@@ -59,7 +60,9 @@ class class_rigids_ibm3D {
 	int get_max_array_size();
 	void assign_refNode_to_cells();
 	void assign_cellIDs_to_nodes();
-	void duplicate_cells();	
+	void duplicate_cells();
+	void relative_node_position_versus_com();
+	void cell_mass_moment_of_inertia_cylinder(float,float);
 	void shift_node_positions(int,float,float,float);
 	void rotate_and_shift_node_positions(int,float,float,float);
 	void rotate_and_shift_node_positions(int,float,float,float,float,float,float);
@@ -73,7 +76,15 @@ class class_rigids_ibm3D {
 	void update_node_positions(int,int);
 	void compute_wall_forces(int,int);
 	void stepIBM(class_scsp_D3Q19&,int,int);
-	void update_node_positions_vacuum(float,int,int);
+	void zero_node_forces(int,int);
+	void zero_rigid_body_forces_torques(int,int);
+	void enforce_rigid_body_max_forces_torques(int,int);
+	void update_node_positions_velocities(int,int);
+	void update_rigid_body(int,int);
+	void sum_rigid_forces_torques(int,int);
+	void unwrap_node_coordinates(int,int);
+	void wrap_node_coordinates(int,int);
+	void wrap_rigid_body_coordinates(int,int);	
 	void build_binMap(int,int);
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);

@@ -858,7 +858,7 @@ void class_scsp_D3Q19::viscous_force_filaments_IBM_LBM(int nBlocks, int nThreads
 
 
 // --------------------------------------------------------
-// Call to "viscous_force_velocity_difference_IBM3D" kernel.  
+// Call to "hydrodynamic_force_bead_fluid_IBM3D" kernel.  
 // Note: this kernel is in the IBM/3D folder, and one
 //       should use nBlocks as if calling an IBM kernel.
 // --------------------------------------------------------
@@ -874,7 +874,7 @@ void class_scsp_D3Q19::hydrodynamic_forces_filaments_IBM_LBM(int nBlocks, int nT
 
 
 // --------------------------------------------------------
-// Call to "viscous_force_velocity_difference_IBM3D" kernel.  
+// Call to "hydrodynamic_force_bead_fluid_IBM3D" kernel.  
 // Note: this kernel is in the IBM/3D folder, and one
 //       should use nBlocks as if calling an IBM kernel.
 // --------------------------------------------------------
@@ -890,7 +890,7 @@ void class_scsp_D3Q19::hydrodynamic_forces_fibers_IBM_LBM(int nBlocks, int nThre
 
 
 // --------------------------------------------------------
-// Call to "interpolate_gradient_of_velocity_rod_IBM3D" kernel.  
+// Call to "hydrodynamic_force_bead_rod_IBM3D" kernel.  
 // Note: this kernel is in the IBM/3D folder, and one
 //       should use nBlocks as if calling an IBM kernel.
 // --------------------------------------------------------
@@ -900,6 +900,21 @@ void class_scsp_D3Q19::hydrodynamic_force_bead_rod(int nBlocks, int nThreads,
 {
 	hydrodynamic_force_bead_rod_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Fx,Fy,Fz,u,v,w,dt,nBeadsPerRod,Nx,Ny,Nz,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "hydrodynamic_force_rigid_node_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::hydrodynamic_force_rigid_node(int nBlocks, int nThreads,
+	                                                 rigidnode* nodes, int nNodes)
+{
+	hydrodynamic_force_rigid_node_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Fx,Fy,Fz,u,v,w,dt,Nx,Ny,Nz,nNodes);	
 }
 
 
