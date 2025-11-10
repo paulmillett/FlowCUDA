@@ -1355,12 +1355,17 @@ void class_capsules_ibm3D::stepIBM_spring_cylinders(class_scsp_D3Q19& lbm, float
 			
 		// update IBM:
 		compute_node_forces_spring(nBlocks,nThreads);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		
 		if (nCells > 1) nonbonded_node_lubrication_interactions(Rad,nu,nBlocks,nThreads);
 		//wall_lubrication_forces_cylinder(chRad,Rad,nu,nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
-		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
-		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		
+		//lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
+		//lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		
 		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
 		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
 		
