@@ -1,6 +1,6 @@
 
-# ifndef SCSP_3D_SHEETS_SLIT_TRAINS_H
-# define SCSP_3D_SHEETS_SLIT_TRAINS_H
+# ifndef SCSP_3D_SHEETS_CHANNEL_H
+# define SCSP_3D_SHEETS_CHANNEL_H
 
 # include "../Base/FlowBase.cuh"
 # include "../D3Q19/scsp/class_scsp_D3Q19.cuh"
@@ -8,7 +8,7 @@
 # include <cuda.h>
 # include <string>
 
-class scsp_3D_sheets_slit_trains : public FlowBase {
+class scsp_3D_sheets_channel : public FlowBase {
 	
 private:
 
@@ -39,6 +39,7 @@ private:
 	float trainRij;
 	float trainAng;
 	float wavelength;
+	float chRad;
 	bool initRandom;
 	bool pulsatile;
 	std::string vtkFormat;
@@ -53,14 +54,15 @@ private:
 		
 public:
 
-	scsp_3D_sheets_slit_trains();
-	~scsp_3D_sheets_slit_trains();
+	scsp_3D_sheets_channel();
+	~scsp_3D_sheets_channel();
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	void calcMembraneParams(float,float,float);
 	void calcRefFlux();
+	float calcInfSum(float,float);
 	
 };
 
-# endif  // SCSP_3D_SHEETS_SLIT_TRAINS_H
+# endif  // SCSP_3D_SHEETS_CHANNEL_H

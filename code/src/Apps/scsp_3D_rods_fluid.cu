@@ -54,9 +54,12 @@ scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-	shearVel = inputParams("LBM/shearVel",0.0);
-	float Re = inputParams("LBM/Re",2.0);
-	shearVel = 2.0*Re*nu/float(Nz);
+	float shearRate = inputParams("LBM/shearRate",0.0);
+	shearVel = shearRate*float(Nz-1)/2.0;
+	
+	//shearVel = inputParams("LBM/shearVel",0.0);
+	//float Re = inputParams("LBM/Re",2.0);
+	//shearVel = 2.0*Re*nu/float(Nz);
 	
 	// ----------------------------------------------
 	// Rods Immersed-Boundary parameters:
@@ -164,6 +167,8 @@ void scsp_3D_rods_fluid::initSystem()
 	rods.duplicate_rods();
 	rods.assign_rodIDs_to_beads();
 	
+	if (nRods == 1) rods.shift_bead_positions(0,float(Nx-1)/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0);
+	
 	fp = Pe*kT/Lrod;
 	up = fp/gam;
 	rods.set_rods_radii(Drod/2.0);
@@ -230,9 +235,11 @@ void scsp_3D_rods_fluid::initSystem()
 	// ----------------------------------------------
 	// randomly disperse filaments: 
 	// ----------------------------------------------
-		
-	//rods.randomize_rods(Lrod+2.0);
-	rods.randomize_rods_xdir_alligned_cylinder(10.0,1.0);
+			
+	if (nRods > 1) {
+		//rods.randomize_rods(Lrod+2.0);
+		rods.randomize_rods_xdir_alligned_cylinder(10.0,1.0);
+	}
 	rods.set_rod_position_orientation(nBlocks,nThreads);
 		
 	// ----------------------------------------------
@@ -295,7 +302,7 @@ void scsp_3D_rods_fluid::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 		
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;
+		cummulativeSteps++;		
 		rods.stepIBM_Euler(lbm,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);

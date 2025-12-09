@@ -59,7 +59,7 @@ void write_vtk_immersed_boundary_3D_filaments(std::string,int,int,int,
 void write_vtk_immersed_boundary_3D_fibers(std::string,int,int,int,
                                            beadfiber*,edgefiber*);
 																							
-void write_vtk_immersed_boundary_3D_rods(std::string,int,int,int,beadrod*);
+void write_vtk_immersed_boundary_3D_rods(std::string,int,int,int,beadrod*,rod*);
 
 void write_vtk_immersed_boundary_3D_rigid_bodies(std::string,int,int,rigidnode*);
 

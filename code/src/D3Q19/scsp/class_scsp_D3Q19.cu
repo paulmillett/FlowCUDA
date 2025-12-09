@@ -926,10 +926,10 @@ void class_scsp_D3Q19::hydrodynamic_force_rigid_node(int nBlocks, int nThreads,
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::interpolate_gradient_of_velocity_rod(int nBlocks, int nThreads,
-	                                                        rod* rods, int nRods)
+	                                                        beadrod* beads, int nBeads)
 {
-	interpolate_gradient_of_velocity_rod_IBM3D
-	<<<nBlocks,nThreads>>> (rods,u,v,w,Nx,Ny,Nz,nRods);	
+	interpolate_gradient_of_velocity_bead_IBM3D
+	<<<nBlocks,nThreads>>> (beads,u,v,w,Nx,Ny,Nz,nBeads);	
 }
 
 

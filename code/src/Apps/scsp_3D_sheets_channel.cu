@@ -1,5 +1,5 @@
 
-# include "scsp_3D_sheets_slit_trains.cuh"
+# include "scsp_3D_sheets_channel.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_sheets_slit_trains::scsp_3D_sheets_slit_trains() : lbm(),ibm()
+scsp_3D_sheets_channel::scsp_3D_sheets_channel() : lbm(),ibm()
 {		
 	
 	// ----------------------------------------------
@@ -28,7 +28,8 @@ scsp_3D_sheets_slit_trains::scsp_3D_sheets_slit_trains() : lbm(),ibm()
 	Q = inputParams("Lattice/Q",19);
 	Nx = inputParams("Lattice/Nx",1);
 	Ny = inputParams("Lattice/Ny",1);
-	Nz = inputParams("Lattice/Nz",1);	
+	Nz = inputParams("Lattice/Nz",1);
+	chRad = inputParams("Lattice/chRad",float(Nz-1)/2.0);	
 	
 	// ----------------------------------------------
 	// GPU parameters:
@@ -76,7 +77,7 @@ scsp_3D_sheets_slit_trains::scsp_3D_sheets_slit_trains() : lbm(),ibm()
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	ibm.set_pbcFlag(1,1,0);
+	ibm.set_pbcFlag(1,0,0);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -101,17 +102,47 @@ scsp_3D_sheets_slit_trains::scsp_3D_sheets_slit_trains() : lbm(),ibm()
 	
 	lbm.allocate();
 	lbm.allocate_forces();
+	lbm.allocate_solid();
 	ibm.allocate();	
 	
 	// ----------------------------------------------
-	// determine membrane parameters (see function
-	// below), then calculate reference flux for no
-	// capsules:
+	// calculate membrane properties:
 	// ----------------------------------------------
 	
-	calcMembraneParams(Re,Ca,ksmax);
-	calcRefFlux();
-	Q0 = inputParams("LBM/Q0",0.0);
+	cellProps = inputParams("IBM/cellProps","uniform");
+	float stddevCa = inputParams("IBM/stddevCa",0.0);
+	float Kv = inputParams("IBM/kv",0.0);
+	float C = inputParams("IBM/C",2.0);
+	float rho = 1.0;
+	float h = float(Nz)/2.0;
+	float w = float(Ny)/2.0; 
+			
+	// set the mechanical properties:
+	ibm.calculate_cell_membrane_props(Re,Ca,stddevCa,a,h,rho,umax,Kv,C,cellProps);	
+	
+	// ----------------------------------------------
+	// calculate body-force depending on Re:
+	// ----------------------------------------------
+	
+	float Dh = 2.0*chRad;
+	umax = Re*nu/Dh;
+	
+	// modify if umax is too high due to high Re:
+	if (umax > 0.03) {
+		umax = 0.03;
+		nu = umax*Dh/Re;
+		lbm.setNu(nu);
+		cout << "  " << endl;
+		cout << "nu = " << nu << endl;	
+	}
+	bodyForx = umax*(4*nu)/chRad/chRad;
+	
+	cout << "  " << endl;
+	cout << "Re = " << Re << endl;
+	cout << "Body Force X-dir = " << bodyForx << endl;
+	cout << "nu = " << nu << endl;
+	cout << "umax = " << umax << endl;
+	cout << "  " << endl;	
 	
 }
 
@@ -121,7 +152,7 @@ scsp_3D_sheets_slit_trains::scsp_3D_sheets_slit_trains() : lbm(),ibm()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_sheets_slit_trains::~scsp_3D_sheets_slit_trains()
+scsp_3D_sheets_channel::~scsp_3D_sheets_channel()
 {
 	lbm.deallocate();
 	ibm.deallocate();	
@@ -133,7 +164,7 @@ scsp_3D_sheets_slit_trains::~scsp_3D_sheets_slit_trains()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_sheets_slit_trains::initSystem()
+void scsp_3D_sheets_channel::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -142,12 +173,30 @@ void scsp_3D_sheets_slit_trains::initSystem()
 	
 	GetPot inputParams("input.dat");
 	string latticeSource = inputParams("Lattice/source","box");	
-		
+	
 	// ----------------------------------------------
-	// create the lattice for shear flow (same as slit):
+	// define the solid walls:
+	// ----------------------------------------------
+	
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = k*Nx*Ny + j*Nx + i;
+				int Si = 0;				
+				// set up solid walls
+				float y = float(j) - float(Ny-1)/2.0;
+				float z = float(k) - float(Nz-1)/2.0;
+				if ((y*y + z*z)/chRad/chRad > 1.0) Si = 1;				
+				lbm.setS(ndx,Si);
+			}
+		}
+	}
+	
+	// ----------------------------------------------
+	// create the lattice for channel flow:
 	// ----------------------------------------------		
 	
-	lbm.create_lattice_box_slit();
+	lbm.create_lattice_box_periodic_solid_walls();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -227,7 +276,7 @@ void scsp_3D_sheets_slit_trains::initSystem()
 	
 	if (initRandom) {
 		float scale = 1.0;   // 0.7;
-		ibm.shrink_and_randomize_cells(scale,2.5,a+4.0,a+4.0);
+		ibm.shrink_and_randomize_cells(scale,2.5,a+4.5,a+4.5);
 		ibm.scale_equilibrium_cell_size(scale,nBlocks,nThreads);
 			
 		cout << " " << endl;
@@ -242,8 +291,7 @@ void scsp_3D_sheets_slit_trains::initSystem()
 		cout << "-----------------------------------------------" << endl;
 		cout << " " << endl;	
 		
-	}
-	
+	}	
 	
 	// ----------------------------------------------
 	// line up cells in a single-file line: 
@@ -278,7 +326,7 @@ void scsp_3D_sheets_slit_trains::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_sheets_slit_trains::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_sheets_channel::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -315,7 +363,7 @@ void scsp_3D_sheets_slit_trains::cycleForward(int stepsPerCycle, int currentCycl
 	// ----------------------------------------------
 		
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;
+		cummulativeSteps++;	
 		// if pulsatile flow, calculate bodyforce:
 		float bodyForxPul = bodyForx;
 		if (pulsatile) bodyForxPul *= sin(2*M_PI*float(cummulativeSteps)/wavelength);
@@ -349,7 +397,7 @@ void scsp_3D_sheets_slit_trains::cycleForward(int stepsPerCycle, int currentCycl
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_sheets_slit_trains::writeOutput(std::string tagname, int step)
+void scsp_3D_sheets_channel::writeOutput(std::string tagname, int step)
 {				
 	
 	float h = float(Nz)/2.0;
@@ -363,7 +411,7 @@ void scsp_3D_sheets_slit_trains::writeOutput(std::string tagname, int step)
 	
 	if (step > 0) { 
 		// analyze membrane geometry:
-		ibm.capsule_geometry_analysis(step);
+		ibm.sheet_geometry_analysis(step);
 		ibm.capsule_train_fraction(trainRij*a,trainAng,step);
 		ibm.output_capsule_data();
 	
@@ -394,7 +442,7 @@ void scsp_3D_sheets_slit_trains::writeOutput(std::string tagname, int step)
 // conditions that maximum u < umax and ks < ksmax:
 // --------------------------------------------------------
 
-void scsp_3D_sheets_slit_trains::calcMembraneParams(float Re, float Ca, float Ksmax)
+void scsp_3D_sheets_channel::calcMembraneParams(float Re, float Ca, float Ksmax)
 {
 	// 'GetPot' object containing input parameters:
 	GetPot inputParams("input.dat");
@@ -404,11 +452,14 @@ void scsp_3D_sheets_slit_trains::calcMembraneParams(float Re, float Ca, float Ks
 	float C = inputParams("IBM/C",2.0);
 	float rho = 1.0;
 	float h = float(Nz)/2.0;
+	float w = float(Ny)/2.0;
 	
 	// calculate umax and required body force:
-	umax = Re*nu/h;     //nu = umax*h/Re;
-	bodyForx = 2.0*rho*umax*umax/(Re*h);   //umax*2.0*rho*nu/(h*h);
-			
+	float Dh = 4.0*(4.0*w*h)/(4.0*(w+h));
+	float infsum = calcInfSum(w,h);	
+	umax = 2.0*Re*nu/Dh;      //Re*nu/h;
+	bodyForx = umax*nu*M_PI*M_PI*M_PI/(16.0*w*w*infsum);
+		
 	// set the mechanical properties:
 	ibm.calculate_cell_membrane_props(Re,Ca,stddevCa,a,h,rho,umax,Kv,C,cellProps);
 }
@@ -420,7 +471,7 @@ void scsp_3D_sheets_slit_trains::calcMembraneParams(float Re, float Ca, float Ks
 // bodyForx, and nu:
 // --------------------------------------------------------
 
-void scsp_3D_sheets_slit_trains::calcRefFlux()
+void scsp_3D_sheets_channel::calcRefFlux()
 {
 	// parameters:
 	float w = float(Ny);   // PBC's in y-dir
@@ -434,3 +485,21 @@ void scsp_3D_sheets_slit_trains::calcRefFlux()
 }
 
 
+
+// --------------------------------------------------------
+// Calculate infinite sum associated with solution
+// to velocity profile in rectanglular channel:
+// --------------------------------------------------------
+
+float scsp_3D_sheets_channel::calcInfSum(float w, float h)
+{
+	float outval = 0.0;
+	// take first 40 terms of infinite sum
+	for (int n = 1; n<80; n=n+2) {
+		float nf = float(n);
+		float pref = pow(-1.0,(nf-1.0)/2)/(nf*nf*nf);
+		float term = pref*(1 - 1/cosh(nf*M_PI*h/2.0/w));
+		outval += term;
+	}
+	return outval;
+}

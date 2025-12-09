@@ -18,12 +18,22 @@ __global__ void zero_rod_forces_torques_moments_IBM3D(
 	if (i < nRods) {
 		rods[i].f = make_float3(0.0f,0.0f,0.0f);
 		rods[i].t = make_float3(0.0f,0.0f,0.0f);
-		rods[i].Ixx = 0.0;
-		rods[i].Iyy = 0.0;
-		rods[i].Izz = 0.0;
-		rods[i].Ixy = 0.0;
-		rods[i].Ixz = 0.0;
-		rods[i].Iyz = 0.0;
+		rods[i].uf = make_float3(0.0f,0.0f,0.0f);
+		rods[i].gradu.xx = 0.0;
+		rods[i].gradu.xy = 0.0;
+		rods[i].gradu.xz = 0.0;
+		rods[i].gradu.yx = 0.0;
+		rods[i].gradu.yy = 0.0;
+		rods[i].gradu.yz = 0.0;
+		rods[i].gradu.zx = 0.0;
+		rods[i].gradu.zy = 0.0;
+		rods[i].gradu.zz = 0.0;		
+		//rods[i].Ixx = 0.0;
+		//rods[i].Iyy = 0.0;
+		//rods[i].Izz = 0.0;
+		//rods[i].Ixy = 0.0;
+		//rods[i].Ixz = 0.0;
+		//rods[i].Iyz = 0.0;
 	}
 }
 
@@ -116,7 +126,8 @@ __global__ void enforce_max_rod_force_torque_IBM3D(
 __global__ void update_bead_positions_rods_IBM3D(
 	beadrod* beads,
 	rod* rods,
-	float L0,	
+	float L0,
+	float dt,	
 	int nBeads)
 {
 	// define bead:
@@ -125,7 +136,7 @@ __global__ void update_bead_positions_rods_IBM3D(
 		int rodID = beads[i].rodID;
 		float offset = float(rods[rodID].centerBead - i);
 		beads[i].rm1 = beads[i].r;
-		beads[i].r = rods[rodID].r + L0*offset*rods[rodID].p;
+		beads[i].r = rods[rodID].r + L0*offset*rods[rodID].p;	
 	}
 }
 
@@ -138,6 +149,7 @@ __global__ void update_bead_positions_rods_IBM3D(
 __global__ void update_bead_positions_rods_singlet_IBM3D(
 	beadrod* beads,
 	rod* rods,
+	float dt,
 	int nBeads)
 {
 	// define bead:
@@ -147,6 +159,28 @@ __global__ void update_bead_positions_rods_singlet_IBM3D(
 		// use only for rods consisting of 1 bead:
 		beads[i].rm1 = beads[i].r;
 		beads[i].r = rods[rodID].r;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D bead update kernel:
+// --------------------------------------------------------
+
+__global__ void update_bead_velocity_rods_IBM3D(
+	beadrod* beads,
+	float3 Box,
+	int3 pbcFlag,
+	float dt,
+	int nBeads)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {		
+		float3 dr = beads[i].r - beads[i].rm1;
+		dr -= roundf(dr/Box)*Box*pbcFlag;  // PBC's	
+		beads[i].v = dr/dt;			
 	}
 }
 
@@ -188,13 +222,11 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {		
-		//rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
-		rods[i].r += dt*(rods[i].f/fricT);
+		rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
 		tensor E = 0.5*(rods[i].gradu + transpose(rods[i].gradu));
 		tensor W = 0.5*(rods[i].gradu - transpose(rods[i].gradu));
-		float3 fltor = (identity() - dyadic(rods[i].p))*(0.88*E + W)*rods[i].p;
-		//rods[i].p += dt*(fltor + cross(rods[i].t,rods[i].p)/fricR);
-		rods[i].p += dt*(cross(rods[i].t,rods[i].p)/fricR);
+		float3 fltor = (identity() - dyadic(rods[i].p))*(0.9965*E + W)*rods[i].p;
+		rods[i].p += dt*(fltor + cross(rods[i].t,rods[i].p)/fricR);		
 		rods[i].p = normalize(rods[i].p);			
 	}
 }
@@ -229,7 +261,7 @@ __global__ void update_rod_position_fluid_IBM3D(
 __global__ void sum_rod_forces_torques_moments_IBM3D(
 	beadrod* beads,
 	rod* rods,
-	float m,	
+	int nBeadsPerRod,
 	int nBeads)
 {
 	// define bead:
@@ -240,21 +272,36 @@ __global__ void sum_rod_forces_torques_moments_IBM3D(
 		float3 ricom = beads[i].r - com;
 		float3 force = beads[i].f;
 		float3 torque = cross(ricom,beads[i].f);
+		float nBeadsPerRodf = float(nBeadsPerRod);
 		// add up forces
-		atomicAdd(&rods[rodID].f.x,force.x);
-		atomicAdd(&rods[rodID].f.y,force.y);
-		atomicAdd(&rods[rodID].f.z,force.z);
+		atomicAdd(&rods[rodID].f.x, force.x);
+		atomicAdd(&rods[rodID].f.y, force.y);
+		atomicAdd(&rods[rodID].f.z, force.z);
 		// add up torques
-		atomicAdd(&rods[rodID].t.x,torque.x);
-		atomicAdd(&rods[rodID].t.y,torque.y);
-		atomicAdd(&rods[rodID].t.z,torque.z);		
+		atomicAdd(&rods[rodID].t.x, torque.x);
+		atomicAdd(&rods[rodID].t.y, torque.y);
+		atomicAdd(&rods[rodID].t.z, torque.z);
+		// add up fluid velocities
+		atomicAdd(&rods[rodID].uf.x, beads[i].uf.x/nBeadsPerRodf);
+		atomicAdd(&rods[rodID].uf.y, beads[i].uf.y/nBeadsPerRodf);
+		atomicAdd(&rods[rodID].uf.z, beads[i].uf.z/nBeadsPerRodf);
+		// add up gradient of fluid velocities
+		atomicAdd(&rods[rodID].gradu.xx, beads[i].gradu.xx/nBeadsPerRodf);	
+		atomicAdd(&rods[rodID].gradu.xy, beads[i].gradu.xy/nBeadsPerRodf);	
+		atomicAdd(&rods[rodID].gradu.xz, beads[i].gradu.xz/nBeadsPerRodf);	
+		atomicAdd(&rods[rodID].gradu.yx, beads[i].gradu.yx/nBeadsPerRodf);	
+		atomicAdd(&rods[rodID].gradu.yy, beads[i].gradu.yy/nBeadsPerRodf);	
+		atomicAdd(&rods[rodID].gradu.yz, beads[i].gradu.yz/nBeadsPerRodf);	
+		atomicAdd(&rods[rodID].gradu.zx, beads[i].gradu.zx/nBeadsPerRodf);	
+		atomicAdd(&rods[rodID].gradu.zy, beads[i].gradu.zy/nBeadsPerRodf);	
+		atomicAdd(&rods[rodID].gradu.zz, beads[i].gradu.zz/nBeadsPerRodf);		
 		// add up moments
-		atomicAdd(&rods[rodID].Ixx,m*(ricom.y*ricom.y + ricom.z*ricom.z));
-		atomicAdd(&rods[rodID].Iyy,m*(ricom.x*ricom.x + ricom.z*ricom.z));
-		atomicAdd(&rods[rodID].Izz,m*(ricom.x*ricom.x + ricom.y*ricom.y));		
-		atomicAdd(&rods[rodID].Ixy,-m*(ricom.x*ricom.y));
-		atomicAdd(&rods[rodID].Ixz,-m*(ricom.x*ricom.z));
-		atomicAdd(&rods[rodID].Iyz,-m*(ricom.y*ricom.z));		
+		//atomicAdd(&rods[rodID].Ixx, m*(ricom.y*ricom.y + ricom.z*ricom.z));
+		//atomicAdd(&rods[rodID].Iyy, m*(ricom.x*ricom.x + ricom.z*ricom.z));
+		//atomicAdd(&rods[rodID].Izz, m*(ricom.x*ricom.x + ricom.y*ricom.y));		
+		//atomicAdd(&rods[rodID].Ixy, -m*(ricom.x*ricom.y));
+		//atomicAdd(&rods[rodID].Ixz, -m*(ricom.x*ricom.z));
+		//atomicAdd(&rods[rodID].Iyz, -m*(ricom.y*ricom.z));		
 	}
 }
 
@@ -322,7 +369,7 @@ __global__ void wrap_rod_coordinates_IBM3D(
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {	
-		rods[i].r = rods[i].r - floorf(rods[i].r/Box)*Box*pbcFlag;		
+		rods[i].r = rods[i].r - floorf(rods[i].r/Box)*Box*pbcFlag;			
 	}
 }
 
@@ -565,18 +612,13 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 		}
 		
 		// --------------------------------------
-		// calculate hydrodynamic forces & add them
-		// to IBM bead forces:
+		// calculate hydrodynamic forces 
 		// --------------------------------------
 		
-		float3 velBead = (beads[i].r - beads[i].rm1)/dt;		
-		float fx = (vxLBMi - velBead.x)/dt/float(nBeadsPerRod);
-		float fy = (vyLBMi - velBead.y)/dt/float(nBeadsPerRod);
-		float fz = (vzLBMi - velBead.z)/dt/float(nBeadsPerRod);
-		beads[i].f.x += fx;
-		beads[i].f.y += fy;
-		beads[i].f.z += fz;
-		
+		float fx = (vxLBMi - beads[i].v.x)/dt/float(nBeadsPerRod);
+		float fy = (vyLBMi - beads[i].v.y)/dt/float(nBeadsPerRod);
+		float fz = (vzLBMi - beads[i].v.z)/dt/float(nBeadsPerRod);
+				
 		// --------------------------------------
 		// distribute the !negative! of the 
 		// hydrodynamic bead force to the LBM
@@ -603,32 +645,32 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to interpolate the gradient of the velocity
-// field at the rod position. 
+// IBM3D kernel to interpolate the fluid velocity and 
+// gradient of the fluid velocity at each bead position. 
 // --------------------------------------------------------
 
-__global__ void interpolate_gradient_of_velocity_rod_IBM3D(
-	rod* rods,
+__global__ void interpolate_gradient_of_velocity_bead_IBM3D(
+	beadrod* beads,
 	float* uLBM,
 	float* vLBM,
 	float* wLBM,
 	int Nx,
 	int Ny,
 	int Nz,
-	int nRods)
+	int nBeads)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
-	if (i < nRods) {
+	if (i < nBeads) {
 				
 		// --------------------------------------
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
 		
-		int i0 = int(floor(rods[i].r.x));
-		int j0 = int(floor(rods[i].r.y));
-		int k0 = int(floor(rods[i].r.z));
+		int i0 = int(floor(beads[i].r.x));
+		int j0 = int(floor(beads[i].r.y));
+		int k0 = int(floor(beads[i].r.z));
 		
 		// --------------------------------------
 		// loop over footprint to get 
@@ -651,9 +693,9 @@ __global__ void interpolate_gradient_of_velocity_rod_IBM3D(
 		for (int kk=k0; kk<=k0+1; kk++) {
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {				
-					float rx = rods[i].r.x - float(ii);
-					float ry = rods[i].r.y - float(jj);
-					float rz = rods[i].r.z - float(kk);
+					float rx = beads[i].r.x - float(ii);
+					float ry = beads[i].r.y - float(jj);
+					float rz = beads[i].r.z - float(kk);
 					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));								
 					dudx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
 					dudy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
@@ -673,21 +715,21 @@ __global__ void interpolate_gradient_of_velocity_rod_IBM3D(
 		}
 		
 		// --------------------------------------
-		// assign grad(u) to rod
+		// assign grad(u) to bead
 		// --------------------------------------
 				
-		rods[i].uf.x = uLBMi;
-		rods[i].uf.y = vLBMi;
-		rods[i].uf.z = wLBMi;
-		rods[i].gradu.xx = dudx;
-		rods[i].gradu.xy = dudy;
-		rods[i].gradu.xz = dudz;
-		rods[i].gradu.yx = dvdx;
-		rods[i].gradu.yy = dvdy;
-		rods[i].gradu.yz = dvdz;
-		rods[i].gradu.zx = dwdx;
-		rods[i].gradu.zy = dwdy;
-		rods[i].gradu.zz = dwdz;
+		beads[i].uf.x = uLBMi;
+		beads[i].uf.y = vLBMi;
+		beads[i].uf.z = wLBMi;
+		beads[i].gradu.xx = dudx;
+		beads[i].gradu.xy = dudy;
+		beads[i].gradu.xz = dudz;
+		beads[i].gradu.yx = dvdx;
+		beads[i].gradu.yy = dvdy;
+		beads[i].gradu.yz = dvdz;
+		beads[i].gradu.zx = dwdx;
+		beads[i].gradu.zy = dwdy;
+		beads[i].gradu.zz = dwdz;
 						
 	}	
 }
@@ -943,7 +985,7 @@ __device__ inline int rod_voxel_ndx(
 // IBM3D kernel to solve for angular acceleration by
 // solving [I][a]=[T], which is a 3x3 matrix problem
 // --------------------------------------------------------
-
+/*
 __device__ inline float3 solve_angular_acceleration(
 	const float Ixx,
 	const float Iyy,
@@ -1026,7 +1068,7 @@ __device__ inline float determinantOfMatrix(float mat[3][3])
                 mat[0][2] * (mat[1][0] * mat[2][1] - mat[1][1] * mat[2][0]);
     return ans;
 }
- 
+*/
 
 
 

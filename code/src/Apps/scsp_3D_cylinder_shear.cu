@@ -55,9 +55,12 @@ scsp_3D_cylinder_shear::scsp_3D_cylinder_shear() : lbm(),ibm()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-	shearVel = inputParams("LBM/shearVel",0.0);
-	float Re = inputParams("LBM/Re",2.0);
-	shearVel = 2.0*Re*nu/float(Nz-1);
+	float shearRate = inputParams("LBM/shearRate",0.0);
+	shearVel = shearRate*float(Nz-1)/2.0;
+	
+	//shearVel = inputParams("LBM/shearVel",0.0);
+	//float Re = inputParams("LBM/Re",2.0);
+	//shearVel = 2.0*Re*nu/float(Nz-1);
 		
 	// ----------------------------------------------
 	// Immersed-Boundary parameters:
@@ -225,7 +228,7 @@ void scsp_3D_cylinder_shear::initSystem()
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();
 	
-	if (nCells == 1) ibm.shift_node_positions(0,31.5,31.5,31.5);
+	if (nCells == 1) ibm.shift_node_positions(0,float(Nx-1)/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0);
 	if (nCells == 2) {
 		ibm.rotate_and_shift_node_positions(0,28.0,30.5,31.5,0.0,M_PI/2.0,0.0);
 		ibm.rotate_and_shift_node_positions(1,35.0,31.5,31.5,0.0,M_PI/2.0,0.0);

@@ -60,6 +60,13 @@ __global__ void compute_node_force_membrane_skalak_Janus_IBM3D(
 	int);
 
 
+__global__ void compute_node_force_membrane_neohookian_IBM3D(
+	triangle*,
+	node*,
+	cell*,	
+	int);
+
+
 __global__ void compute_node_force_membrane_area_IBM3D(
 	triangle*,
     node*,

@@ -42,14 +42,24 @@ __global__ void update_bead_positions_rods_IBM3D(
 	beadrod*,
 	rod*,
 	float,
+	float,
 	int);
 	
 	
 __global__ void update_bead_positions_rods_singlet_IBM3D(
 	beadrod*,
 	rod*,
+	float,
 	int);
-	
+
+
+__global__ void update_bead_velocity_rods_IBM3D(
+	beadrod*,
+	float3,
+	int3,
+	float,
+	int);
+		
 	
 __global__ void update_rod_position_orientation_IBM3D(
 	rod*,
@@ -77,7 +87,7 @@ __global__ void update_rod_position_fluid_IBM3D(
 __global__ void sum_rod_forces_torques_moments_IBM3D(
 	beadrod*,
 	rod*,
-	float,	
+	int,	
 	int);
 
 
@@ -161,8 +171,8 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	int);
 
 
-__global__ void interpolate_gradient_of_velocity_rod_IBM3D(
-	rod*,
+__global__ void interpolate_gradient_of_velocity_bead_IBM3D(
+	beadrod*,
 	float*,
 	float*,
 	float*,
@@ -235,8 +245,9 @@ __device__ inline int rod_voxel_ndx(
 	int,
 	int,
 	int);
+	
 
-
+/*
 __device__ inline float3 solve_angular_acceleration(
 	const float,
 	const float,
@@ -249,6 +260,7 @@ __device__ inline float3 solve_angular_acceleration(
 
 __device__ inline float determinantOfMatrix(
 	float[3][3]);
+*/
 
 
 # endif  // KERNELS_RODS_IBM3D_H

@@ -1362,10 +1362,7 @@ void class_capsules_ibm3D::stepIBM_spring_cylinders(class_scsp_D3Q19& lbm, float
 		//wall_lubrication_forces_cylinder(chRad,Rad,nu,nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
-		
-		//lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
-		//lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
-		
+				
 		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
 		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
 		
@@ -1539,11 +1536,13 @@ void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, in
 			
 		// update IBM:
 		compute_node_forces_skalak_sheets(nBlocks,nThreads);
+		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		
 		nonbonded_node_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
-		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
-		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
+		
 		update_node_positions_verlet_1(nBlocks,nThreads);   // include forces in position update (more accurate)
 		//update_node_positions(nBlocks,nThreads);          // standard IBM approach, only including velocities (less accurate)
 		
@@ -2099,6 +2098,42 @@ void class_capsules_ibm3D::compute_node_forces_skalak_sheets(int nBlocks, int nT
 					
 	// Third, compute the Skalak forces for each face:
 	compute_node_force_membrane_skalak_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
+	
+	// Fourth, compute the bending force for each edge:		
+	compute_node_force_membrane_bending_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);
+					
+	// Sixth, re-wrap node coordinates:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);
+			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on nodes based 
+// on the membrane mechanics model (Neo-Hookian model).  This
+// one assumes elastic sheets, so volume correction is
+// turned off:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::compute_node_forces_neohookian_sheets(int nBlocks, int nThreads) 
+{
+	// First, zero the node forces and the cell volumes:
+	zero_node_forces_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
+			
+	zero_cell_volumes_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
+	// Second, unwrap node coordinates:
+	unwrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,cells,Box,pbcFlag,nNodes);	
+					
+	// Third, compute the Neo-Hookian forces for each face:
+	compute_node_force_membrane_neohookian_IBM3D
 	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
 	
 	// Fourth, compute the bending force for each edge:		

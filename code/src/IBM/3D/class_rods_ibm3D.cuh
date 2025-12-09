@@ -83,6 +83,7 @@ class class_rods_ibm3D {
 	void set_rod_position_orientation(int,int);
 	void update_bead_position_rods(int,int);
 	void update_bead_position_rods_singlet(int,int);
+	void update_bead_velocity_rods(int,int);
 	void update_rod_position_orientation(int,int);
 	void update_rod_position_orientation_fluid(int,int);
 	void update_rod_position_fluid(int,int);
