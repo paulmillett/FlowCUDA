@@ -1532,18 +1532,7 @@ void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nB
 		float theta = acos(abs(rods[i].p.x));		
 		outfile << theta << endl;
 	}
-	
-	/*	
-	outfile << " " << endl;
-	//outfile << "LINE_DATA " << nRods << endl;
-	outfile << "SCALARS " << "theta " << "float" << endl;
-	//outfile << "LOOKUP_TABLE default" << endl;
-	for (int i=0; i<nRods; i++) {
-		float theta = acos(abs(rods[i].p.x));		
-		outfile << theta << endl;
-	}
-	*/
-	
+		
 	// -----------------------------------
 	//	Write if headBead:
 	// -----------------------------------
