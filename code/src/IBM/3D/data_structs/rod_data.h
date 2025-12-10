@@ -33,13 +33,17 @@ struct rod {
 	int nBeads;
 	int indxB0;   // starting bead index for filament
 	float rad;    // radius of bead 
+	float ar;     // aspect ratio of rod
+	float mobPar; // mobility coefficient (parallel)
+	float mobPer; // mobility coefficient (perpendicular)
+	float mobRot; // mobility coefficient (rotational)
 	float3 r;     // position
 	float3 v;     // velocity
 	float3 f;     // force	
 	float3 t;     // torque
 	float3 p;     // orientation vector
 	float3 uf;    // fluid velocity at rod position
-	tensor gradu;       // gradient of fluid velocity
+	tensor gradu;         // gradient of fluid velocity
 	//float Ixx,Iyy,Izz;  // moments of inertia
 	//float Ixy,Ixz,Iyz;  // products of inertia
 };

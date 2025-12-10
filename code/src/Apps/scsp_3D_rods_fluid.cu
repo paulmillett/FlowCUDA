@@ -74,7 +74,7 @@ scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
 	gam = inputParams("IBM_RODS/gamma",0.1);
 	Drod = inputParams("IBM_RODS/diam",1.0);
 	nBeads = nBeadsPerRod*nRods;
-	Lrod = float(nBeadsPerRod)*L0;
+	Lrod = float(nBeadsPerRod-1)*L0;
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -166,16 +166,30 @@ void scsp_3D_rods_fluid::initSystem()
 	rods.create_first_rod();
 	rods.duplicate_rods();
 	rods.assign_rodIDs_to_beads();
+	rods.set_rods_radii(Drod/2.0);
 	
 	if (nRods == 1) rods.shift_bead_positions(0,float(Nx-1)/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0);
 	
-	fp = Pe*kT/Lrod;
-	up = fp/gam;
-	rods.set_rods_radii(Drod/2.0);
-	cout << "  " << endl;
-	cout << "Rod kT = " << kT << endl;
-	cout << "Rod fp = " << fp << endl;
-	cout << "Rod up = " << up << endl;
+	// ----------------------------------------------			
+	// mobility coefficients.  See Luders et al. 
+	// J. Chem. Phys. 159:054901 (2023) Eqs. (15-17)
+	// (note: mobility = diffusivity/kT)
+	// (assume fluid density = 1)
+	// ----------------------------------------------
+	
+	float ar = Lrod/Drod;  // aspect ratio
+	float mobPar = (log(ar) - 0.207 + 0.980/ar - 0.133/(ar*ar)) / (2.0*M_PI*nu*Lrod); 
+	float mobPer = (log(ar) + 0.839 + 0.185/ar + 0.233/(ar*ar)) / (4.0*M_PI*nu*Lrod);
+	float mobRot = (log(ar) - 0.662 + 0.917/ar - 0.050/(ar*ar)) / (M_PI*nu*Lrod*Lrod*Lrod);
+	
+	rods.set_aspect_ratio(ar);
+	rods.set_mobility_coefficients(mobPar,mobPer,mobRot);
+	
+	cout << " " << endl;
+	cout << "Rod aspect ratio = " << ar << endl;
+	cout << "Rod mobility coeff (parallel) = " << mobPar << endl;
+	cout << "Rod mobility coeff (perpendicular) = " << mobPer << endl;
+	cout << "Rod mobility coeff (rotational) = " << mobRot << endl;	
 	
 	// ----------------------------------------------			
 	// drag friction coefficients using Broersma's
@@ -183,6 +197,7 @@ void scsp_3D_rods_fluid::initSystem()
 	// 128:1639(2006)
 	// ----------------------------------------------
 	
+	/*
 	// translational:
 	float delt = log(2*Lrod/Drod);  // this is natural log
 	float g1 = 0.807 + 0.15/delt + 13.5/delt/delt - 37.0/delt/delt/delt + 22.0/delt/delt/delt/delt;
@@ -206,6 +221,7 @@ void scsp_3D_rods_fluid::initSystem()
 	rods.set_friction_coefficient_rotational(fricR);
 	cout << "Rod fricR = " << fricR << endl;
 	cout << "Rod noiseR = " << noiseR << endl;	
+	*/
 	
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 

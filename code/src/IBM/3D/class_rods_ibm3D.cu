@@ -240,7 +240,7 @@ void class_rods_ibm3D::set_rod_radius(int rID, float rad)
 
 void class_rods_ibm3D::set_rods_types(int val)
 {
-	// set filamType for ALL filaments:
+	// set rodType for ALL rods:
 	for (int r=0; r<nRods; r++) rodsH[r].rodType = val;
 }
 
@@ -248,6 +248,22 @@ void class_rods_ibm3D::set_rod_type(int rID, int val)
 {
 	// set rodType for ONE rod:
 	rodsH[rID].rodType = val;
+}
+
+void class_rods_ibm3D::set_aspect_ratio(float val)
+{
+	// set aspect ratio for ALL rods:
+	for (int r=0; r<nRods; r++) rodsH[r].ar = val;
+}
+
+void class_rods_ibm3D::set_mobility_coefficients(float mPar, float mPerp, float mRot)
+{
+	// set mobility coefficients for ALL rods:
+	for (int r=0; r<nRods; r++) {
+		rodsH[r].mobPar = mPar;
+		rodsH[r].mobPer = mPerp;
+		rodsH[r].mobRot = mRot;
+	}
 }
 
 void class_rods_ibm3D::set_friction_coefficient_translational(float val)

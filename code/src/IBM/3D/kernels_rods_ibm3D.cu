@@ -221,13 +221,25 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 {
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
-	if (i < nRods) {		
-		rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
+	if (i < nRods) {
+				
+		// mobility coefficients
+		tensor ppT = dyadic(rods[i].p);
+		tensor Imppt = identity() - ppT;
+		tensor mobTensor = rods[i].mobPar*ppT + rods[i].mobPer*Imppt;
+				
+		// rod translation:		
+		rods[i].r += dt*(rods[i].uf + mobTensor*rods[i].f);
+		
+		// rod rotation:
+		float ar = rods[i].ar;
+		float shape = (ar*ar - 1.0)/(ar*ar + 1.0);  // Bretherton constant
 		tensor E = 0.5*(rods[i].gradu + transpose(rods[i].gradu));
 		tensor W = 0.5*(rods[i].gradu - transpose(rods[i].gradu));
-		float3 fltor = (identity() - dyadic(rods[i].p))*(0.9965*E + W)*rods[i].p;
-		rods[i].p += dt*(fltor + cross(rods[i].t,rods[i].p)/fricR);		
-		rods[i].p = normalize(rods[i].p);			
+		float3 fltor = Imppt*(shape*E + W)*rods[i].p;
+		rods[i].p += dt*(fltor + rods[i].mobRot*cross(rods[i].t,rods[i].p));		
+		rods[i].p = normalize(rods[i].p);
+					
 	}
 }
 

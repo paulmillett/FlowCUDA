@@ -68,7 +68,7 @@ scsp_3D_rods_cylinder::scsp_3D_rods_cylinder() : lbm(),rods()
 	gam = inputParams("IBM_RODS/gamma",0.1);
 	Drod = inputParams("IBM_RODS/diam",1.0);
 	nBeads = nBeadsPerRod*nRods;
-	Lrod = float(nBeadsPerRod)*L0;
+	Lrod = float(nBeadsPerRod-1)*L0;
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:

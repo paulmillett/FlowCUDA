@@ -66,6 +66,8 @@ class class_rods_ibm3D {
 	void set_rod_radius(int,float);
 	void set_rods_types(int);
 	void set_rod_type(int,int);
+	void set_aspect_ratio(float);
+	void set_mobility_coefficients(float,float,float);
 	void set_friction_coefficient_translational(float);
 	void set_friction_coefficient_rotational(float);
 	int get_max_array_size();
