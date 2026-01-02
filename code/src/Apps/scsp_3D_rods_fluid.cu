@@ -246,15 +246,15 @@ void scsp_3D_rods_fluid::initSystem()
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	//srand(time(NULL));
+	srand(time(NULL));
 	
 	// ----------------------------------------------
 	// randomly disperse filaments: 
 	// ----------------------------------------------
 			
 	if (nRods > 1) {
-		//rods.randomize_rods(Lrod+2.0);
-		rods.randomize_rods_xdir_alligned_cylinder(10.0,1.0);
+		rods.randomize_rods(Lrod+2.0);
+		//rods.randomize_rods_xdir_alligned_cylinder(10.0,1.0);
 	}
 	rods.set_rod_position_orientation(nBlocks,nThreads);
 		

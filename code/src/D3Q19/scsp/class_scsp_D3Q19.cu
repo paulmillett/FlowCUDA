@@ -905,6 +905,21 @@ void class_scsp_D3Q19::hydrodynamic_force_bead_rod(int nBlocks, int nThreads,
 
 
 // --------------------------------------------------------
+// Call to "extrapolate_force_bead_rod_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::extrapolate_force_bead_rod(int nBlocks, int nThreads,
+	                                              beadrod* beads, rod* rods, int nBeads, int nBeadsPerRod)
+{
+	extrapolate_force_bead_rod_IBM3D
+	<<<nBlocks,nThreads>>> (beads,rods,Fx,Fy,Fz,nBeadsPerRod,Nx,Ny,Nz,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
 // Call to "hydrodynamic_force_rigid_node_IBM3D" kernel.  
 // Note: this kernel is in the IBM/3D folder, and one
 //       should use nBlocks as if calling an IBM kernel.

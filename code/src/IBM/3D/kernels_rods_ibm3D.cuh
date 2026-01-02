@@ -171,6 +171,19 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	int);
 
 
+__global__ void extrapolate_force_bead_rod_IBM3D(
+	beadrod*,
+	rod*,
+	float*,
+	float*,
+	float*,
+	int,
+	int,
+	int,
+	int,
+	int);
+		
+
 __global__ void interpolate_gradient_of_velocity_bead_IBM3D(
 	beadrod*,
 	float*,

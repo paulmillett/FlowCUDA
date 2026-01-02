@@ -533,7 +533,7 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 			const float bmri = Rad - ri;
 			const float force = A/pow(bmri,2) - A/pow(d,2);
 			beads[i].f.y -= force*(yi/ri);
-			beads[i].f.z -= force*(zi/ri);
+			beads[i].f.z -= force*(zi/ri);			
 		}				
 	}
 }
@@ -568,8 +568,8 @@ __global__ void push_beads_into_sphere_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to interpolate the gradient of the velocity
-// field at the rod position. 
+// IBM3D kernel to determine the hydrodynamic force at a 
+// bead, then extrapolate it to the LBM lattice. 
 // --------------------------------------------------------
 
 __global__ void hydrodynamic_force_bead_rod_IBM3D(
@@ -591,7 +591,7 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	
 	if (i < nBeads) {
-				
+			
 		// --------------------------------------
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
@@ -618,7 +618,7 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
 					vxLBMi += del*uLBM[ndx];
 					vyLBMi += del*vLBM[ndx];
-					vzLBMi += del*wLBM[ndx];				
+					vzLBMi += del*wLBM[ndx];			
 				}
 			}
 		}
@@ -650,6 +650,68 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 					atomicAdd(&fzLBM[ndx],-del*fz);				
 				}
 			}
+		}		
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to extrapolate the rod's force to the LBM
+// lattice.  This is done by averaging the rod's force to
+// every bead. 
+// --------------------------------------------------------
+
+__global__ void extrapolate_force_bead_rod_IBM3D(
+	beadrod* beads,
+	rod* rods,
+	float* fxLBM,
+	float* fyLBM,
+	float* fzLBM,
+	int nBeadsPerRod,
+	int Nx,
+	int Ny,
+	int Nz,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	
+	if (i < nBeads) {
+		
+		// --------------------------------------
+		// find the averaged rod force for each
+		// bead
+		// --------------------------------------
+		
+		int rodID = beads[i].rodID;
+		float3 beadForce = rods[rodID].f/nBeadsPerRod;
+			
+		// --------------------------------------
+		// find nearest LBM voxel (rounded down)
+		// --------------------------------------
+		
+		int i0 = int(floor(beads[i].r.x));
+		int j0 = int(floor(beads[i].r.y));
+		int k0 = int(floor(beads[i].r.z));
+		
+		// --------------------------------------
+		// loop over footprint
+		// --------------------------------------
+		
+		for (int kk=k0; kk<=k0+1; kk++) {
+			for (int jj=j0; jj<=j0+1; jj++) {
+				for (int ii=i0; ii<=i0+1; ii++) {				
+					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+					float rx = beads[i].r.x - float(ii);
+					float ry = beads[i].r.y - float(jj);
+					float rz = beads[i].r.z - float(kk);
+					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+					atomicAdd(&fxLBM[ndx],del*beadForce.x);
+					atomicAdd(&fyLBM[ndx],del*beadForce.y);
+					atomicAdd(&fzLBM[ndx],del*beadForce.z);
+				}
+			}		
 		}		
 	}	
 }
@@ -898,6 +960,13 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);
 	if (r < repD) {
+		// linear spring force repulsion
+		float force = repA - (repA/repD)*r;
+		float3 fij = force*(rij/r);
+		beads[i].f += fij;
+		
+		// WCA force:
+		/*
 		float sig = 0.8909*repD;  // this ensures F=0 is at cutoff
 		float eps = 0.001;
 		float sigor = sig/r;
@@ -905,6 +974,7 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 		float sigor12 = sigor6*sigor6;
 		float force = 24.0*eps*(2*sigor12 - sigor6)/r/r;
 		beads[i].f += force*rij;
+		*/		
 	} 	
 }
 
@@ -1088,3 +1158,4 @@ __device__ inline float determinantOfMatrix(float mat[3][3])
 
 
 
+                                               

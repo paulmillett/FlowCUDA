@@ -56,7 +56,7 @@ scsp_3D_rods_cylinder::scsp_3D_rods_cylinder() : lbm(),rods()
 	
 	nu = inputParams("LBM/nu",0.1666666);
 	float Re = inputParams("LBM/Re",2.0);
-	umax = inputParams("LBM/umax",0.1);
+	umax = inputParams("LBM/umax",0.03);
 		
 	// ----------------------------------------------
 	// Rods Immersed-Boundary parameters:
@@ -69,6 +69,17 @@ scsp_3D_rods_cylinder::scsp_3D_rods_cylinder() : lbm(),rods()
 	Drod = inputParams("IBM_RODS/diam",1.0);
 	nBeads = nBeadsPerRod*nRods;
 	Lrod = float(nBeadsPerRod-1)*L0;
+	
+	// ----------------------------------------------
+	// calculate particle volume fraction:
+	// ----------------------------------------------
+	
+	float Vp = float(nRods)*(M_PI*Drod*Drod*Lrod/4.0);
+	float V = M_PI*chRad*chRad*float(Nx);
+	float phi = Vp/V;
+	cout << " " << endl;
+	cout << "particle volume fraction = " << phi << endl;
+	cout << " " << endl;
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -204,39 +215,28 @@ void scsp_3D_rods_cylinder::initSystem()
 	rods.duplicate_rods();
 	rods.assign_rodIDs_to_beads();
 	rods.set_rods_radii(Drod/2.0);
-		
+	
 	// ----------------------------------------------			
-	// drag friction coefficients using Broersma's
-	// relations.  See Tsay et al. J. Amer. Chem. Soc.
-	// 128:1639(2006)
+	// mobility coefficients.  See Luders et al. 
+	// J. Chem. Phys. 159:054901 (2023) Eqs. (15-17)
+	// (note: mobility = diffusivity/kT)
+	// (assume fluid density = 1)
 	// ----------------------------------------------
 	
-	// translational:
-	/*
-	float delt = log(2*Lrod/Drod);  // this is natural log
-	float g1 = 0.807 + 0.15/delt + 13.5/delt/delt - 37.0/delt/delt/delt + 22.0/delt/delt/delt/delt;
-	float g2 = -0.193 + 0.15/delt + 8.1/delt/delt - 18.0/delt/delt/delt + 9.0/delt/delt/delt/delt;
-	float pref = delt - 0.5*(g1 + g2);
-	if (pref < 1.0) pref = 1.0;
-	float DT = pref*kT/(3.0*M_PI*nu*Lrod);  // diffusivity (assume fluid density = 1)
-	float fricT = kT/DT;
-	*/
-	float fricT = 3.37334;	 // will need to find a good approximation for this!
-	rods.set_friction_coefficient_translational(fricT);
-	cout << "Rod fricT = " << fricT << endl;
+	float ar = Lrod/Drod;  // aspect ratio
+	float mobPar = (log(ar) - 0.207 + 0.980/ar - 0.133/(ar*ar)) / (2.0*M_PI*nu*Lrod); 
+	float mobPer = (log(ar) + 0.839 + 0.185/ar + 0.233/(ar*ar)) / (4.0*M_PI*nu*Lrod);
+	float mobRot = (log(ar) - 0.662 + 0.917/ar - 0.050/(ar*ar)) / (M_PI*nu*Lrod*Lrod*Lrod);
 	
-	// rotational:
-	/*
-	g1 = 1.14 + 0.2/delt + 16.0/delt/delt - 63.0/delt/delt/delt + 62.0/delt/delt/delt/delt;
-	pref = delt - g1;
-	if (pref < 0.5) pref = 0.5;
-	float DR = pref*3.0*kT/(M_PI*nu*Lrod*Lrod*Lrod);  // rotational diffusivity
-	float fricR = kT/DR;
-	*/
-	float fricR = 12.193;   // will need to find a good approximation for this!
-	rods.set_friction_coefficient_rotational(fricR);
-	cout << "Rod fricR = " << fricR << endl;
+	rods.set_aspect_ratio(ar);
+	rods.set_mobility_coefficients(mobPar,mobPer,mobRot);
 	
+	cout << " " << endl;
+	cout << "Rod aspect ratio = " << ar << endl;
+	cout << "Rod mobility coeff (parallel) = " << mobPar << endl;
+	cout << "Rod mobility coeff (perpendicular) = " << mobPer << endl;
+	cout << "Rod mobility coeff (rotational) = " << mobRot << endl;	
+		
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
@@ -260,13 +260,14 @@ void scsp_3D_rods_cylinder::initSystem()
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	//srand(time(NULL));
+	srand(time(NULL));
 	
 	// ----------------------------------------------
 	// randomly disperse filaments: 
 	// ----------------------------------------------
 		
-	rods.randomize_rods_xdir_alligned_cylinder(chRad,2.0);
+	//rods.randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,1.0,1.0);
+	rods.semi_randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,Drod/2.0+0.1,Drod/2.0+0.1);
 	rods.set_rod_position_orientation(nBlocks,nThreads);
 		
 	// ----------------------------------------------
@@ -367,11 +368,15 @@ void scsp_3D_rods_cylinder::writeOutput(std::string tagname, int step)
 	
 	if (step == 0) {
 		// only print out vtk files
+		rods.orientation_in_cylindrical_channel(step);
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 		rods.write_output("rods",step);
 	}
 	
 	if (step > 0) { 					
+		// output rod position & orientation: 
+		rods.orientation_in_cylindrical_channel(step);
+		
 		// write vtk output for LBM and IBM:
 		int intervalVTK = nSteps/nVTKOutputs;
 		if (nVTKOutputs == 0) intervalVTK = nSteps;

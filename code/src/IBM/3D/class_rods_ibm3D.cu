@@ -62,11 +62,12 @@ class_rods_ibm3D::class_rods_ibm3D()
 	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
 	N.y = inputParams("Lattice/Ny",1);
-	N.z = inputParams("Lattice/Nz",1);	
+	N.z = inputParams("Lattice/Nz",1);
 	Box.x = float(N.x);   // assume dx=1
 	Box.y = float(N.y);
 	Box.z = float(N.z);
 	pbcFlag = make_int3(1,1,1);
+	chRad = inputParams("Lattice/chRad",10.0);
 			
 	// if we need bins, do some calculations:
 	binsFlag = false;
@@ -387,15 +388,43 @@ void class_rods_ibm3D::randomize_rods_inside_sphere(float xs, float ys, float zs
 
 
 // --------------------------------------------------------
-// randomize fiber positions, but all oriented in x-dir:
+// randomize rod positions, but all oriented in x-dir:
 // --------------------------------------------------------
 
-void class_rods_ibm3D::randomize_rods_xdir_alligned_cylinder(float chRad, float sepWall)
+void class_rods_ibm3D::randomize_rods_xdir_alligned_cylinder(float L, float R, float sepWall, float sepMin)
 {
 	// copy bead positions from device to host:
 	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
+		
+	// assign random position and orientation to each rod:
+	float3* rodCOM = (float3*)malloc(nRods*sizeof(float3));
+	for (int r=0; r<nRods; r++) {
+		rodCOM[r] = make_float3(0.0);
+		float3 shift = make_float3(0.0,0.0,0.0);	
+		bool tooClose = true;
+		while (tooClose) {
+			// reset tooClose to false
+			tooClose = false;
+			// get random position
+			float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
+			float ang = (float)rand()/RAND_MAX*(2*M_PI);
+			shift.x = (float)rand()/RAND_MAX*Box.x;		
+			shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+			shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
+			// check with other cells
+			for (int d=0; d<r; d++) {
+				if (cylinder_overlap(shift,rodCOM[d],L,R,sepMin)) {                    
+					tooClose = true;
+                    break;
+				}				
+			}			
+		}
+		rodCOM[r] = shift;	
+		shift_bead_positions(r,shift.x,shift.y,shift.z);
+	}
 	
-	// assign random position and orientation to each filament:
+	/*	
+	// assign random position and orientation to each rod:
 	for (int f=0; f<nRods; f++) {
 		float3 shift = make_float3(0.0,0.0,0.0);
 		// get random position
@@ -406,9 +435,74 @@ void class_rods_ibm3D::randomize_rods_xdir_alligned_cylinder(float chRad, float 
 		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
 		shift_bead_positions(f,shift.x,shift.y,shift.z);
 	}
+	*/
 	
 	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);	
+}
+
+
+
+// --------------------------------------------------------
+// randomize rod positions, but all oriented
+// in x-direction inside a cylindrical channel.  Here,
+// rods are put in groups with the same
+// x-position and random radial positions.
+// --------------------------------------------------------
+
+void class_rods_ibm3D::semi_randomize_rods_xdir_alligned_cylinder(float L, float R, float sepWall, float sepMin)
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
+	
+	// calculate 'group' parameters:
+	int nGroups = int(Box.x/(L+sepMin));
+	int nRods_per_group = nRods/nGroups;
+	if (nRods%nGroups > 0) nRods_per_group += 1;  // in case nRods/nGroups is not a round number
+	float groupLength = Box.x/float(nGroups);
+	
+	cout << "number of groups = " << nGroups << endl;
+	cout << "number of rods per group = " << nRods_per_group << endl;
+	cout << "group length = " << groupLength << endl;
+	
+	// arrays needed for positioning rods:
+	float3* rodCOM = (float3*)malloc(nRods*sizeof(float3));
+	int* rodGroup = (int*)malloc(nRods*sizeof(int));
+	
+	// assign random position and orientation to each rod:
+	for (int r=0; r<nRods; r++) {
+		rodCOM[r] = make_float3(0.0);
+		rodGroup[r] = r/nRods_per_group;
+		float3 shift = make_float3(0.0,0.0,0.0);	
+		bool tooClose = true;
+		while (tooClose) {
+			// reset tooClose to false
+			tooClose = false;
+			// get random position
+			float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
+			float ang = (float)rand()/RAND_MAX*(2*M_PI);
+			shift.x = groupLength/2.0 + rodGroup[r]*groupLength;
+			
+			if (shift.x > Box.x) cout << shift.x << " " << rodGroup[r] << endl;
+			
+			shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+			shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
+			// check with other rods
+			for (int d=0; d<r; d++) {
+				// only check overlap for rods in the same group
+				if (rodGroup[d] != rodGroup[r]) continue;
+				if (cylinder_overlap(shift,rodCOM[d],L,R,sepMin)) {                    
+					tooClose = true;
+                    break;
+				}				
+			}			
+		}
+		rodCOM[r] = shift;	
+		shift_bead_positions(r,shift.x,shift.y,shift.z);
+	}
+	
+	// copy bead positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);
 }
 
 
@@ -544,29 +638,41 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	//  to the bead velocity.
 	// ----------------------------------------------------------
 	
-	// zero fluid forces:
+	// zero fluid forces and apply hydrodynamic force to fluid:
 	lbm.zero_forces(nBlocks,nThreads);
+	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod); 
+	
+	
+	
+	// LOOP over the below code for IBM sub-steps...
+	
 	
 	// re-build bin lists for rod beads:
 	reset_bin_lists(nBlocks,nThreads);
 	build_bin_lists(nBlocks,nThreads);
-		
+	
 	// calculate IBM forces:
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
-	lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod);
-	nonbonded_bead_interactions(nBlocks,nThreads);	
-	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);		
-	unwrap_bead_coordinates(nBlocks,nThreads);
-	sum_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
+	nonbonded_bead_interactions(nBlocks,nThreads); 
+	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);
+	
+	
+	
+	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,nBeads,nBeadsPerRod);
+	
+	
 		
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
 	// update IBM positions:
 	enforce_max_rod_force_torque(nBlocks,nThreads);
 	update_rod_position_orientation_fluid(nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	update_bead_velocity_rods(nBlocks,nThreads);
-		
+			
 }
 
 
@@ -957,6 +1063,75 @@ void class_rods_ibm3D::unwrap_bead_coordinates()
 
 
 
+// --------------------------------------------------------
+// Check if two cylindrically-shaped capsules are overlapping,
+// assuming their major axis is alligned in the x-direction.
+//
+// Also, assuming PBC's in the x-direction ONLY.
+//
+// --------------------------------------------------------
 
+bool class_rods_ibm3D::cylinder_overlap(float3 iCOM, float3 jCOM, float L, float R, float sepMin)
+{
+	bool flag = false;
+		
+	// 1st: check how close cylinders are in the x-dir:
+	float3 dr = iCOM - jCOM;
+	dr -= roundf(dr/Box)*Box;	
+	if (abs(dr.x) > (L + sepMin)) {
+		return flag;  // (return if cylinders are not close enough in x-dir)
+	}
+	
+	// 2nd: check how close cylinders are in the yz-plane:
+	float ryz = sqrt(dr.y*dr.y + dr.z*dr.z);	
+	if (ryz < (2*R + sepMin)) {
+		flag = true;
+	}
+	
+	return flag;	
+}
+
+
+
+// --------------------------------------------------------
+// Output the rod orientation, position, and radial position
+// inside cylindrical channel
+// --------------------------------------------------------
+
+void class_rods_ibm3D::orientation_in_cylindrical_channel(int step)
+{
+	
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "rod_orientation.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------
+	// Loop over the capsules  
+	// -----------------------------------------
+		
+	for (int r=0; r<nRods; r++) {		
+		// radial distance to channel centerline:
+		float ymid = (Box.y-1.0)/2.0;
+		float zmid = (Box.z-1.0)/2.0;
+		float yi = rodsH[r].r.y - ymid;
+		float zi = rodsH[r].r.z - zmid;
+		float ri = sqrt(yi*yi + zi*zi);
+		// print data:
+		outfile << fixed << setprecision(4) << step << "  " << r << "  " << rodsH[r].p.x << "  " 
+			                                                             << rodsH[r].p.y << "  " 
+																		 << rodsH[r].p.z << "  "
+																		 << rodsH[r].r.x << "  "
+																		 << rodsH[r].r.y << "  " 
+																		 << rodsH[r].r.z << "  "
+																		 << ri << endl;		
+	}
+
+}
 
 

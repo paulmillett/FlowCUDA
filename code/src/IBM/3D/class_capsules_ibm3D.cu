@@ -757,7 +757,7 @@ void class_capsules_ibm3D::randomize_capsules_xdir_alligned_cylinder(float L, fl
 	// copy node positions from device to host:
 	cudaMemcpy(nodesH, nodes, sizeof(node)*nNodes, cudaMemcpyDeviceToHost);	
 	
-	// assign random position and orientation to each filament:
+	// assign random position and orientation to each cell:
 	float3* cellCOM = (float3*)malloc(nCells*sizeof(float3));
 	for (int c=0; c<nCells; c++) {
 		cellCOM[c] = make_float3(0.0);

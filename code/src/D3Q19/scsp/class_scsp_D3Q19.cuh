@@ -152,6 +152,7 @@ public:
 	void hydrodynamic_forces_filaments_IBM_LBM(int,int,float,bead*,int);
 	void hydrodynamic_forces_fibers_IBM_LBM(int,int,float,beadfiber*,int);
 	void hydrodynamic_force_bead_rod(int,int,beadrod*,int,int);
+	void extrapolate_force_bead_rod(int,int,beadrod*,rod*,int,int);
 	void hydrodynamic_force_rigid_node(int,int,rigidnode*,int);
 	void interpolate_gradient_of_velocity_rod(int,int,beadrod*,int);
 	void inside_hemisphere(int,int);
