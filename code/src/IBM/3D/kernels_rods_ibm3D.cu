@@ -27,7 +27,7 @@ __global__ void zero_rod_forces_torques_moments_IBM3D(
 		rods[i].gradu.yz = 0.0;
 		rods[i].gradu.zx = 0.0;
 		rods[i].gradu.zy = 0.0;
-		rods[i].gradu.zz = 0.0;		
+		rods[i].gradu.zz = 0.0;
 		//rods[i].Ixx = 0.0;
 		//rods[i].Iyy = 0.0;
 		//rods[i].Izz = 0.0;
@@ -668,6 +668,7 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 	float* fxLBM,
 	float* fyLBM,
 	float* fzLBM,
+	float L0,
 	int nBeadsPerRod,
 	int Nx,
 	int Ny,
@@ -686,7 +687,25 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 		
 		int rodID = beads[i].rodID;
 		float3 beadForce = rods[rodID].f/nBeadsPerRod;
-			
+		
+		// --------------------------------------
+		// the rod torque is converted to a force
+		// by calculating the force couple that
+		// produces the same torque, assuming the
+		// separation distance is 1/2 the rod length.
+		// The force couple is then spread across
+		// the rod
+		// --------------------------------------
+		
+		float Lrod = float(nBeadsPerRod-1)*L0;
+		float Lrod2 = Lrod/2.0;
+		float3 FcoupleSep = Lrod*rods[rodID].p;
+		float3 Fcouple = cross(rods[rodID].t,FcoupleSep)/(Lrod2*Lrod2);
+		float nBeadsPerRod2 = float(nBeadsPerRod-1)/2.0;
+		Fcouple /= nBeadsPerRod2;
+		if (i > rods[rodID].centerBead) Fcouple *= -1.0;
+		beadForce += Fcouple;
+				
 		// --------------------------------------
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
@@ -943,8 +962,9 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to calculate i-j force:
-// Weeks-Chandler-Anderson potential
+// IBM3D kernel to calculate i-j lubrication force.  The 
+// model comes from Ladd & Verberg, Journal of Statistical
+// Physics, 104 (2001) 1191.  See Eq. (74).
 // --------------------------------------------------------
 
 __device__ inline void pairwise_bead_interaction_forces_WCA(
@@ -958,12 +978,37 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 {
 	float3 rij = beads[i].r - beads[j].r;
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
-	const float r = length(rij);
-	if (r < repD) {
-		// linear spring force repulsion
-		float force = repA - (repA/repD)*r;
-		float3 fij = force*(rij/r);
+	const float r = length(rij);	
+	const float cutoff = 0.666667;
+	const float nu = 0.1666666667;
+	const float Ri = 0.5*repD;  // bead radius
+	const float Rj = 0.5*repD;  // bead radius
+	
+	if (r < cutoff) {
+		
+		float3 fij = make_float3(0.0f,0.0f,0.0f);
+		
+		/*
+		// lubrication force:
+		float3 uij = rij/r;
+		float3 vij = beads[i].v - beads[j].v;
+		float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);
+		float udotv = dot(uij,vij);
+		float surfsep = r - Ri - Rj;
+		if (surfsep < 0.025) surfsep = 0.025;
+		float invsurfsep = 1.0/surfsep - 1.0/(cutoff-Ri-Rj);
+		fij += -6.0*M_PI*nu*coeff*uij*udotv*invsurfsep;			
+		*/
+		
+		// linear (repulsive) contact force
+		if (r < repD) {
+			float force = repA - (repA/repD)*r;
+			fij += force*(rij/r);
+		}
+		
+		// add force to bead i:
 		beads[i].f += fij;
+		
 		
 		// WCA force:
 		/*
@@ -1158,4 +1203,3 @@ __device__ inline float determinantOfMatrix(float mat[3][3])
 
 
 
-                                               

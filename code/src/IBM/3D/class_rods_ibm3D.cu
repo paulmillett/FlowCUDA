@@ -593,9 +593,9 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 	//  to the bead velocity.
 	// ----------------------------------------------------------
 	
-	// zero fluid forces and apply hydrodynamic force to fluid:
+	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
-	lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod);
+	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod);
 	
 	
 	
@@ -611,7 +611,7 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
 	nonbonded_bead_interactions(nBlocks,nThreads);	
-	compute_wall_forces(nBlocks,nThreads);		
+	compute_wall_forces(nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_rod_forces_torques_moments(nBlocks,nThreads);	
 			
@@ -620,6 +620,9 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 	update_rod_position_orientation_fluid(nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	update_bead_velocity_rods(nBlocks,nThreads);
+	
+	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
+	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);
 		
 }
 
@@ -638,13 +641,14 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	//  to the bead velocity.
 	// ----------------------------------------------------------
 	
-	// zero fluid forces and apply hydrodynamic force to fluid:
+	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
-	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod); 
+	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod); 	
 	
 	
 	
-	// LOOP over the below code for IBM sub-steps...
+	// LOOP over the below code for IBM sub-steps...	
+	
 	
 	
 	// re-build bin lists for rod beads:
@@ -656,14 +660,7 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
 	nonbonded_bead_interactions(nBlocks,nThreads); 
-	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);
-	
-	
-	
-	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,nBeads,nBeadsPerRod);
-	
-	
-		
+	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_rod_forces_torques_moments(nBlocks,nThreads);	
 	
@@ -672,6 +669,9 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	update_rod_position_orientation_fluid(nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	update_bead_velocity_rods(nBlocks,nThreads);
+	
+	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
+	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);	
 			
 }
 

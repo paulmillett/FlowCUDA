@@ -911,10 +911,10 @@ void class_scsp_D3Q19::hydrodynamic_force_bead_rod(int nBlocks, int nThreads,
 // --------------------------------------------------------
 
 void class_scsp_D3Q19::extrapolate_force_bead_rod(int nBlocks, int nThreads,
-	                                              beadrod* beads, rod* rods, int nBeads, int nBeadsPerRod)
+	                                              beadrod* beads, rod* rods, float L0, int nBeads, int nBeadsPerRod)
 {
 	extrapolate_force_bead_rod_IBM3D
-	<<<nBlocks,nThreads>>> (beads,rods,Fx,Fy,Fz,nBeadsPerRod,Nx,Ny,Nz,nBeads);	
+	<<<nBlocks,nThreads>>> (beads,rods,Fx,Fy,Fz,L0,nBeadsPerRod,Nx,Ny,Nz,nBeads);	
 }
 
 

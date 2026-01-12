@@ -177,6 +177,7 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 	float*,
 	float*,
 	float*,
+	float,
 	int,
 	int,
 	int,
