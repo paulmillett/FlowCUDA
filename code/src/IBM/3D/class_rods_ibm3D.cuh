@@ -29,6 +29,8 @@ class class_rods_ibm3D {
 	float dt;
 	float repA;
 	float repD;
+	float repWall;
+	float fricWall;
 	float repA_bn;
 	float repD_bn;
 	float beadFmax;
@@ -78,11 +80,14 @@ class class_rods_ibm3D {
 	void rotate_and_shift_bead_positions(int,float,float,float);
 	void randomize_rods(float);
 	void randomize_rods_inside_sphere(float,float,float,float,float);
+	void randomize_rods_cylinder();
 	void randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	void semi_randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	float calc_separation_pbc(float3,float3);
 	void stepIBM_Euler(class_scsp_D3Q19&,int,int);
 	void stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19&,float,int,int);
+	void stepIBM_Euler_push_inside_cylinder(int,float,int,int);
+	void stepIBM_Euler_relax_rods(int,float,int,int);
 	void zero_rod_forces_torques_moments(int,int);
 	void set_rod_position_orientation(int,int);
 	void update_bead_position_rods(int,int);
@@ -90,6 +95,7 @@ class class_rods_ibm3D {
 	void update_bead_velocity_rods(int,int);
 	void update_rod_position_orientation(int,int);
 	void update_rod_position_orientation_fluid(int,int);
+	void update_rod_position_orientation_no_fluid(int,int);
 	void update_rod_position_fluid(int,int);
 	void zero_bead_forces(int,int);
 	void enforce_max_bead_force(int,int);
@@ -108,6 +114,7 @@ class class_rods_ibm3D {
 	void wall_forces_ydir_zdir(int,int);
 	void compute_wall_forces_cylinder(float,int,int);
 	void push_beads_inside_sphere(float,float,float,float,int,int);
+	void push_rods_inside_cylinder(float,int,int);
 	void write_output(std::string,int);
 	void unwrap_bead_coordinates();
 	bool cylinder_overlap(float3,float3,float,float,float);

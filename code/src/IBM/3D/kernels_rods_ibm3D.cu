@@ -187,7 +187,7 @@ __global__ void update_bead_velocity_rods_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D bead update kernel:
+// IBM3D rod update kernel:
 // --------------------------------------------------------
 
 __global__ void update_rod_position_orientation_IBM3D(
@@ -209,14 +209,12 @@ __global__ void update_rod_position_orientation_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D bead update kernel:
+// IBM3D rod update kernel:
 // --------------------------------------------------------
 
 __global__ void update_rod_position_orientation_fluid_IBM3D(
 	rod* rods,
 	float dt,
-	float fricT,
-	float fricR,
 	int nRods)
 {
 	// define bead:
@@ -238,6 +236,36 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 		tensor W = 0.5*(rods[i].gradu - transpose(rods[i].gradu));
 		float3 fltor = Imppt*(shape*E + W)*rods[i].p;
 		rods[i].p += dt*(fltor + rods[i].mobRot*cross(rods[i].t,rods[i].p));		
+		rods[i].p = normalize(rods[i].p);
+					
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D rod update kernel:
+// --------------------------------------------------------
+
+__global__ void update_rod_position_orientation_no_fluid_IBM3D(
+	rod* rods,
+	float dt,
+	int nRods)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nRods) {
+				
+		// mobility coefficients
+		tensor ppT = dyadic(rods[i].p);
+		tensor Imppt = identity() - ppT;
+		tensor mobTensor = rods[i].mobPar*ppT + rods[i].mobPer*Imppt;
+				
+		// rod translation:		
+		rods[i].r += dt*(mobTensor*rods[i].f);
+		
+		// rod rotation:
+		rods[i].p += dt*(rods[i].mobRot*cross(rods[i].t,rods[i].p));		
 		rods[i].p = normalize(rods[i].p);
 					
 	}
@@ -516,6 +544,7 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 	float Rad,
 	float repA,
 	float repD,
+	float fric,
 	int nBeads)
 {
 	// define node:
@@ -530,10 +559,20 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 		const float ri = sqrt(yi*yi + zi*zi);
 		// radial wall		
 		if (ri > Rad - d) {
-			const float bmri = Rad - ri;
-			const float force = A/pow(bmri,2) - A/pow(d,2);
+			// parabolic normal force:
+			//const float bmri = Rad - ri;
+			//const float force = A/pow(bmri,2) - A/pow(d,2);
+			//beads[i].f.y -= force*(yi/ri);
+			//beads[i].f.z -= force*(zi/ri);	
+			
+			// linear normal force:
+			const float delta = (ri + d) - Rad;  // distance protruding into wall
+			const float force = A*delta;
 			beads[i].f.y -= force*(yi/ri);
-			beads[i].f.z -= force*(zi/ri);			
+			beads[i].f.z -= force*(zi/ri);
+			
+			// friction force:
+			beads[i].f.x -= fric*force;	
 		}				
 	}
 }
@@ -564,6 +603,41 @@ __global__ void push_beads_into_sphere_IBM3D(
 		}
 	}
 }
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void push_beads_into_cylinder_IBM3D(
+	beadrod* beads,
+	float3 Box,
+	float Rad,
+	float repA,
+	float repD,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float ymid = (Box.y-1.0)/2.0;
+		const float zmid = (Box.z-1.0)/2.0;
+		const float yi = beads[i].r.y - ymid;  // distance to channel centerline
+		const float zi = beads[i].r.z - zmid;  // "                            "
+		const float ri = sqrt(yi*yi + zi*zi);
+		// radial wall		
+		if (ri > Rad - d) {
+			const float outside_dist = ri - (Rad - d);
+			const float force = 0.01*outside_dist;
+			beads[i].f.y -= force*(yi/ri);
+			beads[i].f.z -= force*(zi/ri);			
+		}
+	}
+}
+
 
 
 
@@ -979,48 +1053,46 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 	float3 rij = beads[i].r - beads[j].r;
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);	
-	const float cutoff = 0.666667;
-	const float nu = 0.1666666667;
 	const float Ri = 0.5*repD;  // bead radius
-	const float Rj = 0.5*repD;  // bead radius
+	const float Rj = 0.5*repD;  // bead radius 
+	const float gapMax = 0.05;  // max gap for lubrication forces
+	const float cutoff = Ri + Rj + gapMax;		
 	
-	if (r < cutoff) {
-		
-		float3 fij = make_float3(0.0f,0.0f,0.0f);
-		
-		/*
-		// lubrication force:
+	// lubrication force:
+	if (r > (Ri+Rj) && r < cutoff) {			
+		const float nu = 0.1666666667;
 		float3 uij = rij/r;
 		float3 vij = beads[i].v - beads[j].v;
 		float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);
 		float udotv = dot(uij,vij);
-		float surfsep = r - Ri - Rj;
-		if (surfsep < 0.025) surfsep = 0.025;
-		float invsurfsep = 1.0/surfsep - 1.0/(cutoff-Ri-Rj);
-		fij += -6.0*M_PI*nu*coeff*uij*udotv*invsurfsep;			
-		*/
+		float gap = r - Ri - Rj;
+		if (gap < 0.001) gap = 0.001;
+		float invgap = 1.0/gap - 1.0/gapMax;		
+		float lubforce = -6.0*M_PI*nu*coeff*udotv*invgap;
+		// ensure lubforce is not too large:
+		float lubforcemag = abs(lubforce);
+		if (lubforcemag > repA) lubforce *= (repA/lubforcemag); 
+		// add lubforce to bead force:
+		beads[i].f += lubforce*(uij);
+	}
 		
-		// linear (repulsive) contact force
-		if (r < repD) {
-			float force = repA - (repA/repD)*r;
-			fij += force*(rij/r);
-		}
-		
-		// add force to bead i:
-		beads[i].f += fij;
-		
-		
-		// WCA force:
-		/*
-		float sig = 0.8909*repD;  // this ensures F=0 is at cutoff
-		float eps = 0.001;
-		float sigor = sig/r;
-		float sigor6 = sigor*sigor*sigor*sigor*sigor*sigor;
-		float sigor12 = sigor6*sigor6;
-		float force = 24.0*eps*(2*sigor12 - sigor6)/r/r;
-		beads[i].f += force*rij;
-		*/		
-	} 	
+	// linear (repulsive) contact force
+	if (r < (Ri+Rj)) {
+		float force = repA - (repA/repD)*r;
+		beads[i].f += force*(rij/r);			
+	}
+	
+	// WCA force:
+	/*
+	float sig = 0.8909*repD;  // this ensures F=0 is at cutoff
+	float eps = 0.001;
+	float sigor = sig/r;
+	float sigor6 = sigor*sigor*sigor*sigor*sigor*sigor;
+	float sigor12 = sigor6*sigor6;
+	float force = 24.0*eps*(2*sigor12 - sigor6)/r/r;
+	beads[i].f += force*rij;
+	*/		
+	
 }
 
 

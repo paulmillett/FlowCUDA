@@ -158,6 +158,7 @@ public:
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);
 	void calculate_relative_viscosity(std::string,float,int);
+	void calculate_relative_flowrate_cylindrical_channel(std::string,float,int);
 	void print_flow_rate_xdir(std::string,int);
 	void read_lattice_geometry(int);
 	void vtk_structured_output_ruvw(std::string,int,int,int,int,int);

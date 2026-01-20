@@ -54,10 +54,11 @@ class_rods_ibm3D::class_rods_ibm3D()
 	L0 = inputParams("IBM_RODS/L0",0.5);
 	repA = inputParams("IBM_RODS/repA",0.0);
 	repD = inputParams("IBM_RODS/repD",0.0);
+	repWall = inputParams("IBM_RODS/repWall",0.0);
+	fricWall = inputParams("IBM_RODS/fricWall",0.0);
 	beadFmax = inputParams("IBM_RODS/beadFmax",1000.0);
 	rodFmax = inputParams("IBM_RODS/rodFmax",1000.0);
 	rodTmax = inputParams("IBM_RODS/rodTmax",1000.0);
-	gam = inputParams("IBM_RODS/gamma",0.1);
 		
 	// domain attributes
 	N.x = inputParams("Lattice/Nx",1);
@@ -391,6 +392,33 @@ void class_rods_ibm3D::randomize_rods_inside_sphere(float xs, float ys, float zs
 // randomize rod positions, but all oriented in x-dir:
 // --------------------------------------------------------
 
+void class_rods_ibm3D::randomize_rods_cylinder()
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
+			
+	// assign random position and orientation to each rod:
+	for (int f=0; f<nRods; f++) {
+		float3 shift = make_float3(0.0,0.0,0.0);
+		// get random position
+		float rad = (float)rand()/RAND_MAX*(chRad);
+		float ang = (float)rand()/RAND_MAX*(2*M_PI);
+		shift.x = (float)rand()/RAND_MAX*Box.x;		
+		shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
+		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
+	}	
+	
+	// copy bead positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);	
+}
+
+
+
+// --------------------------------------------------------
+// randomize rod positions, but all oriented in x-dir:
+// --------------------------------------------------------
+
 void class_rods_ibm3D::randomize_rods_xdir_alligned_cylinder(float L, float R, float sepWall, float sepMin)
 {
 	// copy bead positions from device to host:
@@ -422,21 +450,7 @@ void class_rods_ibm3D::randomize_rods_xdir_alligned_cylinder(float L, float R, f
 		rodCOM[r] = shift;	
 		shift_bead_positions(r,shift.x,shift.y,shift.z);
 	}
-	
-	/*	
-	// assign random position and orientation to each rod:
-	for (int f=0; f<nRods; f++) {
-		float3 shift = make_float3(0.0,0.0,0.0);
-		// get random position
-		float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
-		float ang = (float)rand()/RAND_MAX*(2*M_PI);
-		shift.x = (float)rand()/RAND_MAX*Box.x;		
-		shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
-		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
-		shift_bead_positions(f,shift.x,shift.y,shift.z);
-	}
-	*/
-	
+		
 	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);	
 }
@@ -589,8 +603,7 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 		
 	// ----------------------------------------------------------
 	//  here, the Euler algorithm is used to update the 
-	//  bead positions - using a viscous drag force proportional
-	//  to the bead velocity.
+	//  rod positions 
 	// ----------------------------------------------------------
 	
 	// zero fluid forces:
@@ -603,14 +616,16 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 	
 	
 	// re-build bin lists for rod beads:
-	reset_bin_lists(nBlocks,nThreads);
-	build_bin_lists(nBlocks,nThreads);
+	if (nRods > 1) {
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+	}
 		
 	// calculate IBM forces:
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
-	nonbonded_bead_interactions(nBlocks,nThreads);	
+	if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads);	
 	compute_wall_forces(nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_rod_forces_torques_moments(nBlocks,nThreads);	
@@ -637,8 +652,7 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 		
 	// ----------------------------------------------------------
 	//  here, the Euler algorithm is used to update the 
-	//  bead positions - using a viscous drag force proportional
-	//  to the bead velocity.
+	//  rod positions 
 	// ----------------------------------------------------------
 	
 	// zero fluid forces:
@@ -652,14 +666,16 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	
 	
 	// re-build bin lists for rod beads:
-	reset_bin_lists(nBlocks,nThreads);
-	build_bin_lists(nBlocks,nThreads);
+	if (nRods > 1) {
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+	}	
 	
 	// calculate IBM forces:
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
-	nonbonded_bead_interactions(nBlocks,nThreads); 
+	if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
 	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_rod_forces_torques_moments(nBlocks,nThreads);	
@@ -673,6 +689,88 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
 	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);	
 			
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only pushing into
+// cylindrical channel):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_push_inside_cylinder(int nSteps, float chRad, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  Here, the objective is to push rods inside a cylindrical 
+	//  channel.  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered and no inter-rod
+	//  interactions are included.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Pushing rods inside cylinder..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		push_rods_inside_cylinder(chRad,nBlocks,nThreads);	
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}
+	
+	cudaDeviceSynchronize(); 
+				
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only pushing into
+// cylindrical channel):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_relax_rods(int nSteps, float chRad, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Relaxing rods to eliminate overlap..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// re-build bin lists for rod beads:
+		if (nRods > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}		
+	
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
+		push_rods_inside_cylinder(chRad,nBlocks,nThreads);	
+		unwrap_bead_coordinates(nBlocks,nThreads);
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}	
+	
+	cudaDeviceSynchronize();
+				
 }
 
 
@@ -791,8 +889,23 @@ void class_rods_ibm3D::update_rod_position_orientation(int nBlocks, int nThreads
 void class_rods_ibm3D::update_rod_position_orientation_fluid(int nBlocks, int nThreads)
 {
 	update_rod_position_orientation_fluid_IBM3D
-	<<<nBlocks,nThreads>>> (rods,dt,fricT,fricR,nRods);
+	<<<nBlocks,nThreads>>> (rods,dt,nRods);
 	
+	wrap_rod_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (rods,Box,pbcFlag,nRods);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "update_rod_position_orientation_no_fluid_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::update_rod_position_orientation_no_fluid(int nBlocks, int nThreads)
+{
+	update_rod_position_orientation_no_fluid_IBM3D
+	<<<nBlocks,nThreads>>> (rods,dt,nRods);
+		
 	wrap_rod_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (rods,Box,pbcFlag,nRods);	
 }
@@ -991,14 +1104,13 @@ void class_rods_ibm3D::wall_forces_ydir_zdir(int nBlocks, int nThreads)
 void class_rods_ibm3D::compute_wall_forces_cylinder(float chRad, int nBlocks, int nThreads)
 {
 	bead_wall_forces_cylinder_IBM3D
-	<<<nBlocks,nThreads>>> (beads,Box,chRad,repA,repD/2.0,nBeads);
+	<<<nBlocks,nThreads>>> (beads,Box,chRad,repWall,repD/2.0,fricWall,nBeads);
 }
 
 
 
 // --------------------------------------------------------
-// Call to kernel that calculates wall forces in y-dir
-// and z-dir:
+// Call to kernel that pushes rods inside a sphere:
 // --------------------------------------------------------
 
 void class_rods_ibm3D::push_beads_inside_sphere(float xs, float ys, float zs, float rs, 
@@ -1006,6 +1118,19 @@ void class_rods_ibm3D::push_beads_inside_sphere(float xs, float ys, float zs, fl
 {
 	push_beads_into_sphere_IBM3D
 	<<<nBlocks,nThreads>>> (beads,xs,ys,zs,rs,nBeads);
+}
+
+
+
+
+// --------------------------------------------------------
+// Call to kernel that pushes rods inside a cylinder:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::push_rods_inside_cylinder(float chRad, int nBlocks, int nThreads)
+{
+	push_beads_into_cylinder_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,chRad,repA,repD,nBeads);
 }
 
 

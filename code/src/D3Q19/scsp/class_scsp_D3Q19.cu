@@ -1144,6 +1144,55 @@ void class_scsp_D3Q19::calculate_flow_rate_xdir(std::string tagname, int tagnum)
 
 
 // --------------------------------------------------------
+// Calculate the time-averaged x-vel profile.  Also,
+// calculate the instantaneous relative flowrate in the
+// cylindrical channel and print to file
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::calculate_relative_flowrate_cylindrical_channel(std::string tagname, float Q0, int tagnum)
+{
+		
+	// define the file location and name (flowrate thru time):
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << tagname << ".dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// create array for the current x-vel average along channel:
+	float* xvel = (float*)malloc(Ny*Nz*sizeof(float));
+	for (int i=0; i<Ny*Nz; i++) xvel[i] = 0.0;
+	
+	// loop over grid and calculate average x-vel for each voxel
+	// on the yz-plane (for current time):
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			float vxsum = 0.0;
+			for (int i=0; i<Nx; i++) {		
+				vxsum += uH[k*Nx*Ny + j*Nx + i];
+			}
+			xvel[k*Ny + j] = vxsum/float(Nx);
+		}
+	}
+	
+	// update the cumulative moving average for x-vel profile:
+	xvelAveCnt++;
+	for (int i=0; i<Ny*Nz; i++) {
+		xvelAve[i] = (xvel[i] + (xvelAveCnt-1)*xvelAve[i])/xvelAveCnt;
+	}
+	
+	// calculate relative viscosity defined as ratio of reference
+	// flux (without capsules) divided by instantaneous flux:
+	float Q = 0.0;
+	for (int i=0; i<Ny*Nz; i++) Q += xvel[i];
+	float relFlowRate = Q/Q0;
+	outfile << fixed << setprecision(4) << tagnum << "  " << Q << "  " << relFlowRate << endl;
+			
+}
+
+
+
+// --------------------------------------------------------
 // Print the time-averaged x-vel profile:
 // --------------------------------------------------------
 
@@ -1162,7 +1211,7 @@ void class_scsp_D3Q19::print_flow_rate_xdir(std::string tagname, int tagnum)
 		outfile << fixed << setprecision(4) << xvelAve[i] << endl;
 	}
 }
-	
+
 
 
 

@@ -128,12 +128,14 @@ scsp_3D_rods_cylinder::scsp_3D_rods_cylinder() : lbm(),rods()
 		cout << "nu = " << nu << endl;	
 	}
 	bodyForx = umax*(4*nu)/chRad/chRad;
+	Q0 = M_PI*chRad*chRad*chRad*chRad*bodyForx/(8.0*nu);
 	
 	cout << "  " << endl;
 	cout << "Re = " << Re << endl;
 	cout << "Body Force X-dir = " << bodyForx << endl;
 	cout << "nu = " << nu << endl;
 	cout << "umax = " << umax << endl;
+	cout << "Q0 = " << Q0 << endl; 
 	cout << "  " << endl;	
 	
 }
@@ -249,7 +251,7 @@ void scsp_3D_rods_cylinder::initSystem()
 		
 	rods.memcopy_host_to_device();
 	lbm.memcopy_host_to_device();
-		
+	
 	// ----------------------------------------------
 	// initialize equilibrium populations: 
 	// ----------------------------------------------
@@ -263,13 +265,32 @@ void scsp_3D_rods_cylinder::initSystem()
 	srand(time(NULL));
 	
 	// ----------------------------------------------
-	// randomly disperse filaments: 
+	// randomly disperse rods: 
 	// ----------------------------------------------
-		
-	//rods.randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,1.0,1.0);
-	rods.semi_randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,Drod/2.0+0.1,Drod/2.0+0.2);
+	
+	string initStruct = inputParams("IBM_RODS/initStruct","random");
+	
+	if (initStruct == "random") {
+		rods.randomize_rods_cylinder(); 
+	}
+	else if (initStruct == "aligned") {
+		//rods.randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,1.0,1.0);
+		rods.semi_randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,Drod/2.0+0.1,Drod/2.0+0.2);
+	}
+			
 	rods.set_rod_position_orientation(nBlocks,nThreads);
 		
+	// ----------------------------------------------
+	// push rods inside cylinder (if 'random'), then
+	// relax rods to eliminate any overlap:
+	// ----------------------------------------------
+	
+	if (initStruct == "random"){
+		rods.stepIBM_Euler_push_inside_cylinder(1000,chRad,nBlocks,nThreads);
+	}
+	
+	rods.stepIBM_Euler_relax_rods(1000,chRad,nBlocks,nThreads);
+	
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------
@@ -285,7 +306,7 @@ void scsp_3D_rods_cylinder::initSystem()
 	
 	cout << "  " << endl;
 	cout << "Done with Initializtion" << endl;
-	
+			
 }
 
 
@@ -376,6 +397,9 @@ void scsp_3D_rods_cylinder::writeOutput(std::string tagname, int step)
 	if (step > 0) { 					
 		// output rod position & orientation: 
 		rods.orientation_in_cylindrical_channel(step);
+				
+		// calculate relative flow-rate:
+		lbm.calculate_relative_flowrate_cylindrical_channel("relative_flowrate_thru_time",Q0,step);
 		
 		// write vtk output for LBM and IBM:
 		int intervalVTK = nSteps/nVTKOutputs;

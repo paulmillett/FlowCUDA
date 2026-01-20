@@ -72,7 +72,11 @@ __global__ void update_rod_position_orientation_IBM3D(
 __global__ void update_rod_position_orientation_fluid_IBM3D(
 	rod*,
 	float,
-	float,
+	int);
+	
+	
+__global__ void update_rod_position_orientation_no_fluid_IBM3D(
+	rod*,
 	float,
 	int);
 
@@ -143,6 +147,7 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 	float,
 	float,
 	float,
+	float,
 	int);
 
 
@@ -154,6 +159,15 @@ __global__ void push_beads_into_sphere_IBM3D(
 	float,
 	int);
 
+
+__global__ void push_beads_into_cylinder_IBM3D(
+	beadrod*,
+	float3,
+	float,
+	float,
+	float,
+	int);
+		
 
 __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	beadrod*,
