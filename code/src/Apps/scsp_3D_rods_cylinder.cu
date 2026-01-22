@@ -228,7 +228,7 @@ void scsp_3D_rods_cylinder::initSystem()
 	float ar = Lrod/Drod;  // aspect ratio
 	float mobPar = (log(ar) - 0.207 + 0.980/ar - 0.133/(ar*ar)) / (2.0*M_PI*nu*Lrod); 
 	float mobPer = (log(ar) + 0.839 + 0.185/ar + 0.233/(ar*ar)) / (4.0*M_PI*nu*Lrod);
-	float mobRot = (log(ar) - 0.662 + 0.917/ar - 0.050/(ar*ar)) / (M_PI*nu*Lrod*Lrod*Lrod);
+	float mobRot = (log(ar) - 0.662 + 0.917/ar - 0.050/(ar*ar)) / (M_PI*nu*Lrod*Lrod*Lrod) * 3.0;
 	
 	rods.set_aspect_ratio(ar);
 	rods.set_mobility_coefficients(mobPar,mobPer,mobRot);
