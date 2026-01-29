@@ -773,7 +773,7 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 		
 		float Lrod = float(nBeadsPerRod-1)*L0;
 		float Lrod2 = Lrod/2.0;
-		float3 FcoupleSep = Lrod*rods[rodID].p;
+		float3 FcoupleSep = Lrod2*rods[rodID].p;
 		float3 Fcouple = cross(rods[rodID].t,FcoupleSep)/(Lrod2*Lrod2);
 		float nBeadsPerRod2 = float(nBeadsPerRod-1)/2.0;
 		Fcouple /= nBeadsPerRod2;
@@ -1058,6 +1058,7 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 	const float gapMax = 0.05;  // max gap for lubrication forces
 	const float cutoff = Ri + Rj + gapMax;		
 	
+	/*
 	// lubrication force:
 	if (r > (Ri+Rj) && r < cutoff) {			
 		const float nu = 0.1666666667;
@@ -1075,6 +1076,7 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 		// add lubforce to bead force:
 		beads[i].f += lubforce*(uij);
 	}
+	*/
 		
 	// linear (repulsive) contact force
 	if (r < (Ri+Rj)) {

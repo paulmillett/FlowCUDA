@@ -44,14 +44,13 @@ class_rods_ibm3D::class_rods_ibm3D()
 	// get some parameters:
 	GetPot inputParams("input.dat");
 	
-	// mesh attributes	
-	nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);
+	// mesh attributes
+	L0 = inputParams("IBM_RODS/L0",0.5);
 	nRods = inputParams("IBM_RODS/nRods",1);
+	nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);
 	nBeads = nBeadsPerRod*nRods;
 	
-	// mechanical properties
-	dt = inputParams("Time/dt",1.0);
-	L0 = inputParams("IBM_RODS/L0",0.5);
+	// mechanical properties	
 	repA = inputParams("IBM_RODS/repA",0.0);
 	repD = inputParams("IBM_RODS/repD",0.0);
 	repWall = inputParams("IBM_RODS/repWall",0.0);
@@ -61,6 +60,7 @@ class_rods_ibm3D::class_rods_ibm3D()
 	rodTmax = inputParams("IBM_RODS/rodTmax",1000.0);
 		
 	// domain attributes
+	dt = inputParams("Time/dt",1.0);	
 	N.x = inputParams("Lattice/Nx",1);
 	N.y = inputParams("Lattice/Ny",1);
 	N.z = inputParams("Lattice/Nz",1);
