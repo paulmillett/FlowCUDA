@@ -1057,8 +1057,7 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 	const float Rj = 0.5*repD;  // bead radius 
 	const float gapMax = 0.05;  // max gap for lubrication forces
 	const float cutoff = Ri + Rj + gapMax;		
-	
-	/*
+		
 	// lubrication force:
 	if (r > (Ri+Rj) && r < cutoff) {			
 		const float nu = 0.1666666667;
@@ -1072,12 +1071,13 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 		float lubforce = -6.0*M_PI*nu*coeff*udotv*invgap;
 		// ensure lubforce is not too large:
 		float lubforcemag = abs(lubforce);
-		if (lubforcemag > repA) lubforce *= (repA/lubforcemag); 
+		float lubforceMax = 0.1*repA;
+		if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
+		//if (lubforce < 0.0) lubforce = 0.0;  // make only repulsive
 		// add lubforce to bead force:
 		beads[i].f += lubforce*(uij);
 	}
-	*/
-		
+			
 	// linear (repulsive) contact force
 	if (r < (Ri+Rj)) {
 		float force = repA - (repA/repD)*r;
