@@ -235,7 +235,6 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 		float shape = (ar*ar - 1.0)/(ar*ar + 1.0);   // Bretherton constant
 		
 		// rod rotation:
-		
 		tensor E = 0.5*(rods[i].gradu + transpose(rods[i].gradu));
 		tensor W = 0.5*(rods[i].gradu - transpose(rods[i].gradu));
 		float3 fltor = Imppt*(shape*E + W)*rods[i].p;
