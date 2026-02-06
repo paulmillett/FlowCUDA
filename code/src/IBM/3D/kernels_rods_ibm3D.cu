@@ -229,9 +229,13 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 		// rod translation:		
 		rods[i].r += dt*(rods[i].uf + mobTensor*rods[i].f);
 		
-		// rod rotation:
+		// rod shape factor for rotation:
 		float ar = rods[i].ar;
-		float shape = (ar*ar - 1.0)/(ar*ar + 1.0);  // Bretherton constant
+		if (ar > 5.0) ar = (1.24*ar)/sqrt(log(ar));  // correction factor for rods vs spheroids: Cox, JFM (1971) 45:625-657 
+		float shape = (ar*ar - 1.0)/(ar*ar + 1.0);   // Bretherton constant
+		
+		// rod rotation:
+		
 		tensor E = 0.5*(rods[i].gradu + transpose(rods[i].gradu));
 		tensor W = 0.5*(rods[i].gradu - transpose(rods[i].gradu));
 		float3 fltor = Imppt*(shape*E + W)*rods[i].p;
@@ -952,6 +956,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 	bindata bins,
 	float repA,
 	float repD,
+	float lubforceMax,
 	int nBeads,
 	float3 Box,	
 	int3 pbcFlag)
@@ -983,7 +988,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 			int j = bins.binMembers[k];
 			if (i==j) continue;
 			if (beads[i].rodID == beads[j].rodID) continue;
-			pairwise_bead_interaction_forces_WCA(i,j,repA,repD,beads,Box,pbcFlag);			
+			pairwise_bead_interaction_forces_WCA(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);			
 		}
 		
 		// -------------------------------
@@ -1000,7 +1005,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 			for (int k=offst; k<offst+occup; k++) {
 				int j = bins.binMembers[k];
 				if (beads[i].rodID == beads[j].rodID) continue;				
-				pairwise_bead_interaction_forces_WCA(i,j,repA,repD,beads,Box,pbcFlag);			
+				pairwise_bead_interaction_forces_WCA(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);			
 			}
 		}
 				
@@ -1046,6 +1051,7 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 	const int j,
 	const float repA,
 	const float repD,
+	const float lubforceMax,
 	beadrod* beads,
 	float3 Box,
 	int3 pbcFlag)
@@ -1071,7 +1077,6 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 		float lubforce = -6.0*M_PI*nu*coeff*udotv*invgap;
 		// ensure lubforce is not too large:
 		float lubforcemag = abs(lubforce);
-		float lubforceMax = 0.1*repA;
 		if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
 		//if (lubforce < 0.0) lubforce = 0.0;  // make only repulsive
 		// add lubforce to bead force:

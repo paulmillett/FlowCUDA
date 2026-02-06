@@ -53,6 +53,7 @@ class_rods_ibm3D::class_rods_ibm3D()
 	// mechanical properties	
 	repA = inputParams("IBM_RODS/repA",0.0);
 	repD = inputParams("IBM_RODS/repD",0.0);
+	lubforceMax = inputParams("IBM_RODS/lubforceMax",0.0);
 	repWall = inputParams("IBM_RODS/repWall",0.0);
 	fricWall = inputParams("IBM_RODS/fricWall",0.0);
 	beadFmax = inputParams("IBM_RODS/beadFmax",1000.0);
@@ -1053,7 +1054,7 @@ void class_rods_ibm3D::nonbonded_bead_interactions(int nBlocks, int nThreads)
 	if (nRods > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
 		nonbonded_bead_interactions_IBM3D
-		<<<nBlocks,nThreads>>> (beads,bins,repA,repD,nBeads,Box,pbcFlag);
+		<<<nBlocks,nThreads>>> (beads,bins,repA,repD,lubforceMax,nBeads,Box,pbcFlag);
 	}	
 }
 

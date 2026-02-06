@@ -29,6 +29,7 @@ class class_rods_ibm3D {
 	float dt;
 	float repA;
 	float repD;
+	float lubforceMax;
 	float repWall;
 	float fricWall;
 	float repA_bn;

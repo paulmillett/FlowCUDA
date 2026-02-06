@@ -221,6 +221,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 	bindata,
 	float,
 	float,
+	float,
 	int,
 	float3,	
 	int3);
@@ -229,6 +230,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 __device__ inline void pairwise_bead_interaction_forces_WCA(
 	const int, 
 	const int,
+	const float,
 	const float,
 	const float,
 	beadrod*,
