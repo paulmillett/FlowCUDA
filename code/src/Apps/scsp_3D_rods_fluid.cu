@@ -168,7 +168,7 @@ void scsp_3D_rods_fluid::initSystem()
 	rods.assign_rodIDs_to_beads();
 	rods.set_rods_radii(Drod/2.0);
 	
-	if (nRods == 1) rods.shift_bead_positions(0,float(Nx-1)/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0);
+	if (nRods == 1) rods.shift_bead_positions(0,float(Nx-1)/2.0 - Lrod/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0);
 	
 	// ----------------------------------------------			
 	// mobility coefficients.  See Luders et al. 
@@ -353,11 +353,16 @@ void scsp_3D_rods_fluid::writeOutput(std::string tagname, int step)
 	
 	if (step == 0) {
 		// only print out vtk files
+		rods.orientation_in_cylindrical_channel(step);
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 		rods.write_output("rods",step);
 	}
 	
-	if (step > 0) { 					
+	if (step > 0) {
+		
+		// output rod position & orientation: 
+		rods.orientation_in_cylindrical_channel(step);
+						
 		// write vtk output for LBM and IBM:
 		int intervalVTK = nSteps/nVTKOutputs;
 		if (nVTKOutputs == 0) intervalVTK = nSteps;

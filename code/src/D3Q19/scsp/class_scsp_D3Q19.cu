@@ -340,6 +340,28 @@ void class_scsp_D3Q19::create_lattice_box()
 
 
 // --------------------------------------------------------
+// Initialize lattice as a "box" which has both iolets
+// and solid walls:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::create_lattice_box_iolets_solid_walls()
+{
+	GetPot inputParams("input.dat");		
+	int flowDir = inputParams("Lattice/flowDir",0);
+	int xLBC = inputParams("Lattice/xLBC",0);
+	int xUBC = inputParams("Lattice/xUBC",0);
+	int yLBC = inputParams("Lattice/yLBC",0);
+	int yUBC = inputParams("Lattice/yUBC",0);
+	int zLBC = inputParams("Lattice/zLBC",0);
+	int zUBC = inputParams("Lattice/zUBC",0);		
+	build_box_lattice_iolets_solid_walls_D3Q19(nVoxels,flowDir,Nx,Ny,Nz,
+	                                           xLBC,xUBC,yLBC,yUBC,zLBC,zUBC,
+							                   voxelTypeH,solidH,nListH);
+}
+
+
+
+// --------------------------------------------------------
 // Initialize lattice as a "box" with periodic BC's:
 // --------------------------------------------------------
 
@@ -631,6 +653,22 @@ void class_scsp_D3Q19::stream_collide_save(int nBlocks, int nThreads, bool save)
 {
 	scsp_stream_collide_save_D3Q19 
 	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,streamIndex,voxelType,iolets,nu,nVoxels,save);
+	float* temp = f1;
+	f1 = f2;
+	f2 = temp;
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_stream_collide_save_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::stream_collide_save_solid(int nBlocks, int nThreads, bool save)
+{
+	if (!solidFlag) cout << "Warning: LBM solid arrays have not been initialized" << endl;
+	scsp_stream_collide_save_solid_D3Q19 
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,streamIndex,voxelType,solid,iolets,nu,nVoxels,save);
 	float* temp = f1;
 	f1 = f2;
 	f2 = temp;

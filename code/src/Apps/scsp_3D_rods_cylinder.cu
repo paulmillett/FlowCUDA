@@ -251,6 +251,7 @@ void scsp_3D_rods_cylinder::initSystem()
 		
 	rods.memcopy_host_to_device();
 	lbm.memcopy_host_to_device();
+	lbm.memcopy_host_to_device_solid();
 	
 	// ----------------------------------------------
 	// initialize equilibrium populations: 

@@ -98,6 +98,7 @@ public:
 	void memcopy_device_to_host();
 	void memcopy_device_to_host_inout();	
 	void create_lattice_box();
+	void create_lattice_box_iolets_solid_walls();
 	void create_lattice_box_periodic();
 	void create_lattice_box_shear();
 	void create_lattice_box_slit();
@@ -129,7 +130,8 @@ public:
 	int getZ(int);
 	int getNList(int);
 	void initial_equilibrium(int,int);
-	void stream_collide_save(int,int,bool);	
+	void stream_collide_save(int,int,bool);
+	void stream_collide_save_solid(int,int,bool);
 	void stream_collide_save_forcing(int,int);
 	void stream_collide_save_forcing_varvisc(float*,float,float,int,int);
 	void stream_collide_save_forcing_solid(int,int);
