@@ -32,6 +32,7 @@
 # include "../Apps/scsp_2D_expand_2.cuh"
 # include "../Apps/scsp_3D_iolets.cuh"
 # include "../Apps/scsp_3D_iolets_solidwalls.cuh"
+# include "../Apps/scsp_3D_iolets_solidwalls_forcing.cuh"
 # include "../Apps/scsp_3D_hemisphere_2.cuh"
 # include "../Apps/scsp_3D_hemisphere_3.cuh"
 # include "../Apps/scsp_3D_bulge.cuh"
@@ -122,6 +123,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_2D_expand_2") return new scsp_2D_expand_2();
 	if (specifier == "scsp_3D_iolets") return new scsp_3D_iolets();
 	if (specifier == "scsp_3D_iolets_solidwalls") return new scsp_3D_iolets_solidwalls();
+	if (specifier == "scsp_3D_iolets_solidwalls_forcing") return new scsp_3D_iolets_solidwalls_forcing();
 	if (specifier == "scsp_3D_hemisphere_2") return new scsp_3D_hemisphere_2();
 	if (specifier == "scsp_3D_hemisphere_3") return new scsp_3D_hemisphere_3();
 	if (specifier == "scsp_3D_bulge") return new scsp_3D_bulge();
