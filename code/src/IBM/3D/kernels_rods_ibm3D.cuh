@@ -86,7 +86,17 @@ __global__ void update_rod_position_fluid_IBM3D(
 	float,
 	float,
 	int);
-	
+
+
+__global__ void move_rod_back_to_inlet_IBM3D(
+	rod*,
+	float3,
+	float,
+	float,
+	float,
+	int,
+	int);
+
 
 __global__ void sum_rod_forces_torques_moments_IBM3D(
 	beadrod*,
@@ -144,6 +154,17 @@ __global__ void bead_wall_forces_ydir_zdir_IBM3D(
 __global__ void bead_wall_forces_cylinder_IBM3D(
 	beadrod*,
 	float3,
+	float,
+	float,
+	float,
+	float,
+	int);
+
+
+__global__ void bead_wall_forces_nozzle_IBM3D(
+	beadrod*,
+	float3,
+	float,
 	float,
 	float,
 	float,
@@ -275,7 +296,7 @@ __device__ inline int rod_voxel_ndx(
 	int,
 	int,
 	int);
-	
+
 
 /*
 __device__ inline float3 solve_angular_acceleration(

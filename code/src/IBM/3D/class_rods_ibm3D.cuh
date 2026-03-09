@@ -88,6 +88,7 @@ class class_rods_ibm3D {
 	void stepIBM_Euler(class_scsp_D3Q19&,int,int);
 	void stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19&,float,int,int);
 	void stepIBM_Euler_push_inside_cylinder(int,float,int,int);
+	void stepIBM_Euler_nozzle_channel(class_scsp_D3Q19&,float,int,int);
 	void stepIBM_Euler_relax_rods(int,float,int,int);
 	void zero_rod_forces_torques_moments(int,int);
 	void set_rod_position_orientation(int,int);
@@ -98,6 +99,7 @@ class class_rods_ibm3D {
 	void update_rod_position_orientation_fluid(int,int);
 	void update_rod_position_orientation_no_fluid(int,int);
 	void update_rod_position_fluid(int,int);
+	void move_rod_back_to_inlet(float,float,int,int);
 	void zero_bead_forces(int,int);
 	void enforce_max_bead_force(int,int);
 	void enforce_max_rod_force_torque(int,int);
@@ -114,6 +116,7 @@ class class_rods_ibm3D {
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
 	void compute_wall_forces_cylinder(float,int,int);
+	void compute_wall_forces_nozzle(float,float,int,int);
 	void push_beads_inside_sphere(float,float,float,float,int,int);
 	void push_rods_inside_cylinder(float,int,int);
 	void write_output(std::string,int);

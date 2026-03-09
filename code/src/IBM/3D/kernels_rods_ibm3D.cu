@@ -197,7 +197,7 @@ __global__ void update_rod_position_orientation_IBM3D(
 	float fricR,
 	int nRods)
 {
-	// define bead:
+	// define rod:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {
 		rods[i].r += dt*(rods[i].f)/fricT;
@@ -217,7 +217,7 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 	float dt,
 	int nRods)
 {
-	// define bead:
+	// define rod:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {
 				
@@ -255,7 +255,7 @@ __global__ void update_rod_position_orientation_no_fluid_IBM3D(
 	float dt,
 	int nRods)
 {
-	// define bead:
+	// define rod:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {
 				
@@ -286,11 +286,51 @@ __global__ void update_rod_position_fluid_IBM3D(
 	float fricT,
 	int nRods)
 {
-	// define bead:
+	// define rod:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {		
 		// only update position (if nBeadsPerRod==1)
 		rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to move rod back to inlet if too close to
+// outlet:
+// --------------------------------------------------------
+
+__global__ void move_rod_back_to_inlet_IBM3D(
+	rod* rods,
+	float3 Box,
+	float L0,
+	float radI,
+	float radO,
+	int nBeadsPerRod,
+	int nRods)
+{
+	// define rod:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nRods) {
+		float Lrod = float(nBeadsPerRod-1)*L0;
+		float offset = Lrod/2.0 + 1.0;
+		// check if rod is too close to outlet (x-dir):
+		if (rods[i].r.x > Box.x - offset) {			
+			// get random position
+			/*
+			float3 shift = make_float3(0.0,0.0,0.0);
+			float rad = curand_uniform(&state[i])*(radI);
+			float ang = curand_uniform(&state[i])*(2*M_PI);
+			shift.x = offset;	
+			shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+			shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;
+			*/
+			// assign new rod position and orientation
+			float scale = radI/radO;
+			rods[i].r = make_float3(offset,rods[i].r.y*scale,rods[i].r.z*scale);
+			//rods[i].p = make_float3(1.0,0.0,0.0);
+		}			
 	}
 }
 
@@ -568,6 +608,50 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 			//beads[i].f.y -= force*(yi/ri);
 			//beads[i].f.z -= force*(zi/ri);	
 			
+			// linear normal force:
+			const float delta = (ri + d) - Rad;  // distance protruding into wall
+			const float force = A*delta;
+			beads[i].f.y -= force*(yi/ri);
+			beads[i].f.z -= force*(zi/ri);
+			
+			// friction force:
+			beads[i].f.x -= fric*force;	
+		}				
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces (cone-shaped nozzle):
+// --------------------------------------------------------
+
+__global__ void bead_wall_forces_nozzle_IBM3D(
+	beadrod* beads,
+	float3 Box,
+	float radIn,
+	float radOut,
+	float repA,
+	float repD,
+	float fric,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float ymid = (Box.y-1.0)/2.0;
+		const float zmid = (Box.z-1.0)/2.0;
+		const float yi = beads[i].r.y - ymid;  // distance to channel centerline
+		const float zi = beads[i].r.z - zmid;  // "                            "
+		const float ri = sqrt(yi*yi + zi*zi);
+		
+		// nozzle radius at bead's position:
+		const float Rad = radIn + (radOut - radIn)*beads[i].r.x/Box.x;
+					
+		// radial wall		
+		if (ri > Rad - d) {			
 			// linear normal force:
 			const float delta = (ri + d) - Rad;  // distance protruding into wall
 			const float force = A*delta;

@@ -733,6 +733,57 @@ void class_rods_ibm3D::stepIBM_Euler_push_inside_cylinder(int nSteps, float chRa
 
 
 // --------------------------------------------------------
+// Take step forward for rods IBM:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float chRad, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  rod positions 
+	// ----------------------------------------------------------
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod); 	
+	
+	
+	
+	// LOOP over the below code for IBM sub-steps...	
+	
+	
+	
+	// re-build bin lists for rod beads:
+	if (nRods > 1) {
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+	}	
+	
+	// calculate IBM forces:
+	zero_bead_forces(nBlocks,nThreads);
+	zero_rod_forces_torques_moments(nBlocks,nThreads);
+	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
+	if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
+	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);	
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+	// update IBM positions:
+	enforce_max_rod_force_torque(nBlocks,nThreads);
+	update_rod_position_orientation_fluid(nBlocks,nThreads);
+	move_rod_back_to_inlet(chRad,chRad,nBlocks,nThreads);
+	update_bead_position_rods(nBlocks,nThreads);
+	//update_bead_velocity_rods(nBlocks,nThreads);
+	
+	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
+	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);	
+			
+}
+
+
+
+// --------------------------------------------------------
 // Take step forward for rods IBM (only pushing into
 // cylindrical channel):
 // --------------------------------------------------------
@@ -929,6 +980,18 @@ void class_rods_ibm3D::update_rod_position_fluid(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "update_rod_position_fluid_IBM3D" kernel: 
+// --------------------------------------------------------
+
+void class_rods_ibm3D::move_rod_back_to_inlet(float radInlet, float radOutlet, int nBlocks, int nThreads)
+{
+	move_rod_back_to_inlet_IBM3D
+	<<<nBlocks,nThreads>>> (rods,Box,L0,radInlet,radOutlet,nBeadsPerRod,nRods);	
+}
+
+
+
+// --------------------------------------------------------
 // Call to "zero_bead_forces_IBM3D" kernel:
 // --------------------------------------------------------
 
@@ -1106,6 +1169,19 @@ void class_rods_ibm3D::compute_wall_forces_cylinder(float chRad, int nBlocks, in
 {
 	bead_wall_forces_cylinder_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Box,chRad,repWall,repD/2.0,fricWall,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates wall forces in radial
+// direction for nozzle channel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::compute_wall_forces_nozzle(float radInlet, float radOutlet, int nBlocks, int nThreads)
+{
+	bead_wall_forces_nozzle_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,radInlet,radOutlet,repWall,repD/2.0,fricWall,nBeads);
 }
 
 

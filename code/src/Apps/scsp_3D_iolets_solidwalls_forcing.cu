@@ -92,20 +92,23 @@ void scsp_3D_iolets_solidwalls_forcing::initSystem()
 	// define the solid walls:
 	// ----------------------------------------------
 	
+	float chRad0 = 18.5;
+	float chRad1 = 6.5;
+	
 	for (int k=0; k<Nz; k++) {
 		for (int j=0; j<Ny; j++) {
 			for (int i=0; i<Nx; i++) {
 				int ndx = k*Nx*Ny + j*Nx + i;
 				int Si = 0;				
-				// set up solid walls
-				if (k < 4 || k > Nz-4) Si = 1;
-				if (j < 4 || j > Nz-4) Si = 1; 
-				/*
-				if (k == 0) Si = 1;
-				if (k == Nz-1) Si = 1;
-				if (j == 0) Si = 1;
-				if (j == Ny-1) Si = 1;
-				*/
+				// set up solid walls (rectangular)
+				//if (k < 4 || k > Nz-4) Si = 1;
+				//if (j < 4 || j > Nz-4) Si = 1; 
+				
+				// set up solid walls (conical)
+				float chRad = chRad0 + (chRad1 - chRad0)*float(i)/float(Nx);
+				float y = float(j) - float(Ny-1)/2.0;
+				float z = float(k) - float(Nz-1)/2.0;
+				if ((y*y + z*z)/chRad/chRad > 1.0) Si = 1;	
 				lbm.setS(ndx,Si);
 			}
 		}
