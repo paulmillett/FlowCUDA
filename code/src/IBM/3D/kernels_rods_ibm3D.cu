@@ -317,18 +317,13 @@ __global__ void move_rod_back_to_inlet_IBM3D(
 		float offset = Lrod/2.0 + 1.0;
 		// check if rod is too close to outlet (x-dir):
 		if (rods[i].r.x > Box.x - offset) {			
-			// get random position
-			/*
-			float3 shift = make_float3(0.0,0.0,0.0);
-			float rad = curand_uniform(&state[i])*(radI);
-			float ang = curand_uniform(&state[i])*(2*M_PI);
-			shift.x = offset;	
-			shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
-			shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;
-			*/
 			// assign new rod position and orientation
+			const float ymid = (Box.y-1.0)/2.0;
+			const float zmid = (Box.z-1.0)/2.0;
 			float scale = radI/radO;
-			rods[i].r = make_float3(offset,rods[i].r.y*scale,rods[i].r.z*scale);
+			rods[i].r.x = offset;
+			rods[i].r.y = ymid + (rods[i].r.y - ymid)*scale;
+			rods[i].r.z = zmid + (rods[i].r.z - zmid)*scale;
 			//rods[i].p = make_float3(1.0,0.0,0.0);
 		}			
 	}
@@ -725,6 +720,44 @@ __global__ void push_beads_into_cylinder_IBM3D(
 	}
 }
 
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void push_beads_into_nozzle_IBM3D(
+	beadrod* beads,
+	float3 Box,
+	float radIn,
+	float radOut,
+	float repA,
+	float repD,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float ymid = (Box.y-1.0)/2.0;
+		const float zmid = (Box.z-1.0)/2.0;
+		const float yi = beads[i].r.y - ymid;  // distance to channel centerline
+		const float zi = beads[i].r.z - zmid;  // "                            "
+		const float ri = sqrt(yi*yi + zi*zi);
+		
+		// nozzle radius at bead's position:
+		const float Rad = radIn + (radOut - radIn)*beads[i].r.x/Box.x;
+		
+		// radial wall		
+		if (ri > Rad - d) {
+			const float outside_dist = ri - (Rad - d);
+			const float force = 0.01*outside_dist;
+			beads[i].f.y -= force*(yi/ri);
+			beads[i].f.z -= force*(zi/ri);			
+		}
+	}
+}
 
 
 

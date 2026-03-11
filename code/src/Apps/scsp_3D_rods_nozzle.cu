@@ -117,7 +117,7 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	// calculate body-force depending on Re:
 	// ----------------------------------------------
 	
-	float Dh = 2.0*radInlet;
+	float Dh = 2.0*radOutlet;
 	umax = Re*nu/Dh;
 	
 	// modify if umax is too high due to high Re:
@@ -128,8 +128,8 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 		cout << "  " << endl;
 		cout << "nu = " << nu << endl;	
 	}
-	bodyForx = umax*(4*nu)/radInlet/radInlet;
-	Q0 = M_PI*radInlet*radInlet*radInlet*radInlet*bodyForx/(8.0*nu);
+	bodyForx = umax*(4*nu)/radOutlet/radOutlet;
+	Q0 = M_PI*radOutlet*radOutlet*radOutlet*radOutlet*bodyForx/(8.0*nu);
 	
 	cout << "  " << endl;
 	cout << "Re = " << Re << endl;
@@ -178,10 +178,11 @@ void scsp_3D_rods_nozzle::initSystem()
 			for (int i=0; i<Nx; i++) {
 				int ndx = k*Nx*Ny + j*Nx + i;
 				int Si = 0;				
-				// set up solid walls
+				// set up solid walls (conical)
+				float chRad = radInlet + (radOutlet - radInlet)*float(i)/float(Nx);
 				float y = float(j) - float(Ny-1)/2.0;
 				float z = float(k) - float(Nz-1)/2.0;
-				if ((y*y + z*z)/radInlet/radInlet > 1.0) Si = 1;				
+				if ((y*y + z*z)/chRad/chRad > 1.0) Si = 1;				
 				lbm.setS(ndx,Si);
 			}
 		}
@@ -295,7 +296,7 @@ void scsp_3D_rods_nozzle::initSystem()
 	// ----------------------------------------------
 	
 	if (initStruct == "random"){
-		rods.stepIBM_Euler_push_inside_cylinder(1000,radInlet,nBlocks,nThreads);
+		rods.stepIBM_Euler_push_inside_nozzle(1000,radInlet,radOutlet,nBlocks,nThreads);
 	}
 	
 	rods.stepIBM_Euler_relax_rods(1000,radInlet,nBlocks,nThreads);
@@ -347,7 +348,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler_nozzle_channel(lbm,radInlet,nBlocks,nThreads);
+			rods.stepIBM_Euler_nozzle_channel(lbm,radInlet,radOutlet,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);	
 			cudaDeviceSynchronize();
@@ -364,7 +365,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		rods.stepIBM_Euler_nozzle_channel(lbm,radInlet,nBlocks,nThreads);
+		rods.stepIBM_Euler_nozzle_channel(lbm,radInlet,radOutlet,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);	
 		cudaDeviceSynchronize();

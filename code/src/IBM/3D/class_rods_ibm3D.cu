@@ -733,10 +733,48 @@ void class_rods_ibm3D::stepIBM_Euler_push_inside_cylinder(int nSteps, float chRa
 
 
 // --------------------------------------------------------
+// Take step forward for rods IBM (only pushing into
+// cylindrical channel):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_push_inside_nozzle(int nSteps, float radInlet, float radOutlet, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  Here, the objective is to push rods inside a cylindrical 
+	//  channel.  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered and no inter-rod
+	//  interactions are included.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Pushing rods inside nozzle..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		push_rods_inside_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}
+	
+	cudaDeviceSynchronize(); 
+				
+}
+
+
+
+// --------------------------------------------------------
 // Take step forward for rods IBM:
 // --------------------------------------------------------
 
-void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float chRad, int nBlocks, int nThreads) 
+void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float radInlet, float radOutlet, int nBlocks, int nThreads) 
 {
 		
 	// ----------------------------------------------------------
@@ -765,14 +803,14 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
 	if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
-	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);	
+	compute_wall_forces_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_rod_forces_torques_moments(nBlocks,nThreads);	
 	
 	// update IBM positions:
 	enforce_max_rod_force_torque(nBlocks,nThreads);
 	update_rod_position_orientation_fluid(nBlocks,nThreads);
-	move_rod_back_to_inlet(chRad,chRad,nBlocks,nThreads);
+	move_rod_back_to_inlet(radInlet,radOutlet,nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	//update_bead_velocity_rods(nBlocks,nThreads);
 	
@@ -1208,6 +1246,18 @@ void class_rods_ibm3D::push_rods_inside_cylinder(float chRad, int nBlocks, int n
 {
 	push_beads_into_cylinder_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Box,chRad,repA,repD,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that pushes rods inside a cylinder:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::push_rods_inside_nozzle(float radInlet, float radOutlet, int nBlocks, int nThreads)
+{
+	push_beads_into_nozzle_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,radInlet,radOutlet,repA,repD,nBeads);
 }
 
 

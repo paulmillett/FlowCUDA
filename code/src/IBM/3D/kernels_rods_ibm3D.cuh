@@ -188,7 +188,17 @@ __global__ void push_beads_into_cylinder_IBM3D(
 	float,
 	float,
 	int);
-		
+
+
+__global__ void push_beads_into_nozzle_IBM3D(
+	beadrod*,
+	float3,
+	float,
+	float,
+	float,
+	float,
+	int);
+			
 
 __global__ void hydrodynamic_force_bead_rod_IBM3D(
 	beadrod*,
