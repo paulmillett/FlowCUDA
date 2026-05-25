@@ -217,27 +217,9 @@ void scsp_3D_rods_cylinder::initSystem()
 	rods.duplicate_rods();
 	rods.assign_rodIDs_to_beads();
 	rods.set_rods_radii(Drod/2.0);
-	
-	// ----------------------------------------------			
-	// mobility coefficients.  See Luders et al. 
-	// J. Chem. Phys. 159:054901 (2023) Eqs. (15-17)
-	// (note: mobility = diffusivity/kT)
-	// (assume fluid density = 1)
-	// ----------------------------------------------
-	
 	float ar = Lrod/Drod;  // aspect ratio
-	float mobPar = (log(ar) - 0.207 + 0.980/ar - 0.133/(ar*ar)) / (2.0*M_PI*nu*Lrod); 
-	float mobPer = (log(ar) + 0.839 + 0.185/ar + 0.233/(ar*ar)) / (4.0*M_PI*nu*Lrod);
-	float mobRot = (log(ar) - 0.662 + 0.917/ar - 0.050/(ar*ar)) / (M_PI*nu*Lrod*Lrod*Lrod) * 3.0;
-	
 	rods.set_aspect_ratio(ar);
-	rods.set_mobility_coefficients(mobPar,mobPer,mobRot);
-	
-	cout << " " << endl;
-	cout << "Rod aspect ratio = " << ar << endl;
-	cout << "Rod mobility coeff (parallel) = " << mobPar << endl;
-	cout << "Rod mobility coeff (perpendicular) = " << mobPer << endl;
-	cout << "Rod mobility coeff (rotational) = " << mobRot << endl;	
+	rods.set_mobility_coefficients(nu,ar,Lrod);	
 		
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
@@ -290,7 +272,7 @@ void scsp_3D_rods_cylinder::initSystem()
 		rods.stepIBM_Euler_push_inside_cylinder(1000,chRad,nBlocks,nThreads);
 	}
 	
-	rods.stepIBM_Euler_relax_rods(1000,chRad,nBlocks,nThreads);
+	rods.stepIBM_Euler_relax_rods_in_cylinder(1000,chRad,nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// write initial output file:

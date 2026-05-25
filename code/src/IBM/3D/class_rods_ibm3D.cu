@@ -193,12 +193,12 @@ void class_rods_ibm3D::memcopy_device_to_host()
 
 
 // --------------------------------------------------------
-// Read IBM information from file:
+// Create the first rod:
 // --------------------------------------------------------
 
 void class_rods_ibm3D::create_first_rod()
 {
-	// set up the bead information for first filament:
+	// set up the bead information for first rod:
 	for (int i=0; i<nBeadsPerRod; i++) {
 		beadsH[i].r.x = 0.0 + float(i)*L0;
 		beadsH[i].r.y = 0.0;
@@ -259,16 +259,6 @@ void class_rods_ibm3D::set_aspect_ratio(float val)
 	for (int r=0; r<nRods; r++) rodsH[r].ar = val;
 }
 
-void class_rods_ibm3D::set_mobility_coefficients(float mPar, float mPerp, float mRot)
-{
-	// set mobility coefficients for ALL rods:
-	for (int r=0; r<nRods; r++) {
-		rodsH[r].mobPar = mPar;
-		rodsH[r].mobPer = mPerp;
-		rodsH[r].mobRot = mRot;
-	}
-}
-
 void class_rods_ibm3D::set_friction_coefficient_translational(float val)
 {
 	fricT = val;
@@ -292,7 +282,7 @@ int class_rods_ibm3D::get_max_array_size()
 
 
 // --------------------------------------------------------
-// Assign the cell ID to every node:
+// Assign the rod ID to every bead:
 // --------------------------------------------------------
 
 void class_rods_ibm3D::assign_rodIDs_to_beads()
@@ -307,7 +297,7 @@ void class_rods_ibm3D::assign_rodIDs_to_beads()
 
 
 // --------------------------------------------------------
-// Duplicate the first cell mesh information to all cells:
+// Duplicate the first rod information to all rods:
 // --------------------------------------------------------
 
 void class_rods_ibm3D::duplicate_rods()
@@ -329,6 +319,40 @@ void class_rods_ibm3D::duplicate_rods()
 			}
 		}
 	}
+}
+
+
+
+// --------------------------------------------------------
+// Set mobility coefficients based on rod aspect ratio:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::set_mobility_coefficients(float nu, float ar, float Lrod)
+{
+	// ----------------------------------------------			
+	// mobility coefficients.  See Luders et al. 
+	// J. Chem. Phys. 159:054901 (2023) Eqs. (15-17)
+	// (note: mobility = diffusivity/kT)
+	// (assume fluid density = 1)
+	// ----------------------------------------------
+		
+	float mobPar = (log(ar) - 0.207 + 0.980/ar - 0.133/(ar*ar)) / (2.0*M_PI*nu*Lrod); 
+	float mobPer = (log(ar) + 0.839 + 0.185/ar + 0.233/(ar*ar)) / (4.0*M_PI*nu*Lrod);
+	float mobRot = (log(ar) - 0.662 + 0.917/ar - 0.050/(ar*ar)) / (M_PI*nu*Lrod*Lrod*Lrod) * 3.0;
+		
+	// set mobility coefficients for ALL rods:
+	for (int r=0; r<nRods; r++) {
+		rodsH[r].mobPar = mobPar;
+		rodsH[r].mobPer = mobPer;
+		rodsH[r].mobRot = mobRot;
+	}
+	
+	// output the numbers:
+	cout << " " << endl;
+	cout << "Rod aspect ratio = " << ar << endl;
+	cout << "Rod mobility coeff (parallel) = " << mobPar << endl;
+	cout << "Rod mobility coeff (perpendicular) = " << mobPer << endl;
+	cout << "Rod mobility coeff (rotational) = " << mobRot << endl;	
 }
 
 
@@ -390,7 +414,7 @@ void class_rods_ibm3D::randomize_rods_inside_sphere(float xs, float ys, float zs
 
 
 // --------------------------------------------------------
-// randomize rod positions, but all oriented in x-dir:
+// randomize rod positions in cylinder:
 // --------------------------------------------------------
 
 void class_rods_ibm3D::randomize_rods_cylinder()
@@ -407,6 +431,44 @@ void class_rods_ibm3D::randomize_rods_cylinder()
 		shift.x = (float)rand()/RAND_MAX*Box.x;		
 		shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
 		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
+		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
+	}	
+	
+	// copy bead positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);	
+}
+
+
+
+// --------------------------------------------------------
+// randomize rod positions in nozzle:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::randomize_rods_nozzle(float radInlet, float radOutlet, float Lrod)
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
+			
+	// assign random position and orientation to each rod:
+	for (int f=0; f<nRods; f++) {
+		
+		float3 shift = make_float3(0.0,0.0,0.0);
+		
+		// get random x-position, but scale the probability of accepting that
+		// position by the ratio of the local radius to the inlet radius
+		float xpos,chRadLocal,randNum;
+		do {
+			xpos = 0.55*Lrod + (float)rand()/RAND_MAX*(Box.x-2.0*Lrod);
+			chRadLocal = radInlet + (radOutlet - radInlet)*(xpos/Box.x);
+			randNum = (float)rand()/RAND_MAX;
+		} while (randNum > chRadLocal/radInlet);
+		
+		// once accepted, proceed to calculate radial position:	
+		float rad = (float)rand()/RAND_MAX*(chRadLocal);
+		float ang = (float)rand()/RAND_MAX*(2*M_PI);		
+		shift.x = xpos;
+		shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;
 		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
 	}	
 	
@@ -802,7 +864,7 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
-	if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
+	if (nRods > 1) nonbonded_bead_interactions_with_friction(nBlocks,nThreads); 
 	compute_wall_forces_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_rod_forces_torques_moments(nBlocks,nThreads);	
@@ -812,7 +874,7 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	update_rod_position_orientation_fluid(nBlocks,nThreads);
 	move_rod_back_to_inlet(radInlet,radOutlet,nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
-	//update_bead_velocity_rods(nBlocks,nThreads);
+	update_bead_velocity_rods(nBlocks,nThreads);
 	
 	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
 	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);	
@@ -826,7 +888,7 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 // cylindrical channel):
 // --------------------------------------------------------
 
-void class_rods_ibm3D::stepIBM_Euler_relax_rods(int nSteps, float chRad, int nBlocks, int nThreads) 
+void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_cylinder(int nSteps, float chRad, int nBlocks, int nThreads) 
 {
 		
 	// ----------------------------------------------------------
@@ -863,6 +925,49 @@ void class_rods_ibm3D::stepIBM_Euler_relax_rods(int nSteps, float chRad, int nBl
 				
 }
 
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only pushing into
+// cylindrical channel):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_nozzle(int nSteps, float radInlet, float radOutlet, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Relaxing rods to eliminate overlap..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// re-build bin lists for rod beads:
+		if (nRods > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}		
+	
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
+		push_rods_inside_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
+		unwrap_bead_coordinates(nBlocks,nThreads);
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}	
+	
+	cudaDeviceSynchronize();
+				
+}
 
 
 
@@ -1155,6 +1260,21 @@ void class_rods_ibm3D::nonbonded_bead_interactions(int nBlocks, int nThreads)
 	if (nRods > 1) {
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
 		nonbonded_bead_interactions_IBM3D
+		<<<nBlocks,nThreads>>> (beads,bins,repA,repD,lubforceMax,nBeads,Box,pbcFlag);
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::nonbonded_bead_interactions_with_friction(int nBlocks, int nThreads)
+{
+	if (nRods > 1) {
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
+		nonbonded_bead_interactions_with_friction_IBM3D
 		<<<nBlocks,nThreads>>> (beads,bins,repA,repD,lubforceMax,nBeads,Box,pbcFlag);
 	}	
 }

@@ -167,30 +167,12 @@ void scsp_3D_rods_fluid::initSystem()
 	rods.duplicate_rods();
 	rods.assign_rodIDs_to_beads();
 	rods.set_rods_radii(Drod/2.0);
+	float ar = Lrod/Drod;  // aspect ratio
+	rods.set_aspect_ratio(ar);
+	rods.set_mobility_coefficients(nu,ar,Lrod);	
 	
 	if (nRods == 1) rods.shift_bead_positions(0,float(Nx-1)/2.0 - Lrod/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0);
-	
-	// ----------------------------------------------			
-	// mobility coefficients.  See Luders et al. 
-	// J. Chem. Phys. 159:054901 (2023) Eqs. (15-17)
-	// (note: mobility = diffusivity/kT)
-	// (assume fluid density = 1)
-	// ----------------------------------------------
-	
-	float ar = Lrod/Drod;  // aspect ratio
-	float mobPar = (log(ar) - 0.207 + 0.980/ar - 0.133/(ar*ar)) / (2.0*M_PI*nu*Lrod); 
-	float mobPer = (log(ar) + 0.839 + 0.185/ar + 0.233/(ar*ar)) / (4.0*M_PI*nu*Lrod);
-	float mobRot = (log(ar) - 0.662 + 0.917/ar - 0.050/(ar*ar)) / (M_PI*nu*Lrod*Lrod*Lrod);
-	
-	rods.set_aspect_ratio(ar);
-	rods.set_mobility_coefficients(mobPar,mobPer,mobRot);
-	
-	cout << " " << endl;
-	cout << "Rod aspect ratio = " << ar << endl;
-	cout << "Rod mobility coeff (parallel) = " << mobPar << endl;
-	cout << "Rod mobility coeff (perpendicular) = " << mobPer << endl;
-	cout << "Rod mobility coeff (rotational) = " << mobRot << endl;	
-	
+		
 	// ----------------------------------------------			
 	// drag friction coefficients using Broersma's
 	// relations.  See Tsay et al. J. Amer. Chem. Soc.

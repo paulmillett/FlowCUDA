@@ -1104,7 +1104,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 			int j = bins.binMembers[k];
 			if (i==j) continue;
 			if (beads[i].rodID == beads[j].rodID) continue;
-			pairwise_bead_interaction_forces_WCA(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);			
+			pairwise_bead_interaction_forces(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);			
 		}
 		
 		// -------------------------------
@@ -1121,7 +1121,75 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 			for (int k=offst; k<offst+occup; k++) {
 				int j = bins.binMembers[k];
 				if (beads[i].rodID == beads[j].rodID) continue;				
-				pairwise_bead_interaction_forces_WCA(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);			
+				pairwise_bead_interaction_forces(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);			
+			}
+		}
+				
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate nonbonded bead interactions
+// using the bin lists:
+// --------------------------------------------------------
+
+__global__ void nonbonded_bead_interactions_with_friction_IBM3D(
+	beadrod* beads,
+	bindata bins,
+	float repA,
+	float repD,
+	float lubforceMax,
+	int nBeads,
+	float3 Box,	
+	int3 pbcFlag)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {		
+		
+		// -------------------------------
+		// calculate bin ID:
+		// -------------------------------
+		
+		int binID = int(floor(beads[i].r.x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(beads[i].r.y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(beads[i].r.z/bins.sizeBins));		
+		
+		// -------------------------------
+		// loop over beads in the same bin:
+		// -------------------------------
+				
+		int offst = binID*bins.binMax;
+		int occup = bins.binOccupancy[binID];
+		if (occup > bins.binMax) {
+			printf("occup = %i \n", occup);
+			occup = bins.binMax;
+		}
+								
+		for (int k=offst; k<offst+occup; k++) {
+			int j = bins.binMembers[k];
+			if (i==j) continue;
+			if (beads[i].rodID == beads[j].rodID) continue;
+			pairwise_bead_interaction_forces_with_friction(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);			
+		}
+		
+		// -------------------------------
+		// loop over neighboring bins:
+		// -------------------------------
+		
+        for (int b=0; b<bins.nnbins; b++) {
+            // get neighboring bin ID
+			int naborbinID = bins.binMap[binID*bins.nnbins + b];
+			offst = naborbinID*bins.binMax;
+			occup = bins.binOccupancy[naborbinID];
+			if (occup > bins.binMax) occup = bins.binMax;
+			// loop over beads in this bin:
+			for (int k=offst; k<offst+occup; k++) {
+				int j = bins.binMembers[k];
+				if (beads[i].rodID == beads[j].rodID) continue;				
+				pairwise_bead_interaction_forces_with_friction(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);			
 			}
 		}
 				
@@ -1162,7 +1230,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 // Physics, 104 (2001) 1191.  See Eq. (74).
 // --------------------------------------------------------
 
-__device__ inline void pairwise_bead_interaction_forces_WCA(
+__device__ inline void pairwise_bead_interaction_forces(
 	const int i, 
 	const int j,
 	const float repA,
@@ -1180,42 +1248,99 @@ __device__ inline void pairwise_bead_interaction_forces_WCA(
 	const float gapMax = 0.05;  // max gap for lubrication forces
 	const float cutoff = Ri + Rj + gapMax;		
 		
-	// lubrication force:
-	if (r > (Ri+Rj) && r < cutoff) {			
-		const float nu = 0.1666666667;
+	// interaction range:
+	if (r < cutoff) {			
+		
 		float3 uij = rij/r;
 		float3 vij = beads[i].v - beads[j].v;
-		float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);
+		
+		// lubrication force:
+		if (r > (Ri+Rj)) {
+			const float nu = 0.1666666667;
+			float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);
+			float udotv = dot(uij,vij);
+			float gap = r - Ri - Rj;
+			if (gap < 0.001) gap = 0.001;
+			float invgap = 1.0/gap - 1.0/gapMax;		
+			float lubforce = -6.0*M_PI*nu*coeff*udotv*invgap;
+			// ensure lubforce is not too large:
+			float lubforcemag = abs(lubforce);
+			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
+			beads[i].f += lubforce*(uij);
+		}
+		
+		// contact force:
+		if (r < (Ri+Rj)) {
+			// normal force
+			float force = repA - (repA/repD)*r;
+			beads[i].f += force*uij;						
+		}
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j lubrication force.  The 
+// model comes from Ladd & Verberg, Journal of Statistical
+// Physics, 104 (2001) 1191.  See Eq. (74).
+// --------------------------------------------------------
+
+__device__ inline void pairwise_bead_interaction_forces_with_friction(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	const float lubforceMax,
+	beadrod* beads,
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = beads[i].r - beads[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);	
+	const float Ri = 0.5*repD;  // bead radius
+	const float Rj = 0.5*repD;  // bead radius 
+	const float gapMax = 0.05;  // max gap for lubrication forces
+	const float cutoff = Ri + Rj + gapMax;		
+		
+	// interaction range:
+	if (r < cutoff) {			
+		
+		float3 uij = rij/r;
+		float3 vij = beads[i].v - beads[j].v;
 		float udotv = dot(uij,vij);
-		float gap = r - Ri - Rj;
-		if (gap < 0.001) gap = 0.001;
-		float invgap = 1.0/gap - 1.0/gapMax;		
-		float lubforce = -6.0*M_PI*nu*coeff*udotv*invgap;
-		// ensure lubforce is not too large:
-		float lubforcemag = abs(lubforce);
-		if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
-		//if (lubforce < 0.0) lubforce = 0.0;  // make only repulsive
-		// add lubforce to bead force:
-		beads[i].f += lubforce*(uij);
-	}
-			
-	// linear (repulsive) contact force
-	if (r < (Ri+Rj)) {
-		float force = repA - (repA/repD)*r;
-		beads[i].f += force*(rij/r);			
-	}
-	
-	// WCA force:
-	/*
-	float sig = 0.8909*repD;  // this ensures F=0 is at cutoff
-	float eps = 0.001;
-	float sigor = sig/r;
-	float sigor6 = sigor*sigor*sigor*sigor*sigor*sigor;
-	float sigor12 = sigor6*sigor6;
-	float force = 24.0*eps*(2*sigor12 - sigor6)/r/r;
-	beads[i].f += force*rij;
-	*/		
-	
+		
+		// lubrication force:
+		if (r > (Ri+Rj)) {
+			const float nu = 0.1666666667;
+			float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);			
+			float gap = r - Ri - Rj;
+			if (gap < 0.001) gap = 0.001;
+			float invgap = 1.0/gap - 1.0/gapMax;		
+			float lubforce = -6.0*M_PI*nu*coeff*udotv*invgap;
+			// ensure lubforce is not too large:
+			float lubforcemag = abs(lubforce);
+			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
+			beads[i].f += lubforce*(uij);
+		}
+		
+		// contact force:
+		if (r < (Ri+Rj)) {
+			// normal force
+			float forceN = repA - (repA/repD)*r;
+			beads[i].f += forceN*uij;
+			// tangential (friction) force
+			float dt = 1.0;  // assumed time step
+			float3 uTij = (vij - udotv*uij)*dt;
+			float uT = length(uTij);	
+			if (uT > 0.0f) {
+				float fric = 0.5;
+				float forceT = min(0.1*uT,fric*forceN);
+				beads[i].f -= forceT*(uTij/uT);		
+			}							
+		}
+	}	
 }
 
 

@@ -1,5 +1,5 @@
 
-# include "scsp_3D_rods_nozzle.cuh"
+# include "scsp_3D_rods_cylinder_binary.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
+scsp_3D_rods_cylinder_binary::scsp_3D_rods_cylinder_binary() : lbm(),rods()
 {		
 	
 	// ----------------------------------------------
@@ -29,8 +29,7 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	Nx = inputParams("Lattice/Nx",1);
 	Ny = inputParams("Lattice/Ny",1);
 	Nz = inputParams("Lattice/Nz",1);
-	radInlet = inputParams("Lattice/radInlet",float(Nz-1)/2.0);
-	radOutlet = inputParams("Lattice/radOutlet",float(Nz-1)/2.0);	
+	chRad = inputParams("Lattice/chRad",float(Nz-1)/2.0);	
 	
 	// ----------------------------------------------
 	// GPU parameters:
@@ -62,24 +61,33 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	// ----------------------------------------------
 	// Rods Immersed-Boundary parameters:
 	// ----------------------------------------------
-		
-	int nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);
-	nRods = inputParams("IBM_RODS/nRods",1);
+	
 	L0 = inputParams("IBM_RODS/L0",0.5);
+	int nRods1 = inputParams("IBM_RODS/nRods1",1);
+	int nRods2 = inputParams("IBM_RODS/nRods2",1);
+	int nBeadsPerRod1 = inputParams("IBM_RODS/nBeadsPerRod1",0);
+	int nBeadsPerRod2 = inputParams("IBM_RODS/nBeadsPerRod2",0);
 	gam = inputParams("IBM_RODS/gamma",0.1);
 	Drod = inputParams("IBM_RODS/diam",1.0);
-	nBeads = nBeadsPerRod*nRods;
-	Lrod = float(nBeadsPerRod-1)*L0;
-	
+	nRods = nRods1 + nRods2;
+	nBeads = nBeadsPerRod1*nRods1 + nBeadsPerRod2*nRods2;
+	Lrod1 = float(nBeadsPerRod1-1)*L0;
+	Lrod2 = float(nBeadsPerRod2-1)*L0;
+		
 	// ----------------------------------------------
 	// calculate particle volume fraction:
 	// ----------------------------------------------
 	
-	float Vp = float(nRods)*(M_PI*Drod*Drod*Lrod/4.0);
-	float V = M_PI*float(Nx)*(radInlet*radInlet + radOutlet*radOutlet + radInlet*radOutlet)/3.0;
-	float phi = Vp/V;
+	float Vp1 = float(nRods1)*(M_PI*Drod*Drod*Lrod1/4.0);
+	float Vp2 = float(nRods2)*(M_PI*Drod*Drod*Lrod2/4.0);
+	float V = M_PI*chRad*chRad*float(Nx);
+	float phi1 = Vp1/V;
+	float phi2 = Vp2/V;
+	float phi = phi1 + phi2;
 	cout << " " << endl;
-	cout << "particle volume fraction = " << phi << endl;
+	cout << "particle volume fraction 1 = " << phi1 << endl;
+	cout << "particle volume fraction 2 = " << phi2 << endl;
+	cout << "particle volume fraction total = " << phi << endl;
 	cout << " " << endl;
 	
 	// ----------------------------------------------
@@ -117,7 +125,7 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	// calculate body-force depending on Re:
 	// ----------------------------------------------
 	
-	float Dh = 2.0*radOutlet;
+	float Dh = 2.0*chRad;
 	umax = Re*nu/Dh;
 	
 	// modify if umax is too high due to high Re:
@@ -128,8 +136,8 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 		cout << "  " << endl;
 		cout << "nu = " << nu << endl;	
 	}
-	bodyForx = umax*(4*nu)/radOutlet/radOutlet;
-	Q0 = M_PI*radOutlet*radOutlet*radOutlet*radOutlet*bodyForx/(8.0*nu);
+	bodyForx = umax*(4*nu)/chRad/chRad;
+	Q0 = M_PI*chRad*chRad*chRad*chRad*bodyForx/(8.0*nu);
 	
 	cout << "  " << endl;
 	cout << "Re = " << Re << endl;
@@ -147,7 +155,7 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_rods_nozzle::~scsp_3D_rods_nozzle()
+scsp_3D_rods_cylinder_binary::~scsp_3D_rods_cylinder_binary()
 {
 	lbm.deallocate();
 	rods.deallocate();
@@ -159,7 +167,7 @@ scsp_3D_rods_nozzle::~scsp_3D_rods_nozzle()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_rods_nozzle::initSystem()
+void scsp_3D_rods_cylinder_binary::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -178,8 +186,7 @@ void scsp_3D_rods_nozzle::initSystem()
 			for (int i=0; i<Nx; i++) {
 				int ndx = k*Nx*Ny + j*Nx + i;
 				int Si = 0;				
-				// set up solid walls (conical)
-				float chRad = radInlet + (radOutlet - radInlet)*float(i)/float(Nx);
+				// set up solid walls
 				float y = float(j) - float(Ny-1)/2.0;
 				float z = float(k) - float(Nz-1)/2.0;
 				if ((y*y + z*z)/chRad/chRad > 1.0) Si = 1;				
@@ -192,21 +199,14 @@ void scsp_3D_rods_nozzle::initSystem()
 	// create the lattice for channel flow:
 	// ----------------------------------------------		
 	
-	lbm.create_lattice_box_iolets_solid_walls();
+	lbm.create_lattice_box_periodic_solid_walls();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
 	// ----------------------------------------------
 		
 	lbm.stream_index_pull();
-	
-	// ----------------------------------------------			
-	// initialize inlets/outlets: 
-	// ----------------------------------------------
-	
-	lbm.read_iolet_info(0,"Iolet1");
-	lbm.read_iolet_info(1,"Iolet2");
-		
+			
 	// ----------------------------------------------			
 	// initialize macros: 
 	// ----------------------------------------------
@@ -226,9 +226,10 @@ void scsp_3D_rods_nozzle::initSystem()
 	rods.duplicate_rods();
 	rods.assign_rodIDs_to_beads();
 	rods.set_rods_radii(Drod/2.0);
-	float ar = Lrod/Drod;  // aspect ratio
-	rods.set_aspect_ratio(ar);
-	rods.set_mobility_coefficients(nu,ar,Lrod);	
+	float ar1 = Lrod1/Drod;  // aspect ratio 1
+	float ar2 = Lrod2/Drod;  // aspect ratio 2
+	rods.set_aspect_ratios(ar1,ar2);
+	rods.set_mobility_coefficients(nu,ar1,Lrod1,ar2,Lrod2);
 			
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
@@ -263,11 +264,11 @@ void scsp_3D_rods_nozzle::initSystem()
 	string initStruct = inputParams("IBM_RODS/initStruct","random");
 	
 	if (initStruct == "random") {
-		rods.randomize_rods_nozzle(radInlet,radOutlet,Lrod); 
+		rods.randomize_rods_cylinder(); 
 	}
 	else if (initStruct == "aligned") {
 		//rods.randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,1.0,1.0);
-		rods.semi_randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,Drod/2.0+0.1,Drod/2.0+0.2);
+		//rods.semi_randomize_rods_xdir_alligned_cylinder(Lrod,Drod/2.0,Drod/2.0+0.1,Drod/2.0+0.2);
 	}
 			
 	rods.set_rod_position_orientation(nBlocks,nThreads);
@@ -278,10 +279,10 @@ void scsp_3D_rods_nozzle::initSystem()
 	// ----------------------------------------------
 	
 	if (initStruct == "random"){
-		rods.stepIBM_Euler_push_inside_nozzle(1000,radInlet,radOutlet,nBlocks,nThreads);
+		rods.stepIBM_Euler_push_inside_cylinder(1000,chRad,nBlocks,nThreads);
 	}
 	
-	rods.stepIBM_Euler_relax_rods_in_nozzle(1000,radInlet,radOutlet,nBlocks,nThreads);
+	rods.stepIBM_Euler_relax_rods_in_cylinder(1000,chRad,nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// write initial output file:
@@ -309,7 +310,7 @@ void scsp_3D_rods_nozzle::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_rods_cylinder_binary::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -330,9 +331,9 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler_nozzle_channel(lbm,radInlet,radOutlet,nBlocks,nThreads);
+			rods.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-			lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);	
+			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			cudaDeviceSynchronize();
 		}
 		cout << " " << endl;
@@ -347,9 +348,9 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		rods.stepIBM_Euler_nozzle_channel(lbm,radInlet,radOutlet,nBlocks,nThreads);
+		rods.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
-		lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);
+		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 		cudaDeviceSynchronize();
 	}
 	
@@ -376,7 +377,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_rods_nozzle::writeOutput(std::string tagname, int step)
+void scsp_3D_rods_cylinder_binary::writeOutput(std::string tagname, int step)
 {				
 	
 	if (step == 0) {

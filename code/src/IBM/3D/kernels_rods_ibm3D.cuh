@@ -256,9 +256,31 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 	int,
 	float3,	
 	int3);
+
+
+__global__ void nonbonded_bead_interactions_with_friction_IBM3D(
+	beadrod*,
+	bindata,
+	float,
+	float,
+	float,
+	int,
+	float3,	
+	int3);
 			
 			
-__device__ inline void pairwise_bead_interaction_forces_WCA(
+__device__ inline void pairwise_bead_interaction_forces(
+	const int, 
+	const int,
+	const float,
+	const float,
+	const float,
+	beadrod*,
+	float3,
+	int3);
+
+
+__device__ inline void pairwise_bead_interaction_forces_with_friction(
 	const int, 
 	const int,
 	const float,
