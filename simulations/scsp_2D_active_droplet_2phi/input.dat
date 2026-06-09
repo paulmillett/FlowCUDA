@@ -1,0 +1,45 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_2D_active_droplet_2phi
+	nu = 0.166666666
+	sf = 1.1
+	fricR = 1.0
+	activity = -0.0005
+	alpha = 0.08
+	beta = 0.0
+	kapp = 0.06
+	kapphi = 0.03
+	a = 0.003
+	mob = 0.2
+	dropRad = 43.5
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 120000
+	Nx = 600
+	Ny = 200
+[]
+
+
+[Time]
+	nSteps = 2000000
+[]
+
+
+[Output]
+	nOutputs = 10
+	nVTKOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+[]
+

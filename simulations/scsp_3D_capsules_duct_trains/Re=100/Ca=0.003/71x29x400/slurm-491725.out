@@ -1,0 +1,37 @@
+scsp_3D_capsules_duct_trains
+  
+H = 35.5
+umax = 0.03
+ks = 0.018
+kb = 0.0032212
+  
+Ca = 0.003
+  
+reference flux = 223.552
+  
+box size does not match nVoxels
+ 
+-----------------------------------------------
+Relaxing capsules...
+... done relaxing
+-----------------------------------------------
+ 
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+50000
+100000
+150000
+200000
+250000
+300000
+350000
+400000
+450000
+500000
+550000
+slurmstepd: error: *** JOB 491725 ON c1612 CANCELLED AT 2024-09-03T14:19:17 ***

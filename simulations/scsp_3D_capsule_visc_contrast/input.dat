@@ -1,0 +1,66 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsule_visc_contrast
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 1.0
+[]
+
+
+[IBM]
+	nNodesPerCell = 642
+	nFacesPerCell = 1280
+	nEdgesPerCell = 1920	
+	nCells = 1
+	a = 6.0
+	Ca = 0.3
+	kv = 0.02
+	gamma = 0.5
+	ibmUpdate = ibm
+	initRandom = 1
+	ibmFile = sphere.dat
+	
+	sizeBins = 4.0
+	binMax = 35
+	repA = 0.1
+	repD = 1.0  #1.732  #sqrt(3)
+	repFmax = 0.1
+	buckets = 1
+	numBucketsY = 20
+	numBucketsZ = 20
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 262144
+	Nx = 64
+	Ny = 64
+	Nz = 64
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 20000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 200
+	nVTKOutputs = 20
+	format = structured
+	fName = macros
+	iskip = 1
+	jskip = 1
+	kskip = 1 
+[]
+
+

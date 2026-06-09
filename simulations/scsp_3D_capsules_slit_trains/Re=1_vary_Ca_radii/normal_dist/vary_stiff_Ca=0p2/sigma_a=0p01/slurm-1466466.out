@@ -1,0 +1,74 @@
+scsp_3D_capsules_slit_trains
+  
+H = 10
+umax = 0.0166667
+  
+Ca = 0.3
+Ca std dev = 0.01
+  
+reference flux = 88.8889
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+... done relaxing
+-----------------------------------------------
+ 
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+10000
+20000
+30000
+40000
+50000
+60000
+70000
+80000
+90000
+100000
+110000
+120000
+130000
+140000
+150000
+160000
+170000
+180000
+190000
+200000
+210000
+220000
+230000
+240000
+250000
+260000
+270000
+280000
+290000
+300000
+310000
+320000

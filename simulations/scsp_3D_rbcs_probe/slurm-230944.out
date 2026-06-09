@@ -1,0 +1,30 @@
+scsp_3D_rbcs_probe
+largest array size = 772650
+nBlocks = 1510, nThreads = 512
+reference flux = 126.942
+  
+  
+hydraulic diameter = 67.7763
+umax (bare fluid) = 0.0491814
+fx = 2.776e-05
+aver shear stress in z-dir = 0.00192868
+aver shear stress in y-dir = 0.000973889
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+10000
+20000
+30000
+40000
+50000
+60000
+70000
+80000
+90000
+100000

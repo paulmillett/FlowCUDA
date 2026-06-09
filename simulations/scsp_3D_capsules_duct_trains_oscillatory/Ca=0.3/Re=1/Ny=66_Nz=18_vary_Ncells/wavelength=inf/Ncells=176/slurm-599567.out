@@ -1,0 +1,12 @@
+scsp_3D_capsules_duct_trains
+  
+H = 9
+umax = 0.0117845
+ks = 0.00277749
+kb = 0.000497048
+  
+Ca = 0.3
+  
+reference flux = 9.39459
+  
+slurmstepd: error: *** JOB 599567 ON c1612 CANCELLED AT 2025-01-15T09:26:36 ***

@@ -1,0 +1,71 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_sheets_slit_trains
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 1.0
+	umax = 0.03
+	pulsatile = 1
+	wavelenth = 10000
+[]
+
+
+[IBM]
+	nNodesPerCell = 145 #509
+	nFacesPerCell = 248 #936
+	nEdgesPerCell = 392 #1444	
+	nCells = 10
+	a = 6.0
+	Ca = 0.02
+	ksmax = 0.002
+	kv = 0.0
+	gamma = 0.5
+	ibmUpdate = ibm
+	ibmFile = sheet.dat
+	initRandom = 1
+	trainRij = 3.5
+	trainAng = 15.0
+	
+	sizeBins = 4.0
+	binMax = 35
+	repA = 0.1
+	repD = 1.0  #1.732  #sqrt(3)
+	repFmax = 0.1
+	buckets = 1
+	numBucketsY = 20
+	numBucketsZ = 20
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 500000
+	Nx = 200
+	Ny = 100
+	Nz = 25
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 600000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 20
+	nVTKOutputs = 20
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2
+[]
+

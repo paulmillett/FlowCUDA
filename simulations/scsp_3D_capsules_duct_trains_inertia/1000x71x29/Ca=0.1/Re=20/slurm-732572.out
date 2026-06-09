@@ -1,0 +1,64 @@
+scsp_3D_capsules_duct_trains
+  
+nu = 0.030885
+  
+H = 14.5
+umax = 0.03
+ks = 0.0027
+kb = 0.00048318
+  
+Ca = 0.1
+  
+reference flux = 43.0796
+  
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+... done relaxing
+-----------------------------------------------
+ 
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+80000
+160000
+240000
+320000
+400000
+480000
+560000
+640000
+720000
+800000
+880000
+960000
+1040000
+1120000
+1200000
+1280000
+1360000
+1440000
+1520000
+1600000

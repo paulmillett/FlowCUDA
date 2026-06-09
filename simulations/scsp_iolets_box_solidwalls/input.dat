@@ -1,0 +1,49 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_iolets_solidwalls
+	nu = 0.166666666
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 320000
+	Nx = 200
+	Ny = 40
+	Nz = 40
+	flowDir = 0
+	numIolets = 2
+	xLBC = 1
+	xUBC = 2
+[]
+
+
+[Iolet1]
+	type = 12
+	rBC = 0.98 #1.0
+[]
+
+
+[Iolet2]
+	type = 11
+	rBC = 1.0 #0.98 
+[]
+
+
+[Time]
+	nSteps = 10000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+[]
+

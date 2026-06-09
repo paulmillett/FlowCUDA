@@ -1,0 +1,11 @@
+scsp_3D_fibers_duct
+ ** On entry to cusparseCreate(): CUDA context cannot be initialized
+
+largest array size = 225000
+nBlocks = 440, nThreads = 512
+  
+Re = 1
+Body Force X-dir = 0.000223437
+nu = 0.166667
+  
+/var/spool/slurmd/job817806/slurm_script: line 8: 26694 Segmentation fault      (core dumped) ~/projects/FlowCUDA/code/bin/FlowCUDA

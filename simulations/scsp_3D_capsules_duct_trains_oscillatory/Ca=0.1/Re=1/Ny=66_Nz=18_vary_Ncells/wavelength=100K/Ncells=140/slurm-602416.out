@@ -1,0 +1,24 @@
+scsp_3D_capsules_duct_trains
+  
+H = 9
+umax = 0.0117845
+ks = 0.00277749
+kb = 0.000497048
+  
+Ca = 0.3
+  
+reference flux = 9.39459
+  
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+slurmstepd: error: *** JOB 602416 ON c2106 CANCELLED AT 2025-01-17T09:27:06 ***

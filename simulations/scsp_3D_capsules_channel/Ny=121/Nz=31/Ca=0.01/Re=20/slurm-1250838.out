@@ -1,0 +1,53 @@
+scsp_3D_capsules_channel
+  
+hydraulic diameter = 61.2469
+umax = 0.03
+ks = 0.00403333
+nu = 0.0459352
+fx = 6.69228e-06
+  
+Re = 20
+Ca = 0.1
+  
+reference flux = 79.5692
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+... done relaxing
+-----------------------------------------------
+ 
+ 
+-----------------------------------------------
+Equilibrating for 500000 steps...
+equilibration step 0
+equilibration step 10000
+equilibration step 20000
+equilibration step 30000
+equilibration step 40000
+equilibration step 50000
+equilibration step 60000
+equilibration step 70000
+equilibration step 80000
+equilibration step 90000
+equilibration step 100000
+equilibration step 110000

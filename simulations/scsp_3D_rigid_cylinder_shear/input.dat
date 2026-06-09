@@ -1,0 +1,62 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_rigid_cylinder_shear
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 1.0
+[]
+
+
+[IBM]
+	nNodesPerBody = 153
+	ibmFile = cylinder.dat	
+	nBodies = 1
+	L = 12.0
+	R = 0.5
+	sepMin = 1.2
+	nNodesLength = 21
+	ibmUpdate = ibm
+	initRandom = 1
+	sizeBins = 4.0
+	binMax = 35
+	repA = 0.01
+	repD = 1.0  #1.732  #sqrt(3)
+	repFmax = 0.1
+	buckets = 1
+	numBucketsY = 20
+	numBucketsZ = 20
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 262144
+	Nx = 64
+	Ny = 64
+	Nz = 64
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 452000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 200
+	nVTKOutputs = 20
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2
+[]
+

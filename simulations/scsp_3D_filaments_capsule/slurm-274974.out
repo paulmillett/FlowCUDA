@@ -1,0 +1,27 @@
+scsp_3D_filaments_capsule
+largest array size = 32768
+nBlocks = 64, nThreads = 512
+Capsule Ks = 0.00462963
+Capsule Kb = 0.0005
+  
+Filament kT = 0.001
+Filament ks = 1
+Filament kb = 0.005
+Filament fp = 0.002
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+50000
+100000
+150000
+200000
+250000
+300000
+350000
+400000
+450000
+slurmstepd: error: *** JOB 274974 ON c1612 CANCELLED AT 2023-11-17T11:29:31 ***

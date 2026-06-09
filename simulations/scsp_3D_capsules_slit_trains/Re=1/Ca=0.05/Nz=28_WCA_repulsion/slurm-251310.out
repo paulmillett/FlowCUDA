@@ -1,0 +1,17 @@
+scsp_3D_capsules_slit_trains
+  
+H = 14
+umax = 0.0119048
+ks = 0.0170068
+kb = 0.00304346
+  
+Ca = 0.05
+  
+reference flux = 88.8889
+  
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+slurmstepd: error: *** JOB 251310 ON c1615 CANCELLED AT 2023-10-23T11:56:06 ***

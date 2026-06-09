@@ -1,0 +1,63 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_rods_cylinder_binary
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 0.2
+[]
+
+
+[IBM_RODS]
+	initStruct = random
+	nBeadsPerRod1 = 61
+	nBeadsPerRod2 = 11
+	nRods1 = 1000
+	nRods2 = 1000
+	L0 = 0.25
+	diam = 0.5
+	sizeBins = 2.0
+	binMax = 200
+	repA = 0.005
+	repD = 0.5
+	lubforceMax = 0.00005
+	repWall = 0.1
+	fricWall = 0.15
+	rodFmax = 0.1
+	rodTmax = 0.1
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 384400
+	Nx = 400
+	Ny = 31
+	Nz = 31
+	numIolets = 0
+	chRad = 14.5
+[]
+
+
+[Time]
+	nSteps = 800000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 40
+	nVTKOutputs = 40
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+
+

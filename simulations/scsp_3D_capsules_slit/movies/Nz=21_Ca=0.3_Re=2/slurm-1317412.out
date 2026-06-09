@@ -1,0 +1,23 @@
+scsp_3D_capsules_slit
+  
+H = 10.5
+umax = 0.03
+ks = 0.009
+nu = 0.1575
+fx = 8.57143e-05
+  
+Re = 2
+Ca = 0.3
+  
+reference flux = 50.4
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+2100
+slurmstepd: error: *** JOB 1317412 ON c1704 CANCELLED AT 2022-09-29T14:01:37 ***

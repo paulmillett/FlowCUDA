@@ -1,0 +1,63 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_fibers_duct
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 1.0
+[]
+
+
+[IBM_FIBERS]
+	nBeadsPerFiber = 30
+	nEdgesPerFiber = 29
+	nFibers = 1
+	dS = 1.0
+	gamma = 0.01
+	sizeBins = 2.0
+	binMax = 200
+	repA = 0.001
+	repD = 1.0
+	beadFmax = 0.1
+	beadMob = 0.005
+	xsh = 500
+	ysh = 4.5
+	zsh = 7.5
+	alpha = -10.0
+	beta = 3.0
+	gammarot = 0.0
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 225000
+	Nx = 1000
+	Ny = 15
+	Nz = 15
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 50000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 50
+	nVTKOutputs = 50
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+
+

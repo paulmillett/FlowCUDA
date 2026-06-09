@@ -1,0 +1,21 @@
+scsp_3D_capsules_slit_Janus
+  
+Capsule ks (Soft) = 0.00813802
+Capsule ks (Hard) = 0.0813802
+Capsule Kb = 0.000878906
+  
+H = 32
+umax = 0.0520833
+fx = 1.69542e-05
+Re = 10
+  
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+10000
+20000
+slurmstepd: error: *** JOB 338650 ON c1612 CANCELLED AT 2024-01-22T15:51:22 ***

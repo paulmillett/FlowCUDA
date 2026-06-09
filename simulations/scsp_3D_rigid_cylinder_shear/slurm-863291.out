@@ -1,0 +1,48 @@
+scsp_3D_cylinders_channel
+largest array size = 384400
+nBlocks = 751, nThreads = 512
+particle volume fraction = 0.0285375
+  
+ks = 0.01
+kb = 0.01
+ka = 0.03
+kv = 0.9
+kag = 0
+  
+Ca = 0.02
+  
+cylinder particle length = 12
+cylinder particle radius = 0.5
+  
+Re = 0.2
+Body Force X-dir = 3.64463e-06
+nu = 0.166667
+umax = 0.00114943
+  
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+20000
+40000
+60000
+80000
+100000
+120000
+140000
+160000
+180000
+200000
+220000
+240000
+260000
+280000
+300000
+320000
+340000
+360000
+380000
+400000

@@ -1,0 +1,476 @@
+scsp_3D_capsules_slit_trains
+reference flux = 88.8889
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Relaxing capsules...
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+relax step 0
+relax step 10000
+relax step 20000
+relax step 30000
+relax step 40000
+relax step 50000
+relax step 60000
+relax step 70000
+relax step 80000
+... done relaxing
+-----------------------------------------------
+ 
+ 
+-----------------------------------------------
+Equilibrating for 1000000 steps...
+equilibration step 0
+equilibration step 10000
+equilibration step 20000
+equilibration step 30000
+equilibration step 40000
+equilibration step 50000
+equilibration step 60000
+equilibration step 70000
+equilibration step 80000
+equilibration step 90000
+equilibration step 100000
+equilibration step 110000
+equilibration step 120000
+equilibration step 130000
+equilibration step 140000
+equilibration step 150000
+equilibration step 160000
+equilibration step 170000
+equilibration step 180000
+equilibration step 190000
+equilibration step 200000
+equilibration step 210000
+equilibration step 220000
+equilibration step 230000
+equilibration step 240000
+equilibration step 250000
+equilibration step 260000
+equilibration step 270000
+equilibration step 280000
+equilibration step 290000
+equilibration step 300000
+equilibration step 310000
+equilibration step 320000
+equilibration step 330000
+equilibration step 340000
+equilibration step 350000
+equilibration step 360000
+equilibration step 370000
+equilibration step 380000
+equilibration step 390000
+equilibration step 400000
+equilibration step 410000
+equilibration step 420000
+equilibration step 430000
+equilibration step 440000
+equilibration step 450000
+equilibration step 460000
+equilibration step 470000
+equilibration step 480000
+equilibration step 490000
+equilibration step 500000
+equilibration step 510000
+equilibration step 520000
+equilibration step 530000
+equilibration step 540000
+separation = 0.364673 
+separation = 0.364673 
+separation = 0.363652 
+separation = 0.485958 
+separation = 0.467114 
+separation = 0.467114 
+separation = 0.449718 
+separation = 0.474478 
+separation = 0.439583 
+separation = 0.435078 
+separation = 0.496613 
+separation = 0.484253 
+separation = 0.419791 
+separation = 0.399037 
+separation = 0.431244 
+separation = 0.431244 
+separation = 0.448736 
+separation = 0.449209 
+separation = 0.449209 
+separation = 0.312130 
+separation = 0.364384 
+separation = 0.412036 
+separation = 0.389727 
+separation = 0.355663 
+separation = 0.403954 
+separation = 0.480293 
+separation = 0.444386 
+separation = 0.440136 
+separation = 0.437618 
+separation = 0.415923 
+separation = 0.365454 
+separation = 0.339230 
+separation = 0.320574 
+separation = 0.328194 
+separation = 0.326732 
+separation = 0.412643 
+equilibration step 550000
+separation = 0.473417 
+separation = 0.477397 
+separation = 0.456976 
+separation = 0.430641 
+separation = 0.430641 
+equilibration step 560000
+separation = 0.483433 
+separation = 0.481760 
+separation = 0.446294 
+separation = 0.416551 
+separation = 0.416551 
+separation = 0.465779 
+separation = 0.431482 
+separation = 0.431482 
+separation = 0.468375 
+separation = 0.478939 
+separation = 0.462939 
+separation = 0.482190 
+separation = 0.455010 
+separation = 0.415577 
+separation = 0.415577 
+separation = 0.438676 
+separation = 0.459774 
+separation = 0.380740 
+separation = 0.385390 
+separation = 0.419811 
+separation = 0.399529 
+separation = 0.367709 
+separation = 0.372373 
+separation = 0.372373 
+separation = 0.460674 
+separation = 0.456501 
+separation = 0.487929 
+separation = 0.456828 
+separation = 0.412873 
+separation = 0.406901 
+separation = 0.411910 
+separation = 0.479568 
+separation = 0.440091 
+separation = 0.438113 
+separation = 0.473581 
+separation = 0.443737 
+separation = 0.397246 
+separation = 0.374872 
+separation = 0.358483 
+separation = 0.333785 
+separation = 0.317802 
+separation = 0.312212 
+separation = 0.291806 
+separation = 0.276557 
+separation = 0.277069 
+separation = 0.277069 
+separation = 0.349834 
+separation = 0.351292 
+separation = 0.283441 
+separation = 0.283441 
+separation = 0.387675 
+separation = 0.394007 
+separation = 0.476179 
+separation = 0.491396 
+separation = 0.342035 
+separation = 0.342035 
+separation = 0.464574 
+separation = 0.430447 
+separation = 0.384252 
+separation = 0.384252 
+separation = 0.467037 
+separation = 0.380415 
+separation = 0.380415 
+separation = 0.400000 
+separation = 0.400000 
+separation = 0.453135 
+separation = 0.313360 
+separation = 0.246304 
+separation = 0.251525 
+separation = 0.240697 
+separation = 0.240697 
+separation = 0.315591 
+separation = 0.261859 
+separation = 0.206205 
+separation = 0.206205 
+separation = 0.304576 
+separation = 0.281340 
+separation = 0.301900 
+separation = 0.367673 
+separation = 0.419698 
+equilibration step 570000
+equilibration step 580000
+equilibration step 590000
+equilibration step 600000
+equilibration step 610000
+equilibration step 620000
+equilibration step 630000
+equilibration step 640000
+equilibration step 650000
+equilibration step 660000
+equilibration step 670000
+equilibration step 680000
+equilibration step 690000
+equilibration step 700000
+equilibration step 710000
+equilibration step 720000
+equilibration step 730000
+equilibration step 740000
+separation = 0.377335 
+separation = 0.225818 
+separation = 0.238678 
+separation = 0.364224 
+separation = 0.407559 
+separation = 0.448257 
+separation = 0.407559 
+separation = 0.448257 
+separation = 0.475576 
+separation = 0.457286 
+separation = 0.457286 
+separation = 0.475576 
+separation = 0.268676 
+separation = 0.268676 
+separation = 0.214728 
+separation = 0.234761 
+separation = 0.234761 
+separation = 0.214728 
+separation = 0.456310 
+separation = 0.456310 
+equilibration step 750000
+equilibration step 760000
+equilibration step 770000
+equilibration step 780000
+equilibration step 790000
+equilibration step 800000
+equilibration step 810000
+equilibration step 820000
+equilibration step 830000
+equilibration step 840000
+equilibration step 850000
+equilibration step 860000
+equilibration step 870000
+equilibration step 880000
+equilibration step 890000
+equilibration step 900000
+equilibration step 910000
+equilibration step 920000
+equilibration step 930000
+equilibration step 940000
+equilibration step 950000
+equilibration step 960000
+equilibration step 970000
+equilibration step 980000
+equilibration step 990000
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+5000
+10000
+15000
+20000
+25000
+30000
+35000
+40000
+45000
+50000
+55000
+60000
+65000
+70000
+75000
+80000
+85000
+90000
+95000
+100000
+105000
+110000
+115000
+120000
+125000
+130000
+135000
+140000
+145000
+150000
+155000
+160000
+165000
+170000
+175000
+180000
+185000
+190000
+195000
+200000
+205000
+210000
+215000
+220000
+225000
+230000
+235000
+240000
+245000
+250000
+255000
+260000
+265000
+270000
+275000
+280000
+285000
+290000
+295000
+300000
+305000
+310000
+315000
+320000
+325000
+330000
+335000
+340000
+345000
+350000
+355000
+360000
+365000
+370000
+375000
+380000
+385000
+390000
+395000
+400000
+405000
+410000
+415000
+420000
+425000
+430000
+435000
+440000
+445000
+450000
+455000
+460000
+465000
+470000
+475000
+480000
+485000
+490000
+495000
+500000
+505000
+510000
+515000
+520000
+525000
+530000
+535000
+540000
+545000
+550000
+555000
+560000
+565000
+570000
+575000
+580000
+585000
+590000
+595000
+600000
+605000
+610000
+615000
+620000
+625000
+630000
+635000
+640000
+645000
+650000
+655000
+660000
+665000
+670000
+675000
+680000
+685000
+690000
+695000
+700000
+705000
+710000
+715000
+720000
+725000
+730000
+735000
+740000
+745000
+750000
+755000
+760000
+765000
+770000
+775000
+780000
+785000
+790000
+795000
+800000
+805000
+810000
+815000
+820000
+825000
+830000
+835000
+840000
+845000
+850000
+855000
+860000
+865000
+870000
+875000
+880000
+885000
+890000
+895000
+900000
+905000
+910000
+915000
+920000
+925000
+930000
+935000
+940000
+945000
+950000
+955000
+960000
+965000
+970000
+975000
+980000
+985000
+990000
+995000
+1000000

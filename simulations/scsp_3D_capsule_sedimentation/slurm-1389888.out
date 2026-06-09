@@ -1,0 +1,24 @@
+scsp_3D_capsule_sedimentation
+  
+hydraulic diameter = 121
+umax = 0.03
+ks = 0.0009
+kb = 0xa33b28nu = 0.166667
+fx = 0.0005
+  
+Re = 10
+Ca = 0.550964
+  
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+1000
+2000
+3000
+4000
+5000
+slurmstepd: error: *** JOB 1389888 ON c1709 CANCELLED AT 2023-01-19T13:10:09 ***

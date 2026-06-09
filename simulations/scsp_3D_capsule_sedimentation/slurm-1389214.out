@@ -1,0 +1,20 @@
+scsp_3D_capsule_sedimentation
+  
+hydraulic diameter = 121
+umax = 0.03
+ks = 0.0009
+nu = 0.166667
+  
+Re = 10
+Ca = 0.550964
+  
+0 20 61 61
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+1000
+/var/spool/slurmd/job1389214/slurm_script: line 8: 57722 Segmentation fault      (core dumped) ~/projects/FlowCUDA/code/bin/FlowCUDA

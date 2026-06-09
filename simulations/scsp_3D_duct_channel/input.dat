@@ -7,7 +7,7 @@
 	App = scsp_3D_duct_channel
 	nu = 0.166666666
 	bodyForx = 0.00001
-	Re = 2
+	Re = 10
 	umax = 0.03
 []
 
@@ -16,10 +16,10 @@
 	D = 3
 	Q = 19
 	source = box
-	nVoxels = 12810
+	nVoxels = 645610 
 	Nx = 10
-	Ny = 61
-	Nz = 21
+	Ny = 401
+	Nz = 161
 	numIolets = 0
 []
 
@@ -33,8 +33,8 @@
 	nOutputs = 10
 	format = structured
 	fName = macros
-	iskip = 1
-	jskip = 1
-	kskip = 1 
+	iskip = 2
+	jskip = 2
+	kskip = 2 
 []
 

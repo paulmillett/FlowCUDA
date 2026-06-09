@@ -1,0 +1,23 @@
+scsp_3D_capsules_slit_trains
+  
+H = 14
+umax = 0.0119048
+ks = 0.00283447
+kb = 0.000507243
+nu = 0.166667
+fx = 2.02462e-05
+  
+Re = 1
+Ca = 0.3
+  
+reference flux = 44.4444
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+5000

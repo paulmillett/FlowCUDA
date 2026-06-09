@@ -1,0 +1,76 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsules_slit_trains
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 1.0
+	umax = 0.03
+	Q0 = 50.3012
+[]
+
+
+[IBM]
+	nNodesPerCell = 642
+	nFacesPerCell = 1280
+	nEdgesPerCell = 1920	
+	cellProps = uniform
+	cellSizes = uniform
+	nCells = 8
+	a = 6.0
+	Ca = 0.3
+	stddevA = 0.5
+	stddevCa = 0.02  #0.05
+	kv = 0.02	
+	ksmax = 0.002	
+	gamma = 0.5
+	ibmUpdate = verlet  #ibm
+	initRandom = 0
+	cellSpacingX = 30.0
+	offsetY = 12.0
+	trainRij = 3.5
+	trainAng = 15.0
+	ibmFile = sphere.dat
+	sizeBins = 4.0
+	binMax = 35
+	repA = 0.1
+	repD = 1.0
+	repFmax = 0.1
+	buckets = 1
+	numBucketsY = 20
+	numBucketsZ = 20
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 115200 
+	Nx = 120
+	Ny = 48
+	Nz = 20
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 100000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 200
+	nVTKOutputs = 20
+	format = structured
+	fName = macros
+	iskip = 1
+	jskip = 1
+	kskip = 1 
+	precision = 5
+[]
+

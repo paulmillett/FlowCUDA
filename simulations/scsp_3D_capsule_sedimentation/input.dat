@@ -1,0 +1,66 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsule_sedimentation
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 10
+	umax = 0.03
+[]
+
+
+[IBM]
+	nNodesPerCell = 642
+	nFacesPerCell = 1280
+	nEdgesPerCell = 1920	
+	nCells = 1
+	a = 6.0
+	Ca = 0.003
+	ks = 0.0009
+	kv = 0.01
+	fx = 0.0005
+	gamma = 0.5
+	ibmUpdate = ibm
+	
+	sizeBins = 4.0
+	binMax = 35
+	repA = 0.1
+	repD = 1.0  #1.732  #sqrt(3)
+	repFmax = 0.1
+	buckets = 1
+	numBucketsY = 20
+	numBucketsZ = 20
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 1464100
+	Nx = 100
+	Ny = 121
+	Nz = 121
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 200000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 200
+	nVTKOutputs = 20
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+

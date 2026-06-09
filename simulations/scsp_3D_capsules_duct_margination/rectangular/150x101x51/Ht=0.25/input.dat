@@ -1,0 +1,70 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsules_duct_margination
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 10.0
+[]
+
+
+[IBM]
+	ibmFile1 = rbc.dat
+	ibmFile2 = oblate.dat
+	nNodesPerCell1 = 642
+	nFacesPerCell1 = 1280
+	nEdgesPerCell1 = 1920
+	nNodesPerCell2 = 162
+	nFacesPerCell2 = 320
+	nEdgesPerCell2 = 480
+	nCells1 = 573
+	nCells2 = 287
+	a1 = 6.0
+	a2 = 2.5
+	Ca1 = 0.2
+	Ca2 = 0.05
+	kv = 0.02
+	gamma = 0.5
+	ibmUpdate = verlet  #ibm
+	initRandom = 1
+	
+	sizeBins = 3.0
+	binMax = 35
+	repA = 0.1
+	repD = 1.0
+	nodeFmax = 0.1
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 772650
+	Nx = 150
+	Ny = 101
+	Nz = 51 
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 3000000 
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 300
+	nVTKOutputs = 15
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+
+

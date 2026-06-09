@@ -1,0 +1,71 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsules_duct_trains
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 1.0
+	umax = 0.03
+	Q0 = 50.3012
+	pulsatile = 1
+	wavelength = 3000.0
+[]
+
+
+[IBM]
+	nNodesPerCell = 642
+	nFacesPerCell = 1280
+	nEdgesPerCell = 1920	
+	nCells = 210
+	a = 6.0
+	Ca = 0.05
+	ksmax = 0.002
+	kv = 0.02
+	gamma = 0.5
+	ibmUpdate = ibm #verlet  #ibm
+	initRandom = 1
+	trainRij = 3.5
+	trainAng = 15.0
+	
+	sizeBins = 4.0
+	binMax = 35
+	repA = 0.1
+	repD = 1.0  #1.732  #sqrt(3)
+	repFmax = 0.1
+	buckets = 1
+	numBucketsY = 20
+	numBucketsZ = 20
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 1584000
+	Nx = 1000
+	Ny = 88
+	Nz = 18
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 3000000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 200
+	nVTKOutputs = 40
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2
+[]
+

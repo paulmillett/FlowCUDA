@@ -1,0 +1,77 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_rods_nozzle
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 0.004 #0.02 #0.05 #0.2
+[]
+
+
+[IBM_RODS]
+	initStruct = random  #aligned
+	nBeadsPerRod = 61
+	nRods = 3000
+	L0 = 0.25
+	diam = 0.5
+	sizeBins = 2.0
+	binMax = 200
+	repA = 0.005
+	repD = 0.5
+	lubforceMax = 0.00005
+	repWall = 0.1
+	fricWall = 0.5
+	rodFmax = 0.1
+	rodTmax = 0.1
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 520200
+	Nx = 200
+	Ny = 51
+	Nz = 51
+	flowDir = 0
+	numIolets = 2
+	xLBC = 1
+	xUBC = 2
+	radInlet = 24.5
+	radOutlet = 6.5 #10.5
+[]
+
+
+[Iolet1]
+	type = 12
+	rBC = 1.0
+[]
+
+
+[Iolet2]
+	type = 11
+	rBC = 1.0 
+[]
+
+
+[Time]
+	nSteps = 400000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 40
+	nVTKOutputs = 40
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+
+

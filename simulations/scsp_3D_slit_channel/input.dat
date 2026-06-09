@@ -5,7 +5,7 @@
 
 [LBM]
 	App = scsp_3D_slit_channel
-	Re = 400.0
+	Re = 100.0
 	umax = 0.03
 []
 
@@ -14,10 +14,10 @@
 	D = 3
 	Q = 19
 	source = box
-	nVoxels = 75600
-	Nx = 30
+	nVoxels = 193200
+	Nx = 10
 	Ny = 120
-	Nz = 21
+	Nz = 161
 	numIolets = 0
 []
 
@@ -28,11 +28,11 @@
 
 
 [Output]
-	nOutputs = 20
+	nOutputs = 10
 	format = structured
 	fName = macros
-	iskip = 1
-	jskip = 1
-	kskip = 1 
+	iskip = 2
+	jskip = 2
+	kskip = 2 
 []
 

@@ -1,0 +1,32 @@
+scsp_3D_capsules_duct_margination
+largest array size = 1732320
+nBlocks = 3384, nThreads = 512
+reference flux = 126.942
+  
+  
+hydraulic diameter = 67.7763
+umax (bare fluid) = 0.0491814
+fx = 2.776e-05
+aver shear stress in z-dir = 0.00192868
+wall shear stress in z-dir = 0.00385768
+aver shear stress in y-dir = 0.000973889
+wall shear stress in y-dir = 0.00305841
+  
+nnbins = 26
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+2000
+4000
+6000
+8000
+10000
+12000
+14000
+16000
+18000
+20000

@@ -1,0 +1,70 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_rbcs_probe
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 10.0
+[]
+
+
+[IBM]
+	ibmFile1 = sphere.dat
+	ibmFile2 = rbc.dat
+	nNodesPerCell1 = 2562
+	nFacesPerCell1 = 5120
+	nEdgesPerCell1 = 7680
+	nNodesPerCell2 = 162
+	nFacesPerCell2 = 320
+	nEdgesPerCell2 = 480
+	nCells1 = 1
+	nCells2 = 1600
+	a1 = 15.0
+	a2 = 3.0
+	Ca1 = 0.2
+	Ca2 = 0.2
+	kv = 0.02
+	gamma = 0.5
+	ibmUpdate = verlet
+	initRandom = 1
+	
+	sizeBins = 3.0
+	binMax = 35
+	repA = 0.1
+	repD = 1.0
+	nodeFmax = 0.1
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 772650
+	Nx = 150
+	Ny = 101
+	Nz = 51 
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 100000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 10
+	nVTKOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+
+

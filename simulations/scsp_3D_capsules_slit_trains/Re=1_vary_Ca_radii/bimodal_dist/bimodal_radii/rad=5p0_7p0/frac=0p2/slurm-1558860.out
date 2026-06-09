@@ -1,0 +1,13 @@
+scsp_3D_capsules_slit_trains
+  
+H = 10
+umax = 0.0166667
+ks = 0.00555556
+kb = 0.000994197
+  
+Ca = 0.3
+  
+reference flux = 88.8889
+  
+nnbins = 26
+slurmstepd: error: *** JOB 1558860 ON c1612 CANCELLED AT 2023-04-20T04:52:11 DUE TO TIME LIMIT ***

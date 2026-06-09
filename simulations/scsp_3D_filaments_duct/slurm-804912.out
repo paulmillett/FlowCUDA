@@ -1,0 +1,26 @@
+scsp_3D_filaments_duct
+largest array size = 90000
+nBlocks = 176, nThreads = 512
+  
+Filament kT = 0
+Filament ks = 0.05
+Filament kb = 0.005
+Filament fp = 0
+Filament up = 0
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+100
+200
+300
+400
+500
+600
+700
+800
+900
+1000

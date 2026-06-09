@@ -1,0 +1,13 @@
+scsp_3D_slit_channel
+reference flux = 386.4
+  
+100000
+200000
+300000
+400000
+500000
+600000
+700000
+800000
+900000
+slurmstepd: error: *** JOB 1352170 ON c1701 CANCELLED AT 2022-12-04T14:34:39 ***

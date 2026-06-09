@@ -1,0 +1,63 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_capsules_slit_Janus
+	nu = 0.1666666667
+	Re = 10.0
+[]
+
+
+[IBM]
+	nNodesPerCell = 2562  #10242
+	nFacesPerCell = 5120  #20480
+	nEdgesPerCell = 7680   #30720
+	nCells = 1
+	a = 6.0
+	kv = 0.001
+	C = 2.0
+	CaSoft = 0.2
+	CaHard = 0.02
+	psi = -0.7
+	gamma = 0.785
+	ibmUpdate = ibm
+	ibmFile = sphere_r=6_nV=2562.dat	
+	sizeBins = 2.0
+	binMax = 35 
+	repA = 0.1
+	repD = 1.3
+	nodeFmax = 0.1
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 262144
+	Nx = 64
+	Ny = 64
+	Nz = 64
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 300000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 30
+	nVTKOutputs = 30
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+
+

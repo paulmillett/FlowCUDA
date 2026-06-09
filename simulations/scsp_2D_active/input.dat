@@ -1,0 +1,38 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_2D_active
+	nu = 0.166666666
+	sf = 1.1
+	fricR = 1.0  #100.0
+	activity = 0.0001
+	alpha = 0.01  #1.0
+	kapp = 0.01   #1.0
+[]
+
+
+[Lattice]
+	D = 2
+	Q = 9
+	source = box
+	nVoxels = 40000
+	Nx = 200
+	Ny = 200
+[]
+
+
+[Time]
+	nSteps = 300000
+[]
+
+
+[Output]
+	nOutputs = 10
+	nVTKOutputs = 10
+	format = structured
+	fName = macros
+[]
+

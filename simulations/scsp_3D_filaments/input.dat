@@ -1,0 +1,61 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_filaments
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 1.0
+[]
+
+
+[IBM_FILAMS]
+	nBeadsPerFilam = 20
+	nEdgesPerFilam = 19
+	forceModel = spring
+	nFilams = 200
+	L0 = 0.25
+	gamma = 0.785
+	ks = 1.0
+	kT = 0.001
+	Pe = 50.0  #200.0
+	PL = 5.0
+	sizeBins = 2.0
+	binMax = 200
+	repA = 1.0
+	repD = 0.5
+	beadFmax = 0.1
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 262144
+	Nx = 64
+	Ny = 64
+	Nz = 64
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 300000
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 30
+	nVTKOutputs = 30
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+
+
