@@ -154,18 +154,20 @@ void class_rods_binary_ibm3D::create_first_rod()
 	// set up indices for ALL rods:
 	for (int f=0; f<nRods; f++) {
 		if (f < nRods1) {
+			rodsH[f].rodType = 1;
 			rodsH[f].nBeads = nBeadsPerRod1;
 			rodsH[f].indxB0 = f*nBeadsPerRod1;      // start index for beads
 			rodsH[f].headBead = f*nBeadsPerRod1;    // head bead (first bead)
 			rodsH[f].tailBead = f*nBeadsPerRod1 + nBeadsPerRod1 - 1;  // tail bead (last bead)
-			rodsH[f].centerBead = f*nBeadsPerRod1 + nBeadsPerRod1/2;  // center-of-mass, assuming nBeadsPerRod is odd	
+			rodsH[f].centerBead = f*nBeadsPerRod1 + nBeadsPerRod1/2;  // center-of-mass, assuming nBeadsPerRod is odd
 		}
 		else {
+			rodsH[f].rodType = 2;
 			rodsH[f].nBeads = nBeadsPerRod2;
 			rodsH[f].indxB0 = nRods1*nBeadsPerRod1 + (f-nRods1)*nBeadsPerRod2;    // start index for beads
 			rodsH[f].headBead = nRods1*nBeadsPerRod1 + (f-nRods1)*nBeadsPerRod2;  // head bead (first bead)
 			rodsH[f].tailBead = nRods1*nBeadsPerRod1 + (f-nRods1)*nBeadsPerRod2 + nBeadsPerRod2 - 1;  // tail bead (last bead)
-			rodsH[f].centerBead = nRods1*nBeadsPerRod1 + (f-nRods1)*nBeadsPerRod2 + nBeadsPerRod2/2;  // center-of-mass, assuming nBeadsPerRod is odd	
+			rodsH[f].centerBead = nRods1*nBeadsPerRod1 + (f-nRods1)*nBeadsPerRod2 + nBeadsPerRod2/2;  // center-of-mass, assuming nBeadsPerRod is odd
 		}
 			
 	}
@@ -202,11 +204,11 @@ void class_rods_binary_ibm3D::duplicate_rods()
 		for (int r=1; r<nRods2; r++) {
 			// copy bead information:
 			for (int i=0; i<nBeadsPerRod2; i++) {
-				int ii = i + rodsH[r].indxB0;
+				int ii = i + r*nBeadsPerRod2 + offsetB;
 				beadsH[ii].r = beadsH[i+offsetB].r;
 				beadsH[ii].f = beadsH[i+offsetB].f;
 				beadsH[ii].rm1 = beadsH[i+offsetB].rm1;
-				beadsH[ii].rodID = r + nRods1;
+				beadsH[ii].rodID = r + nRods1;				
 			}
 		}
 	}	
@@ -229,7 +231,7 @@ void class_rods_binary_ibm3D::set_aspect_ratios(float ar1, float ar2)
 			rodsH[r].ar = ar1;
 		} else {
 			rodsH[r].ar = ar2;
-		}
+		}		
 	}
 }
 
@@ -270,7 +272,6 @@ void class_rods_binary_ibm3D::set_mobility_coefficients(float nu, float ar1, flo
 			rodsH[r].mobPer = mobPer2;
 			rodsH[r].mobRot = mobRot2;
 		}
-		
 	}
 	
 	// output the numbers:
@@ -288,4 +289,48 @@ void class_rods_binary_ibm3D::set_mobility_coefficients(float nu, float ar1, flo
 
 
 
+// --------------------------------------------------------
+// Output the rod orientation, position, and radial position
+// inside cylindrical channel
+//
+// Override from parent class
+//
+// --------------------------------------------------------
+
+void class_rods_binary_ibm3D::orientation_in_cylindrical_channel(int step)
+{
+	
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "rod_orientation.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------
+	// Loop over the capsules  
+	// -----------------------------------------
+		
+	for (int r=0; r<nRods; r++) {		
+		// radial distance to channel centerline:
+		float ymid = (Box.y-1.0)/2.0;
+		float zmid = (Box.z-1.0)/2.0;
+		float yi = rodsH[r].r.y - ymid;
+		float zi = rodsH[r].r.z - zmid;
+		float ri = sqrt(yi*yi + zi*zi);
+		// print data:
+		outfile << fixed << setprecision(4) << step << "  " << r << "  " << rodsH[r].rodType << " "
+			                                                             << rodsH[r].p.x << "  " 
+			                                                             << rodsH[r].p.y << "  " 
+																		 << rodsH[r].p.z << "  "
+																		 << rodsH[r].r.x << "  "
+																		 << rodsH[r].r.y << "  " 
+																		 << rodsH[r].r.z << "  "
+																		 << ri << endl;		
+	}
+
+}
 

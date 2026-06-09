@@ -36,6 +36,7 @@ class class_rods_binary_ibm3D : public class_rods_ibm3D {
 	void duplicate_rods();
 	void set_aspect_ratios(float,float);
 	void set_mobility_coefficients(float,float,float,float,float);
+	void orientation_in_cylindrical_channel(int);
 };
 
 # endif  // CLASS_RODS_BINARY_IBM3D_H

@@ -277,13 +277,13 @@ void scsp_3D_rods_cylinder_binary::initSystem()
 	// push rods inside cylinder (if 'random'), then
 	// relax rods to eliminate any overlap:
 	// ----------------------------------------------
-	
+		
 	if (initStruct == "random"){
 		rods.stepIBM_Euler_push_inside_cylinder(1000,chRad,nBlocks,nThreads);
 	}
 	
 	rods.stepIBM_Euler_relax_rods_in_cylinder(1000,chRad,nBlocks,nThreads);
-	
+		
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------

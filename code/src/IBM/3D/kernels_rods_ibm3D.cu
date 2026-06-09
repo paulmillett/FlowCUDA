@@ -313,7 +313,7 @@ __global__ void move_rod_back_to_inlet_IBM3D(
 	// define rod:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nRods) {
-		float Lrod = float(nBeadsPerRod-1)*L0;
+		float Lrod = float(rods[i].nBeads-1)*L0;  //float(nBeadsPerRod-1)*L0;
 		float offset = Lrod/2.0 + 1.0;
 		// check if rod is too close to outlet (x-dir):
 		if (rods[i].r.x > Box.x - offset) {			
@@ -350,7 +350,7 @@ __global__ void sum_rod_forces_torques_moments_IBM3D(
 		float3 ricom = beads[i].r - com;
 		float3 force = beads[i].f;
 		float3 torque = cross(ricom,beads[i].f);
-		float nBeadsPerRodf = float(nBeadsPerRod);
+		float nBeadsPerRodf = float(rods[rodID].nBeads);  // float(nBeadsPerRod);
 		// add up forces
 		atomicAdd(&rods[rodID].f.x, force.x);
 		atomicAdd(&rods[rodID].f.y, force.y);
@@ -821,9 +821,9 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 		// calculate hydrodynamic forces 
 		// --------------------------------------
 		
-		float fx = (vxLBMi - beads[i].v.x)/dt/float(nBeadsPerRod);
-		float fy = (vyLBMi - beads[i].v.y)/dt/float(nBeadsPerRod);
-		float fz = (vzLBMi - beads[i].v.z)/dt/float(nBeadsPerRod);
+		float fx = (vxLBMi - beads[i].v.x)/dt; // /float(nBeadsPerRod);
+		float fy = (vyLBMi - beads[i].v.y)/dt; // /float(nBeadsPerRod);
+		float fz = (vzLBMi - beads[i].v.z)/dt; // /float(nBeadsPerRod);
 				
 		// --------------------------------------
 		// distribute the !negative! of the 
@@ -880,7 +880,7 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 		// --------------------------------------
 		
 		int rodID = beads[i].rodID;
-		float3 beadForce = rods[rodID].f/nBeadsPerRod;
+		float3 beadForce = rods[rodID].f/rods[rodID].nBeads;  //rods[rodID].f/nBeadsPerRod;
 		
 		// --------------------------------------
 		// the rod torque is converted to a force
@@ -891,11 +891,11 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 		// the rod
 		// --------------------------------------
 		
-		float Lrod = float(nBeadsPerRod-1)*L0;
+		float Lrod = float(rods[rodID].nBeads-1)*L0;  //float(nBeadsPerRod-1)*L0;
 		float Lrod2 = Lrod/2.0;
 		float3 FcoupleSep = Lrod2*rods[rodID].p;
 		float3 Fcouple = cross(rods[rodID].t,FcoupleSep)/(Lrod2*Lrod2);
-		float nBeadsPerRod2 = float(nBeadsPerRod-1)/2.0;
+		float nBeadsPerRod2 = float(rods[rodID].nBeads-1)/2.0;  //float(nBeadsPerRod-1)/2.0;
 		Fcouple /= nBeadsPerRod2;
 		if (i > rods[rodID].centerBead) Fcouple *= -1.0;
 		beadForce += Fcouple;

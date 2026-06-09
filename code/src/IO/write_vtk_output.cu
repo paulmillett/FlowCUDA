@@ -1474,7 +1474,7 @@ void write_vtk_immersed_boundary_3D_fibers(std::string tagname, int tagnum, int 
 // Write IBM mesh to 'vtk' file:
 // -------------------------------------------------------------------------
 
-void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nBeads, int nBeadsPerRod, beadrod* beads, rod* rods)
+void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nBeads, int nBeadsPerRod, int nRods, beadrod* beads, rod* rods)
 {
 		
 	// -----------------------------------
@@ -1508,9 +1508,7 @@ void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nB
 	for (int i=0; i<nBeads; i++) {
 		outfile << fixed << setprecision(3) << beads[i].r.x << "  " << beads[i].r.y << "  " << beads[i].r.z << endl;
 	}
-	*/
-	
-	int nRods = nBeads/nBeadsPerRod;
+	*/	
 	
 	outfile << " " << endl;	
 	outfile << "POINTS " << 2*nRods << " float" << endl;
@@ -1566,7 +1564,19 @@ void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nB
 		float theta = acos(abs(rods[i].p.x));		
 		outfile << theta << endl;
 	}
-			
+	
+	// -----------------------------------------------
+	//	Write the rod type for each line:
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	//outfile << "CELL_DATA " << nRods << endl;
+	outfile << "SCALARS " << "rodtype " << "int " << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nRods; i++) {
+		outfile << rods[i].rodType << endl;
+	}
+	
 	// -----------------------------------
 	//	Write if headBead:
 	// -----------------------------------

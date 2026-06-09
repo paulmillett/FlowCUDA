@@ -419,6 +419,7 @@ void class_rods_ibm3D::randomize_rods_inside_sphere(float xs, float ys, float zs
 
 void class_rods_ibm3D::randomize_rods_cylinder()
 {
+	
 	// copy bead positions from device to host:
 	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
 			
@@ -435,7 +436,8 @@ void class_rods_ibm3D::randomize_rods_cylinder()
 	}	
 	
 	// copy bead positions from host to device:
-	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);	
+	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);
+		
 }
 
 
@@ -629,6 +631,7 @@ void class_rods_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float
 	// update node positions:
 	int istr = rodsH[fID].indxB0;
 	int iend = istr + rodsH[fID].nBeads;
+	
 	for (int i=istr; i<iend; i++) {
 		// rotate:
 		float xrot = beadsH[i].r.x*(cos(a)*cos(b)) + beadsH[i].r.y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + beadsH[i].r.z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
@@ -1412,7 +1415,7 @@ void class_rods_ibm3D::push_rods_inside_nozzle(float radInlet, float radOutlet, 
 void class_rods_ibm3D::write_output(std::string tagname, int tagnum)
 {
 	write_vtk_immersed_boundary_3D_rods(tagname,tagnum,
-	nBeads,nBeadsPerRod,beadsH,rodsH);
+	nBeads,nBeadsPerRod,nRods,beadsH,rodsH);
 }
 
 
