@@ -188,6 +188,22 @@ __global__ void push_beads_into_cylinder_IBM3D(
 	float,
 	float,
 	int);
+	
+	
+__global__ void push_beads_into_duct_IBM3D(
+	beadrod*,
+	float3,
+	float,
+	float,
+	int);
+	
+	
+__global__ void push_beads_into_slit_IBM3D(
+	beadrod*,
+	float3,
+	float,
+	float,
+	int);
 
 
 __global__ void push_beads_into_nozzle_IBM3D(

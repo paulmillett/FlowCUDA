@@ -726,6 +726,87 @@ __global__ void push_beads_into_cylinder_IBM3D(
 // IBM3D kernel to calculate wall forces:
 // --------------------------------------------------------
 
+__global__ void push_beads_into_duct_IBM3D(
+	beadrod* beads,
+	float3 Box,
+	float repA,
+	float repD,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float yi = beads[i].r.y;
+		const float zi = beads[i].r.z;
+		// bottom wall
+		if (yi < d) {
+			const float outside_dist = d + (0.0 - yi);
+			const float force = 0.01*outside_dist;
+			beads[i].f.y += force;
+		}
+		// top wall
+		else if (yi > Box.y-1.0-d) {
+			const float outside_dist = yi - (Box.y-1.0-d);
+			const float force = 0.01*outside_dist;
+			beads[i].f.y -= force;
+		}
+		// back wall
+		if (zi < d) {
+			const float outside_dist = d + (0.0 - zi);
+			const float force = 0.01*outside_dist;
+			beads[i].f.z += force;
+		}
+		// front wall
+		else if (zi > Box.z-1.0-d) {
+			const float outside_dist = zi - (Box.z-1.0-d);
+			const float force = 0.01*outside_dist;
+			beads[i].f.z -= force;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
+__global__ void push_beads_into_slit_IBM3D(
+	beadrod* beads,
+	float3 Box,
+	float repA,
+	float repD,
+	int nBeads)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		const float d = repD;
+		const float A = repA;
+		const float zi = beads[i].r.z;
+		// bottom wall
+		if (zi < d) {
+			const float outside_dist = d + (0.0 - zi);
+			const float force = 0.01*outside_dist;
+			beads[i].f.z += force;
+		}
+		// top wall
+		else if (zi > Box.z-1.0-d) {
+			const float outside_dist = zi - (Box.z-1.0-d);
+			const float force = 0.01*outside_dist;
+			beads[i].f.z -= force;
+		}
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate wall forces:
+// --------------------------------------------------------
+
 __global__ void push_beads_into_nozzle_IBM3D(
 	beadrod* beads,
 	float3 Box,

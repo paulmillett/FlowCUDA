@@ -67,6 +67,8 @@
 # include "../Apps/scsp_3D_rods_fluid.cuh"
 # include "../Apps/scsp_3D_rods_cylinder.cuh"
 # include "../Apps/scsp_3D_rods_cylinder_binary.cuh"
+# include "../Apps/scsp_3D_rods_duct.cuh"
+# include "../Apps/scsp_3D_rods_slit.cuh"
 # include "../Apps/scsp_3D_rods_nozzle.cuh"
 # include "../Apps/scsp_3D_rigid_cylinder_shear.cuh"
 # include "../Apps/scsp_3D_duct_channel.cuh"
@@ -160,6 +162,8 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_rods_fluid") return new scsp_3D_rods_fluid();
 	if (specifier == "scsp_3D_rods_cylinder") return new scsp_3D_rods_cylinder();
 	if (specifier == "scsp_3D_rods_cylinder_binary") return new scsp_3D_rods_cylinder_binary();
+	if (specifier == "scsp_3D_rods_duct") return new scsp_3D_rods_duct();
+	if (specifier == "scsp_3D_rods_slit") return new scsp_3D_rods_slit();
 	if (specifier == "scsp_3D_rods_nozzle") return new scsp_3D_rods_nozzle();
 	if (specifier == "scsp_3D_rigid_cylinder_shear") return new scsp_3D_rigid_cylinder_shear();
 	if (specifier == "scsp_3D_duct_channel") return new scsp_3D_duct_channel();

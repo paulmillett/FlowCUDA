@@ -443,6 +443,35 @@ void class_rods_ibm3D::randomize_rods_cylinder()
 
 
 // --------------------------------------------------------
+// randomize rod positions in duct:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::randomize_rods_duct()
+{
+	
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
+			
+	// assign random position and orientation to each rod:
+	for (int f=0; f<nRods; f++) {
+		float3 shift = make_float3(0.0,0.0,0.0);
+		// get random position
+		float rad = (float)rand()/RAND_MAX*(chRad);
+		float ang = (float)rand()/RAND_MAX*(2*M_PI);
+		shift.x = (float)rand()/RAND_MAX*Box.x;		
+		shift.y = (float)rand()/RAND_MAX*Box.y;
+		shift.z = (float)rand()/RAND_MAX*Box.z;		
+		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
+	}	
+	
+	// copy bead positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);
+		
+}
+
+
+
+// --------------------------------------------------------
 // randomize rod positions in nozzle:
 // --------------------------------------------------------
 
@@ -760,82 +789,6 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 
 
 // --------------------------------------------------------
-// Take step forward for rods IBM (only pushing into
-// cylindrical channel):
-// --------------------------------------------------------
-
-void class_rods_ibm3D::stepIBM_Euler_push_inside_cylinder(int nSteps, float chRad, int nBlocks, int nThreads) 
-{
-		
-	// ----------------------------------------------------------
-	//  Here, the objective is to push rods inside a cylindrical 
-	//  channel.  The Euler algorithm is used to update the 
-	//  rod positions, but no fluid is considered and no inter-rod
-	//  interactions are included.  
-	// ----------------------------------------------------------
-	
-	cout << " " << endl;
-	cout << "Pushing rods inside cylinder..." << endl;
-	cout << " " << endl;
-	
-	for (int i=0; i<nSteps; i++) {
-		// calculate IBM forces:
-		zero_bead_forces(nBlocks,nThreads);
-		zero_rod_forces_torques_moments(nBlocks,nThreads);
-		push_rods_inside_cylinder(chRad,nBlocks,nThreads);	
-		sum_rod_forces_torques_moments(nBlocks,nThreads);	
-	
-		// update IBM positions:
-		enforce_max_rod_force_torque(nBlocks,nThreads);
-		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
-		update_bead_position_rods(nBlocks,nThreads);
-	}
-	
-	cudaDeviceSynchronize(); 
-				
-}
-
-
-
-// --------------------------------------------------------
-// Take step forward for rods IBM (only pushing into
-// cylindrical channel):
-// --------------------------------------------------------
-
-void class_rods_ibm3D::stepIBM_Euler_push_inside_nozzle(int nSteps, float radInlet, float radOutlet, int nBlocks, int nThreads) 
-{
-		
-	// ----------------------------------------------------------
-	//  Here, the objective is to push rods inside a cylindrical 
-	//  channel.  The Euler algorithm is used to update the 
-	//  rod positions, but no fluid is considered and no inter-rod
-	//  interactions are included.  
-	// ----------------------------------------------------------
-	
-	cout << " " << endl;
-	cout << "Pushing rods inside nozzle..." << endl;
-	cout << " " << endl;
-	
-	for (int i=0; i<nSteps; i++) {
-		// calculate IBM forces:
-		zero_bead_forces(nBlocks,nThreads);
-		zero_rod_forces_torques_moments(nBlocks,nThreads);
-		push_rods_inside_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
-		sum_rod_forces_torques_moments(nBlocks,nThreads);	
-	
-		// update IBM positions:
-		enforce_max_rod_force_torque(nBlocks,nThreads);
-		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
-		update_bead_position_rods(nBlocks,nThreads);
-	}
-	
-	cudaDeviceSynchronize(); 
-				
-}
-
-
-
-// --------------------------------------------------------
 // Take step forward for rods IBM:
 // --------------------------------------------------------
 
@@ -891,6 +844,158 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 // cylindrical channel):
 // --------------------------------------------------------
 
+void class_rods_ibm3D::stepIBM_Euler_push_inside_cylinder(int nSteps, float chRad, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  Here, the objective is to push rods inside a cylindrical 
+	//  channel.  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered and no inter-rod
+	//  interactions are included.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Pushing rods inside cylinder..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		push_rods_inside_cylinder(chRad,nBlocks,nThreads);	
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}
+	
+	cudaDeviceSynchronize(); 
+				
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only pushing into
+// rectangular duct):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_push_inside_duct(int nSteps, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  Here, the objective is to push rods inside a cylindrical 
+	//  channel.  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered and no inter-rod
+	//  interactions are included.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Pushing rods inside cylinder..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		push_rods_inside_duct(nBlocks,nThreads);	
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}
+	
+	cudaDeviceSynchronize(); 
+				
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only pushing into
+// rectangular duct):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_push_inside_slit(int nSteps, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  Here, the objective is to push rods inside a cylindrical 
+	//  channel.  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered and no inter-rod
+	//  interactions are included.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Pushing rods inside cylinder..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		push_rods_inside_slit(nBlocks,nThreads);	
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}
+	
+	cudaDeviceSynchronize(); 
+				
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only pushing into
+// cylindrical channel):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_push_inside_nozzle(int nSteps, float radInlet, float radOutlet, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  Here, the objective is to push rods inside a cylindrical 
+	//  channel.  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered and no inter-rod
+	//  interactions are included.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Pushing rods inside nozzle..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		push_rods_inside_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}
+	
+	cudaDeviceSynchronize(); 
+				
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only relaxing inside
+// cylindrical channel):
+// --------------------------------------------------------
+
 void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_cylinder(int nSteps, float chRad, int nBlocks, int nThreads) 
 {
 		
@@ -931,8 +1036,96 @@ void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_cylinder(int nSteps, float ch
 
 
 // --------------------------------------------------------
-// Take step forward for rods IBM (only pushing into
-// cylindrical channel):
+// Take step forward for rods IBM (only relaxing inside
+// rectangular duct):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_duct(int nSteps, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Relaxing rods to eliminate overlap..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// re-build bin lists for rod beads:
+		if (nRods > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}		
+	
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
+		push_rods_inside_duct(nBlocks,nThreads);
+		unwrap_bead_coordinates(nBlocks,nThreads);
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}	
+	
+	cudaDeviceSynchronize();
+				
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only relaxing inside
+// rectangular duct):
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_slit(int nSteps, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  The Euler algorithm is used to update the 
+	//  rod positions, but no fluid is considered.  
+	// ----------------------------------------------------------
+	
+	cout << " " << endl;
+	cout << "Relaxing rods to eliminate overlap..." << endl;
+	cout << " " << endl;
+	
+	for (int i=0; i<nSteps; i++) {
+		// re-build bin lists for rod beads:
+		if (nRods > 1) {
+			reset_bin_lists(nBlocks,nThreads);
+			build_bin_lists(nBlocks,nThreads);
+		}		
+	
+		// calculate IBM forces:
+		zero_bead_forces(nBlocks,nThreads);
+		zero_rod_forces_torques_moments(nBlocks,nThreads);
+		if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
+		push_rods_inside_slit(nBlocks,nThreads);
+		unwrap_bead_coordinates(nBlocks,nThreads);
+		sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+		// update IBM positions:
+		enforce_max_rod_force_torque(nBlocks,nThreads);
+		update_rod_position_orientation_no_fluid(nBlocks,nThreads);
+		update_bead_position_rods(nBlocks,nThreads);
+	}	
+	
+	cudaDeviceSynchronize();
+				
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM (only relaxing inside
+// conical nozzle):
 // --------------------------------------------------------
 
 void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_nozzle(int nSteps, float radInlet, float radOutlet, int nBlocks, int nThreads) 
@@ -1360,7 +1553,6 @@ void class_rods_ibm3D::push_beads_inside_sphere(float xs, float ys, float zs, fl
 
 
 
-
 // --------------------------------------------------------
 // Call to kernel that pushes rods inside a cylinder:
 // --------------------------------------------------------
@@ -1369,6 +1561,30 @@ void class_rods_ibm3D::push_rods_inside_cylinder(float chRad, int nBlocks, int n
 {
 	push_beads_into_cylinder_IBM3D
 	<<<nBlocks,nThreads>>> (beads,Box,chRad,repA,repD,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that pushes rods inside a duct:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::push_rods_inside_duct(int nBlocks, int nThreads)
+{
+	push_beads_into_duct_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that pushes rods inside a slit:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::push_rods_inside_slit(int nBlocks, int nThreads)
+{
+	push_beads_into_slit_IBM3D
+	<<<nBlocks,nThreads>>> (beads,Box,repA,repD,nBeads);
 }
 
 
