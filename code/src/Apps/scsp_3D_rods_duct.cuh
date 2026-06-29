@@ -51,6 +51,7 @@ public:
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
 	float calcInfSum(float,float);
+	void calcRefFlux();
 	
 };
 

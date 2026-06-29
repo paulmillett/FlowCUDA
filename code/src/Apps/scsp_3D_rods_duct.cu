@@ -114,7 +114,7 @@ scsp_3D_rods_duct::scsp_3D_rods_duct() : lbm(),rods()
 	// calculate body-force depending on Re:
 	// ----------------------------------------------
 	
-	// calculate umax and required body force:
+	// calculate umax and required body force: 
 	float h = float(Nz)/2.0;
 	float w = float(Ny)/2.0;	
 	float Dh = 4.0*(4.0*w*h)/(4.0*(w+h));
@@ -129,7 +129,7 @@ scsp_3D_rods_duct::scsp_3D_rods_duct() : lbm(),rods()
 		cout << "nu = " << nu << endl;	
 	}
 	bodyForx = umax*nu*M_PI*M_PI*M_PI/(16.0*w*w*infsum);
-	Q0 = 2.0*bodyForx*h*h*h*w/3.0/nu;  // this may need to be checked!!
+	calcRefFlux();
 		
 	cout << "  " << endl;
 	cout << "Re = " << Re << endl;
@@ -402,6 +402,40 @@ float scsp_3D_rods_duct::calcInfSum(float w, float h)
 		outval += term;
 	}
 	return outval;
+}
+
+
+
+// --------------------------------------------------------
+// Calculate reference flux for the chosen values of w, h,
+// bodyForx, and nu:
+// --------------------------------------------------------
+
+void scsp_3D_rods_duct::calcRefFlux()
+{
+	// parameters:
+	float w = float(Ny)/2.0;
+	float h = float(Nz)/2.0;
+	Q0 = 0.0;
+	
+	// calculate solution for velocity at every
+	// site in the y-z plane:
+	for (int j=0; j<Ny; j++) {
+		for (int k=0; k<Nz; k++) {
+			float y = float(j) - w;
+			float z = float(k) - h;
+			float sumval = 0.0;
+			// take first 40 terms of infinite sum
+			for (int n = 1; n<80; n=n+2) {
+				float nf = float(n);
+				float pref = pow(-1.0,(nf-1.0)/2)/(nf*nf*nf);
+				float term = pref*(1 - cosh(nf*M_PI*z/2/w) / cosh(nf*M_PI*h/2/w)) * cos(nf*M_PI*y/2/w);
+				sumval += term;
+			}
+			float u0 = (16*bodyForx*w*w/nu/pow(M_PI,3))*sumval;
+			Q0 += u0;
+		}
+	}	
 }
 
 

@@ -128,7 +128,7 @@ scsp_3D_rods_slit::scsp_3D_rods_slit() : lbm(),rods()
 		cout << "nu = " << nu << endl;	
 	}
 	bodyForx = 2.0*rho*umax*umax/(Re*h);
-	Q0 = 2.0*bodyForx*h*h*h*w/3.0/nu;  // this may need to be checked!!
+	Q0 = 2.0*bodyForx*h*h*h*(2.0*w)/3.0/nu;
 		
 	cout << "  " << endl;
 	cout << "Re = " << Re << endl;
