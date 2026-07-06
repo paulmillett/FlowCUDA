@@ -46,7 +46,7 @@ class class_rods_ibm3D {
 	int3 pbcFlag;
 	bool binsFlag;
 	bindata bins;
-			
+				
 	// host arrays:
 	beadrod* beadsH;
 	rod* rodsH;
@@ -54,6 +54,7 @@ class class_rods_ibm3D {
 	// device arrays:
 	beadrod* beads;
 	rod* rods;
+	curandState* states;
 	
 	// methods:
 	class_rods_ibm3D();
@@ -79,11 +80,12 @@ class class_rods_ibm3D {
 	void duplicate_rods();	
 	void shift_bead_positions(int,float,float,float);
 	void rotate_and_shift_bead_positions(int,float,float,float);
+	void rotate_and_shift_bead_positions(int,float,float,float,float,float,float);
 	void randomize_rods(float);
 	void randomize_rods_inside_sphere(float,float,float,float,float);
 	void randomize_rods_cylinder();
 	void randomize_rods_duct();
-	void randomize_rods_nozzle(float,float,float);
+	void randomize_rods_nozzle(float,float,float,float);
 	void randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	void semi_randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	float calc_separation_pbc(float3,float3);
@@ -92,12 +94,13 @@ class class_rods_ibm3D {
 	void stepIBM_Euler_push_inside_cylinder(int,float,int,int);
 	void stepIBM_Euler_push_inside_duct(int,int,int);
 	void stepIBM_Euler_push_inside_slit(int,int,int);
-	void stepIBM_Euler_push_inside_nozzle(int,float,float,int,int);
-	void stepIBM_Euler_nozzle_channel(class_scsp_D3Q19&,float,float,int,int);
+	void stepIBM_Euler_push_inside_nozzle(int,float,float,float,int,int);
+	void stepIBM_Euler_nozzle_channel(class_scsp_D3Q19&,float,float,float,int,int);
 	void stepIBM_Euler_relax_rods_in_cylinder(int,float,int,int);
 	void stepIBM_Euler_relax_rods_in_duct(int,int,int);
 	void stepIBM_Euler_relax_rods_in_slit(int,int,int);
-	void stepIBM_Euler_relax_rods_in_nozzle(int,float,float,int,int);
+	void stepIBM_Euler_relax_rods_in_nozzle(int,float,float,float,int,int);
+	void init_rand_kernel(int,int);
 	void zero_rod_forces_torques_moments(int,int);
 	void set_rod_position_orientation(int,int);
 	void update_bead_position_rods(int,int);
@@ -108,6 +111,7 @@ class class_rods_ibm3D {
 	void update_rod_position_orientation_no_fluid(int,int);
 	void update_rod_position_fluid(int,int);
 	void move_rod_back_to_inlet(float,float,int,int);
+	void move_rod_back_to_inlet_random(float,float,float,int,int);
 	void zero_bead_forces(int,int);
 	void enforce_max_bead_force(int,int);
 	void enforce_max_rod_force_torque(int,int);
@@ -125,12 +129,12 @@ class class_rods_ibm3D {
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
 	void compute_wall_forces_cylinder(float,int,int);
-	void compute_wall_forces_nozzle(float,float,int,int);
+	void compute_wall_forces_nozzle(float,float,float,int,int);
 	void push_beads_inside_sphere(float,float,float,float,int,int);
 	void push_rods_inside_cylinder(float,int,int);
 	void push_rods_inside_duct(int,int);
 	void push_rods_inside_slit(int,int);
-	void push_rods_inside_nozzle(float,float,int,int);
+	void push_rods_inside_nozzle(float,float,float,int,int);
 	void write_output(std::string,int);
 	void unwrap_bead_coordinates();
 	bool cylinder_overlap(float3,float3,float,float,float);

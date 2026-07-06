@@ -5,6 +5,21 @@
 
 
 // --------------------------------------------------------
+// 1. Initialization Kernel: Sets up the PRNG state for each thread
+// --------------------------------------------------------
+
+__global__ void init_rand_kernel_IBM3D(
+	curandState *state,
+	unsigned long seed)
+{
+    // Each thread gets same seed, a unique sequence number (i), and no offset
+	int i = blockIdx.x*blockDim.x + threadIdx.x;    
+    curand_init(seed,i,0,&state[i]);
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to zero rod forces, torques, moment of
 // inertia:
 // --------------------------------------------------------
@@ -240,7 +255,7 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 		float3 fltor = Imppt*(shape*E + W)*rods[i].p;
 		rods[i].p += dt*(fltor + rods[i].mobRot*cross(rods[i].t,rods[i].p));		
 		rods[i].p = normalize(rods[i].p);
-					
+							
 	}
 }
 
@@ -325,6 +340,85 @@ __global__ void move_rod_back_to_inlet_IBM3D(
 			rods[i].r.y = ymid + (rods[i].r.y - ymid)*scale;
 			rods[i].r.z = zmid + (rods[i].r.z - zmid)*scale;
 			//rods[i].p = make_float3(1.0,0.0,0.0);
+		}			
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to move rod back to inlet if too close to
+// outlet:
+// --------------------------------------------------------
+
+__global__ void move_rod_back_to_inlet_random_IBM3D(
+	rod* rods,
+	float3 Box,
+	float L0,
+	float lenI,
+	float radI,
+	float radO,
+	int nBeadsPerRod,
+	int nRods,
+	curandState* state)
+{
+	// define rod:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nRods) {
+		
+		float Lrod = float(rods[i].nBeads-1)*L0;  //float(nBeadsPerRod-1)*L0;
+		float offset = Lrod/2.0 + 1.0;
+		
+		// check if rod is too close to outlet (x-dir):
+		if (rods[i].r.x > Box.x - offset) {
+			
+			// Copy random state to local registers:
+		    curandState localState = state[i];
+			
+			// find new rod position & orientation in loading zone:
+			while (true) {
+				
+				// get random position in loading zone:
+				float ran1 = curand_uniform(&localState);
+				float ran2 = curand_uniform(&localState);
+				float ran3 = curand_uniform(&localState);						
+				float xpo = offset + ran1*(lenI - 2*offset);
+				float rad = ran2*(radI);
+				float ang = ran3*(2*M_PI);
+				rods[i].r.x = xpo;
+				rods[i].r.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+				rods[i].r.z = rad*sin(ang) + (Box.z-1.0)/2.0;
+			
+				// get random orientation:
+				float ran4 = curand_uniform(&localState);
+				float ran5 = curand_uniform(&localState);
+				float phi = ran4*(2*M_PI);  // azimuthal angle
+				float psi = 2.0*ran5 - 1.0; // random num from -1 to 1
+				rods[i].p.x = sqrt(1.0-psi*psi)*cos(phi);
+				rods[i].p.y = sqrt(1.0-psi*psi)*sin(phi);
+				rods[i].p.z = psi;
+						
+				// radial position of rod head:
+				float3 head = rods[i].r + offset*rods[i].p;		
+				float ymid = (Box.y-1.0)/2.0;
+				float zmid = (Box.z-1.0)/2.0;
+				float hyi = head.y - ymid;  // distance to channel centerline
+				float hzi = head.z - zmid;  // "                            "
+				float hri = sqrt(hyi*hyi + hzi*hzi);
+						
+				// radial position of rod tail:
+				float3 tail = rods[i].r - offset*rods[i].p;			
+				float tyi = tail.y - ymid;  // distance to channel centerline
+				float tzi = tail.z - zmid;  // "                            "
+				float tri = sqrt(tyi*tyi + tzi*tzi);
+				
+				// if head and tail are inside the radial wall, then exit:
+				if (hri < radI && tri < radI) break;
+				
+			}
+			
+			// save the final updated state back to global memory
+		    state[i] = localState;
 		}			
 	}
 }
@@ -624,6 +718,7 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 __global__ void bead_wall_forces_nozzle_IBM3D(
 	beadrod* beads,
 	float3 Box,
+	float lenIn,
 	float radIn,
 	float radOut,
 	float repA,
@@ -643,8 +738,9 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		const float ri = sqrt(yi*yi + zi*zi);
 		
 		// nozzle radius at bead's position:
-		const float Rad = radIn + (radOut - radIn)*beads[i].r.x/Box.x;
-					
+		float Rad = radIn;
+		if (beads[i].r.x > lenIn) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenIn)/(Box.x-lenIn);
+							
 		// radial wall		
 		if (ri > Rad - d) {			
 			// linear normal force:
@@ -810,6 +906,7 @@ __global__ void push_beads_into_slit_IBM3D(
 __global__ void push_beads_into_nozzle_IBM3D(
 	beadrod* beads,
 	float3 Box,
+	float lenIn,
 	float radIn,
 	float radOut,
 	float repA,
@@ -828,7 +925,8 @@ __global__ void push_beads_into_nozzle_IBM3D(
 		const float ri = sqrt(yi*yi + zi*zi);
 		
 		// nozzle radius at bead's position:
-		const float Rad = radIn + (radOut - radIn)*beads[i].r.x/Box.x;
+		float Rad = radIn;
+		if (beads[i].r.x > lenIn) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenIn)/(Box.x-lenIn);
 		
 		// radial wall		
 		if (ri > Rad - d) {
@@ -882,7 +980,8 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 				
 		float vxLBMi = 0.0;
 		float vyLBMi = 0.0;
-		float vzLBMi = 0.0;		
+		float vzLBMi = 0.0;
+			
 		for (int kk=k0; kk<=k0+1; kk++) {
 			for (int jj=j0; jj<=j0+1; jj++) {
 				for (int ii=i0; ii<=i0+1; ii++) {				
@@ -897,15 +996,15 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 				}
 			}
 		}
-		
+				
 		// --------------------------------------
 		// calculate hydrodynamic forces 
 		// --------------------------------------
 		
-		float fx = (vxLBMi - beads[i].v.x)/dt; // /float(nBeadsPerRod);
-		float fy = (vyLBMi - beads[i].v.y)/dt; // /float(nBeadsPerRod);
-		float fz = (vzLBMi - beads[i].v.z)/dt; // /float(nBeadsPerRod);
-				
+		float fx = (vxLBMi - beads[i].v.x)/dt/100.0; // /float(nBeadsPerRod);
+		float fy = (vyLBMi - beads[i].v.y)/dt/100.0; // /float(nBeadsPerRod);
+		float fz = (vzLBMi - beads[i].v.z)/dt/100.0; // /float(nBeadsPerRod);
+						
 		// --------------------------------------
 		// distribute the !negative! of the 
 		// hydrodynamic bead force to the LBM

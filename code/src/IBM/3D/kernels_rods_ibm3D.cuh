@@ -9,6 +9,11 @@
 # include "../../Utils/helper_math.h"
 
 
+__global__ void init_rand_kernel_IBM3D(
+	curandState *state, 
+    unsigned long seed);
+
+
 __global__ void zero_rod_forces_torques_moments_IBM3D(
 	rod*,	
 	int);
@@ -96,6 +101,18 @@ __global__ void move_rod_back_to_inlet_IBM3D(
 	float,
 	int,
 	int);
+	
+	
+__global__ void move_rod_back_to_inlet_random_IBM3D(
+	rod*,
+	float3,
+	float,
+	float,
+	float,
+	float,
+	int,
+	int,
+	curandState*);
 
 
 __global__ void sum_rod_forces_torques_moments_IBM3D(
@@ -169,6 +186,7 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 	float,
 	float,
 	float,
+	float,
 	int);
 
 
@@ -209,6 +227,7 @@ __global__ void push_beads_into_slit_IBM3D(
 __global__ void push_beads_into_nozzle_IBM3D(
 	beadrod*,
 	float3,
+	float,
 	float,
 	float,
 	float,

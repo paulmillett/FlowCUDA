@@ -111,6 +111,7 @@ void class_rods_ibm3D::allocate()
 	// allocate array memory (device):	
 	cudaMalloc((void **) &beads, nBeads*sizeof(beadrod));
 	cudaMalloc((void **) &rods, nRods*sizeof(rod));
+	cudaMalloc((void **) &states, nRods*sizeof(curandState));
 	if (binsFlag) {		
 		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
 		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
@@ -475,7 +476,7 @@ void class_rods_ibm3D::randomize_rods_duct()
 // randomize rod positions in nozzle:
 // --------------------------------------------------------
 
-void class_rods_ibm3D::randomize_rods_nozzle(float radInlet, float radOutlet, float Lrod)
+void class_rods_ibm3D::randomize_rods_nozzle(float lenInlet, float radInlet, float radOutlet, float Lrod)
 {
 	// copy bead positions from device to host:
 	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
@@ -490,7 +491,8 @@ void class_rods_ibm3D::randomize_rods_nozzle(float radInlet, float radOutlet, fl
 		float xpos,chRadLocal,randNum;
 		do {
 			xpos = 0.55*Lrod + (float)rand()/RAND_MAX*(Box.x-2.0*Lrod);
-			chRadLocal = radInlet + (radOutlet - radInlet)*(xpos/Box.x);
+			if (xpos <= lenInlet) chRadLocal = radInlet;
+			if (xpos >  lenInlet) chRadLocal = radInlet + (radOutlet - radInlet)*(xpos-lenInlet)/(Box.x-lenInlet);
 			randNum = (float)rand()/RAND_MAX;
 		} while (randNum > chRadLocal/radInlet);
 		
@@ -677,6 +679,31 @@ void class_rods_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float
 
 
 // --------------------------------------------------------
+// Shift IBM start positions by specified amount:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float ysh, float zsh, float a, float b, float g)
+{
+	// update node positions:
+	int istr = rodsH[fID].indxB0;
+	int iend = istr + rodsH[fID].nBeads;
+	
+	for (int i=istr; i<iend; i++) {
+		// rotate:
+		float xrot = beadsH[i].r.x*(cos(a)*cos(b)) + beadsH[i].r.y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + beadsH[i].r.z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
+		float yrot = beadsH[i].r.x*(sin(a)*cos(b)) + beadsH[i].r.y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + beadsH[i].r.z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
+		float zrot = beadsH[i].r.x*(-sin(b))       + beadsH[i].r.y*(cos(b)*sin(g))                      + beadsH[i].r.z*(cos(b)*cos(g));
+		// shift:		 
+		beadsH[i].r.x = xrot + xsh;
+		beadsH[i].r.y = yrot + ysh;
+		beadsH[i].r.z = zrot + zsh;
+		beadsH[i].rm1 = beadsH[i].r;
+	}
+}
+
+
+
+// --------------------------------------------------------
 // Calculate wall forces:
 // --------------------------------------------------------
 
@@ -792,7 +819,7 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 // Take step forward for rods IBM:
 // --------------------------------------------------------
 
-void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float radInlet, float radOutlet, int nBlocks, int nThreads) 
+void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float lenInlet, float radInlet, float radOutlet, int nBlocks, int nThreads) 
 {
 		
 	// ----------------------------------------------------------
@@ -821,7 +848,7 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
 	if (nRods > 1) nonbonded_bead_interactions_with_friction(nBlocks,nThreads); 
-	compute_wall_forces_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
+	compute_wall_forces_nozzle(lenInlet,radInlet,radOutlet,nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_rod_forces_torques_moments(nBlocks,nThreads);	
 	
@@ -829,11 +856,12 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	enforce_max_rod_force_torque(nBlocks,nThreads);
 	update_rod_position_orientation_fluid(nBlocks,nThreads);
 	move_rod_back_to_inlet(radInlet,radOutlet,nBlocks,nThreads);
+	//move_rod_back_to_inlet_random(lenInlet,radInlet,radOutlet,nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	update_bead_velocity_rods(nBlocks,nThreads);
 	
 	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
-	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);	
+	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);
 			
 }
 
@@ -958,7 +986,7 @@ void class_rods_ibm3D::stepIBM_Euler_push_inside_slit(int nSteps, int nBlocks, i
 // cylindrical channel):
 // --------------------------------------------------------
 
-void class_rods_ibm3D::stepIBM_Euler_push_inside_nozzle(int nSteps, float radInlet, float radOutlet, int nBlocks, int nThreads) 
+void class_rods_ibm3D::stepIBM_Euler_push_inside_nozzle(int nSteps, float lenInlet, float radInlet, float radOutlet, int nBlocks, int nThreads) 
 {
 		
 	// ----------------------------------------------------------
@@ -976,7 +1004,7 @@ void class_rods_ibm3D::stepIBM_Euler_push_inside_nozzle(int nSteps, float radInl
 		// calculate IBM forces:
 		zero_bead_forces(nBlocks,nThreads);
 		zero_rod_forces_torques_moments(nBlocks,nThreads);
-		push_rods_inside_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
+		push_rods_inside_nozzle(lenInlet,radInlet,radOutlet,nBlocks,nThreads);	
 		sum_rod_forces_torques_moments(nBlocks,nThreads);	
 	
 		// update IBM positions:
@@ -1128,7 +1156,7 @@ void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_slit(int nSteps, int nBlocks,
 // conical nozzle):
 // --------------------------------------------------------
 
-void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_nozzle(int nSteps, float radInlet, float radOutlet, int nBlocks, int nThreads) 
+void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_nozzle(int nSteps, float lenInlet, float radInlet, float radOutlet, int nBlocks, int nThreads) 
 {
 		
 	// ----------------------------------------------------------
@@ -1151,7 +1179,7 @@ void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_nozzle(int nSteps, float radI
 		zero_bead_forces(nBlocks,nThreads);
 		zero_rod_forces_torques_moments(nBlocks,nThreads);
 		if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads); 
-		push_rods_inside_nozzle(radInlet,radOutlet,nBlocks,nThreads);	
+		push_rods_inside_nozzle(lenInlet,radInlet,radOutlet,nBlocks,nThreads);	
 		unwrap_bead_coordinates(nBlocks,nThreads);
 		sum_rod_forces_torques_moments(nBlocks,nThreads);	
 	
@@ -1189,6 +1217,17 @@ void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_nozzle(int nSteps, float radI
 
 
 
+
+
+// --------------------------------------------------------
+// Call to "zero_rod_forces_torques_moments_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::init_rand_kernel(int nBlocks, int nThreads)
+{
+	init_rand_kernel_IBM3D
+	<<<nBlocks,nThreads>>> (states,1234ULL);
+}
 
 
 
@@ -1319,13 +1358,25 @@ void class_rods_ibm3D::update_rod_position_fluid(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
-// Call to "update_rod_position_fluid_IBM3D" kernel: 
+// Call to "move_rod_back_to_inlet_IBM3D" kernel: 
 // --------------------------------------------------------
 
 void class_rods_ibm3D::move_rod_back_to_inlet(float radInlet, float radOutlet, int nBlocks, int nThreads)
 {
 	move_rod_back_to_inlet_IBM3D
 	<<<nBlocks,nThreads>>> (rods,Box,L0,radInlet,radOutlet,nBeadsPerRod,nRods);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "move_rod_back_to_inlet_random_IBM3D" kernel: 
+// --------------------------------------------------------
+
+void class_rods_ibm3D::move_rod_back_to_inlet_random(float lenInlet, float radInlet, float radOutlet, int nBlocks, int nThreads)
+{
+	move_rod_back_to_inlet_random_IBM3D
+	<<<nBlocks,nThreads>>> (rods,Box,L0,lenInlet,radInlet,radOutlet,nBeadsPerRod,nRods,states);	
 }
 
 
@@ -1532,10 +1583,10 @@ void class_rods_ibm3D::compute_wall_forces_cylinder(float chRad, int nBlocks, in
 // direction for nozzle channel:
 // --------------------------------------------------------
 
-void class_rods_ibm3D::compute_wall_forces_nozzle(float radInlet, float radOutlet, int nBlocks, int nThreads)
+void class_rods_ibm3D::compute_wall_forces_nozzle(float lenInlet, float radInlet, float radOutlet, int nBlocks, int nThreads)
 {
 	bead_wall_forces_nozzle_IBM3D
-	<<<nBlocks,nThreads>>> (beads,Box,radInlet,radOutlet,repWall,repD/2.0,fricWall,nBeads);
+	<<<nBlocks,nThreads>>> (beads,Box,lenInlet,radInlet,radOutlet,repWall,repD/2.0,fricWall,nBeads);
 }
 
 
@@ -1593,10 +1644,10 @@ void class_rods_ibm3D::push_rods_inside_slit(int nBlocks, int nThreads)
 // Call to kernel that pushes rods inside a cylinder:
 // --------------------------------------------------------
 
-void class_rods_ibm3D::push_rods_inside_nozzle(float radInlet, float radOutlet, int nBlocks, int nThreads)
+void class_rods_ibm3D::push_rods_inside_nozzle(float lenInlet, float radInlet, float radOutlet, int nBlocks, int nThreads)
 {
 	push_beads_into_nozzle_IBM3D
-	<<<nBlocks,nThreads>>> (beads,Box,radInlet,radOutlet,repA,repD,nBeads);
+	<<<nBlocks,nThreads>>> (beads,Box,lenInlet,radInlet,radOutlet,repA,repD,nBeads);
 }
 
 

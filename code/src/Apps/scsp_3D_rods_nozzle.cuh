@@ -38,6 +38,7 @@ private:
 	float Drod;
 	float radInlet;
 	float radOutlet;
+	float lenInlet;
 	float Q0;
 	bool initRandom;
 	
