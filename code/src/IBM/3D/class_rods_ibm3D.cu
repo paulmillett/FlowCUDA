@@ -855,8 +855,8 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	// update IBM positions:
 	enforce_max_rod_force_torque(nBlocks,nThreads);
 	update_rod_position_orientation_fluid(nBlocks,nThreads);
-	move_rod_back_to_inlet(radInlet,radOutlet,nBlocks,nThreads);
-	//move_rod_back_to_inlet_random(lenInlet,radInlet,radOutlet,nBlocks,nThreads);
+	//move_rod_back_to_inlet(radInlet,radOutlet,nBlocks,nThreads);
+	move_rod_back_to_inlet_random(lenInlet,radInlet,radOutlet,nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	update_bead_velocity_rods(nBlocks,nThreads);
 	
@@ -1226,7 +1226,7 @@ void class_rods_ibm3D::stepIBM_Euler_relax_rods_in_nozzle(int nSteps, float lenI
 void class_rods_ibm3D::init_rand_kernel(int nBlocks, int nThreads)
 {
 	init_rand_kernel_IBM3D
-	<<<nBlocks,nThreads>>> (states,1234ULL);
+	<<<nBlocks,nThreads>>> (states,1234ULL,nRods);
 }
 
 

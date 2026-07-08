@@ -10,11 +10,12 @@
 
 __global__ void init_rand_kernel_IBM3D(
 	curandState *state,
-	unsigned long seed)
+	unsigned long seed,
+	int nRods)
 {
     // Each thread gets same seed, a unique sequence number (i), and no offset
-	int i = blockIdx.x*blockDim.x + threadIdx.x;    
-    curand_init(seed,i,0,&state[i]);
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nRods) curand_init(seed,i,0,&state[i]);
 }
 
 
@@ -255,7 +256,7 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 		float3 fltor = Imppt*(shape*E + W)*rods[i].p;
 		rods[i].p += dt*(fltor + rods[i].mobRot*cross(rods[i].t,rods[i].p));		
 		rods[i].p = normalize(rods[i].p);
-							
+									
 	}
 }
 

@@ -11,7 +11,8 @@
 
 __global__ void init_rand_kernel_IBM3D(
 	curandState *state, 
-    unsigned long seed);
+    unsigned long seed,
+	int);
 
 
 __global__ void zero_rod_forces_torques_moments_IBM3D(

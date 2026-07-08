@@ -258,7 +258,7 @@ void scsp_3D_rods_nozzle::initSystem()
 	// set the random number seed: 
 	// ----------------------------------------------
 	
-	//srand(time(NULL));
+	srand(time(NULL));
 	
 	// ----------------------------------------------
 	// set the random number seed for kernels
