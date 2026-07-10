@@ -188,6 +188,7 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 	float,
 	float,
 	float,
+	float,
 	int);
 
 

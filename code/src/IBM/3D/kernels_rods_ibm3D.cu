@@ -725,12 +725,13 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 	float repA,
 	float repD,
 	float fric,
+	float lubforceMax,
 	int nBeads)
 {
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
-		const float d = repD;
+		const float d = repD;                  // this should be = bead radius
 		const float A = repA;
 		const float ymid = (Box.y-1.0)/2.0;
 		const float zmid = (Box.z-1.0)/2.0;
@@ -741,15 +742,35 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		// nozzle radius at bead's position:
 		float Rad = radIn;
 		if (beads[i].r.x > lenIn) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenIn)/(Box.x-lenIn);
-							
-		// radial wall		
+		
+		// lubrication force with wall
+		if (ri > (Rad - 2*d) && ri < (Rad - d)) {
+			float nu = 0.1666666667;
+			float gap = Rad - ri - d;
+			// normal lubrication force:
+			float gapMax = d;
+			float invgap = 1.0/gap - 1.0/gapMax;			
+			float velN = beads[i].v.y*(yi/ri) + beads[i].v.z*(zi/ri);
+			float lubforceN = 6.0*M_PI*nu*d*d*invgap*velN;
+			float lubforceNmag = abs(lubforceN);
+			if (lubforceNmag > lubforceMax) lubforceN *= (lubforceMax/lubforceNmag);
+			beads[i].f.y -= lubforceN*(yi/ri);
+			beads[i].f.z -= lubforceN*(zi/ri);
+			// tangential lubrication force:
+			float velT = beads[i].v.x;
+			float lubforceT = 6.0*M_PI*nu*d*log(d/gap)*velT;
+			float lubforceTmag = abs(lubforceT);
+			if (lubforceTmag > lubforceMax) lubforceT *= (lubforceMax/lubforceTmag);
+			beads[i].f.x -= lubforceT;
+		}
+		
+		// contact force with wall		
 		if (ri > Rad - d) {			
 			// linear normal force:
 			const float delta = (ri + d) - Rad;  // distance protruding into wall
 			const float force = A*delta;
 			beads[i].f.y -= force*(yi/ri);
-			beads[i].f.z -= force*(zi/ri);
-			
+			beads[i].f.z -= force*(zi/ri);			
 			// friction force:
 			beads[i].f.x -= fric*force;	
 		}				

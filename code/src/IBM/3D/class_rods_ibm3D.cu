@@ -1586,7 +1586,7 @@ void class_rods_ibm3D::compute_wall_forces_cylinder(float chRad, int nBlocks, in
 void class_rods_ibm3D::compute_wall_forces_nozzle(float lenInlet, float radInlet, float radOutlet, int nBlocks, int nThreads)
 {
 	bead_wall_forces_nozzle_IBM3D
-	<<<nBlocks,nThreads>>> (beads,Box,lenInlet,radInlet,radOutlet,repWall,repD/2.0,fricWall,nBeads);
+	<<<nBlocks,nThreads>>> (beads,Box,lenInlet,radInlet,radOutlet,repWall,repD/2.0,fricWall,lubforceMax,nBeads);
 }
 
 
