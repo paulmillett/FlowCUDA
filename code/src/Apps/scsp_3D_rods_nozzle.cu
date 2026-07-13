@@ -3,6 +3,10 @@
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
+# include <iomanip>
+# include <fstream>
+# include <string>
+# include <sstream>
 using namespace std;  
 
 
@@ -32,6 +36,7 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	lenInlet = inputParams("Lattice/lenInlet",0.0);
 	radInlet = inputParams("Lattice/radInlet",float(Nz-1)/2.0);
 	radOutlet = inputParams("Lattice/radOutlet",float(Nz-1)/2.0);
+	lenCylinder = inputParams("Lattice/lenCylinder",0.0); 
 	
 	// ----------------------------------------------
 	// GPU parameters:
@@ -77,9 +82,9 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	// ----------------------------------------------
 	
 	float Vp = float(nRods)*(M_PI*Drod*Drod*Lrod/4.0);
-	float Vnozzle = M_PI*(float(Nx)-lenInlet)*(radInlet*radInlet + radOutlet*radOutlet + radInlet*radOutlet)/3.0;
-	float Vloadzn = M_PI*(lenInlet)*(radInlet*radInlet);
-	float V = Vnozzle + Vloadzn;
+	float Vnozzle = M_PI*(float(Nx)-lenCylinder)*(radInlet*radInlet + radOutlet*radOutlet + radInlet*radOutlet)/3.0;
+	float Vcylind = M_PI*(lenCylinder)*(radInlet*radInlet);
+	float V = Vnozzle + Vcylind;
 	float phi = Vp/V;
 	cout << " " << endl;
 	cout << "particle volume fraction = " << phi << endl;
@@ -142,6 +147,12 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	cout << "Q0 = " << Q0 << endl; 
 	cout << "  " << endl;	
 	
+	// ----------------------------------------------
+	// write VTK file for nozzle wall viz:
+	// ----------------------------------------------
+	
+	nozzleWallVTKFile();
+	
 }
 
 
@@ -183,7 +194,7 @@ void scsp_3D_rods_nozzle::initSystem()
 				int Si = 0;				
 				// set up solid walls (loading zone + conical nozzle)
 				float chRad = radInlet;
-				if (float(i) > lenInlet) chRad = radInlet + (radOutlet - radInlet)*(float(i)-lenInlet)/(float(Nx)-lenInlet);
+				if (float(i) > lenCylinder) chRad = radInlet + (radOutlet - radInlet)*(float(i)-lenCylinder)/(float(Nx)-lenCylinder);
 				float y = float(j) - float(Ny-1)/2.0;
 				float z = float(k) - float(Nz-1)/2.0;
 				if ((y*y + z*z)/chRad/chRad > 1.0) Si = 1;				
@@ -275,7 +286,7 @@ void scsp_3D_rods_nozzle::initSystem()
 	string initStruct = inputParams("IBM_RODS/initStruct","random");
 	
 	if (initStruct == "random") {
-		if (nRods > 1) rods.randomize_rods_nozzle(lenInlet,radInlet,radOutlet,Lrod); 
+		if (nRods > 1) rods.randomize_rods_nozzle(lenCylinder,radInlet,radOutlet,Lrod); 
 		if (nRods == 1) {
 			rods.rotate_and_shift_bead_positions(0,154.0,25.0,33.0,0.0,M_PI/2,0.0);
 			rods.memcopy_host_to_device();
@@ -294,10 +305,10 @@ void scsp_3D_rods_nozzle::initSystem()
 	// ----------------------------------------------
 		
 	if (initStruct == "random"){
-		rods.stepIBM_Euler_push_inside_nozzle(1000,lenInlet,radInlet,radOutlet,nBlocks,nThreads);
+		rods.stepIBM_Euler_push_inside_nozzle(1000,lenCylinder,radInlet,radOutlet,nBlocks,nThreads);
 	}
 	
-	rods.stepIBM_Euler_relax_rods_in_nozzle(1000,lenInlet,radInlet,radOutlet,nBlocks,nThreads);
+	rods.stepIBM_Euler_relax_rods_in_nozzle(1000,lenCylinder,radInlet,radOutlet,nBlocks,nThreads);
 		
 	// ----------------------------------------------
 	// write initial output file:
@@ -346,7 +357,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler_nozzle_channel(lbm,lenInlet,radInlet,radOutlet,nBlocks,nThreads);
+			rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);	
 			cudaDeviceSynchronize();
@@ -363,7 +374,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		rods.stepIBM_Euler_nozzle_channel(lbm,lenInlet,radInlet,radOutlet,nBlocks,nThreads);
+		rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);
 		cudaDeviceSynchronize();
@@ -417,6 +428,84 @@ void scsp_3D_rods_nozzle::writeOutput(std::string tagname, int step)
 			rods.write_output("rods",step);
 		}
 	}	
+}
+
+
+
+// --------------------------------------------------------
+// Write a VTK file for a quad mesh corresponding to the nozzle
+// wall geometry:
+// --------------------------------------------------------
+
+void scsp_3D_rods_nozzle::nozzleWallVTKFile()
+{				
+	
+	// decide the mesh resolution:
+	int nVertsX = Nx;
+	int nVertsR = 360;
+	int nVerts = nVertsX*nVertsR;
+	int nQuads = nVertsR*(nVertsX-1);
+	
+	// arrays:
+	float3* vertices = (float3*)std::malloc(nVerts*sizeof(float3));
+	int4* quads = (int4*)std::malloc(nQuads*sizeof(int4));
+		
+	// vertex positions:
+	for (int i=0; i<nVertsX; i++) {
+		for (int r=0; r<nVertsR; r++) {
+			float xv = float(i);
+			float angle = float(r)/float(nVertsR)*2.0*M_PI;
+			float rad = radInlet;
+			if (xv > lenCylinder) rad = radInlet + (radOutlet - radInlet)*(float(i)-lenCylinder)/(float(Nx)-lenCylinder);
+			float yv = rad*cos(angle);
+			float zv = rad*sin(angle);
+			vertices[i*nVertsR+r].x = xv;
+			vertices[i*nVertsR+r].y = yv + float(Ny-1)/2.0;
+			vertices[i*nVertsR+r].z = zv + float(Nz-1)/2.0;
+		}
+	}
+	
+	// calculate the 4 vertices for each quad element:
+	for (int i=0; i<nVertsX-1; i++) {
+		for (int r=0; r<nVertsR; r++) {
+			int next_r = (r + 1)%nVertsR;
+			int bottom_left = i*nVertsR + r;
+			int bottom_right = i*nVertsR + next_r;
+			int top_left  = (i + 1)*nVertsR + r;
+			int top_right = (i + 1)*nVertsR + next_r;
+			quads[i*nVertsR+r].x = bottom_left;
+			quads[i*nVertsR+r].y = bottom_right;
+			quads[i*nVertsR+r].z = top_right;
+			quads[i*nVertsR+r].w = top_left;
+		}
+	}
+	
+	// write the VTK file:
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/nozzle_geo.vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing IBM data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET POLYDATA" << endl;			
+	
+	outfile << " " << endl;	
+	outfile << "POINTS " << nVerts << " float" << endl;
+	for (int i=0; i<nVerts; i++) {
+		outfile << fixed << setprecision(3) << vertices[i].x << "  " << vertices[i].y << "  " << vertices[i].z << endl;
+	}
+		
+	outfile << " " << endl;
+	outfile << "POLYGONS " << nQuads << " " << 5*nQuads << endl;
+	for (int i=0; i<nQuads; i++) {
+		outfile << 4 << " " << quads[i].x << " " << quads[i].y << " " << quads[i].z << " " << quads[i].w << endl;
+	}
+
 }
 
 

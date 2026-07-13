@@ -95,7 +95,7 @@ class class_rods_ibm3D {
 	void stepIBM_Euler_push_inside_duct(int,int,int);
 	void stepIBM_Euler_push_inside_slit(int,int,int);
 	void stepIBM_Euler_push_inside_nozzle(int,float,float,float,int,int);
-	void stepIBM_Euler_nozzle_channel(class_scsp_D3Q19&,float,float,float,int,int);
+	void stepIBM_Euler_nozzle_channel(class_scsp_D3Q19&,float,float,float,float,int,int);
 	void stepIBM_Euler_relax_rods_in_cylinder(int,float,int,int);
 	void stepIBM_Euler_relax_rods_in_duct(int,int,int);
 	void stepIBM_Euler_relax_rods_in_slit(int,int,int);

@@ -39,6 +39,7 @@ private:
 	float radInlet;
 	float radOutlet;
 	float lenInlet;
+	float lenCylinder;
 	float Q0;
 	bool initRandom;
 	
@@ -53,6 +54,7 @@ public:
 	void initSystem();
 	void cycleForward(int,int);
 	void writeOutput(std::string,int);
+	void nozzleWallVTKFile();
 	
 };
 

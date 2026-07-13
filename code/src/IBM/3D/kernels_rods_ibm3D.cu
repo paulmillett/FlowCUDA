@@ -719,7 +719,7 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 __global__ void bead_wall_forces_nozzle_IBM3D(
 	beadrod* beads,
 	float3 Box,
-	float lenIn,
+	float lenCyl,
 	float radIn,
 	float radOut,
 	float repA,
@@ -741,7 +741,7 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		
 		// nozzle radius at bead's position:
 		float Rad = radIn;
-		if (beads[i].r.x > lenIn) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenIn)/(Box.x-lenIn);
+		if (beads[i].r.x > lenCyl) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenCyl)/(Box.x-lenCyl);
 		
 		// lubrication force with wall
 		if (ri > (Rad - 2*d) && ri < (Rad - d)) {
@@ -928,7 +928,7 @@ __global__ void push_beads_into_slit_IBM3D(
 __global__ void push_beads_into_nozzle_IBM3D(
 	beadrod* beads,
 	float3 Box,
-	float lenIn,
+	float lenCyl,
 	float radIn,
 	float radOut,
 	float repA,
@@ -948,7 +948,7 @@ __global__ void push_beads_into_nozzle_IBM3D(
 		
 		// nozzle radius at bead's position:
 		float Rad = radIn;
-		if (beads[i].r.x > lenIn) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenIn)/(Box.x-lenIn);
+		if (beads[i].r.x > lenCyl) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenCyl)/(Box.x-lenCyl);
 		
 		// radial wall		
 		if (ri > Rad - d) {
@@ -1503,7 +1503,7 @@ __device__ inline void pairwise_bead_interaction_forces_with_friction(
 	const float r = length(rij);	
 	const float Ri = 0.5*repD;  // bead radius
 	const float Rj = 0.5*repD;  // bead radius 
-	const float gapMax = 0.05;  // max gap for lubrication forces
+	const float gapMax = 0.25;  // 0.05 (max gap for lubrication forces)
 	const float cutoff = Ri + Rj + gapMax;		
 		
 	// interaction range:
