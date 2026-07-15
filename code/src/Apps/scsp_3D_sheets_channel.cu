@@ -66,7 +66,6 @@ scsp_3D_sheets_channel::scsp_3D_sheets_channel() : lbm(),ibm()
 	a = inputParams("IBM/a",10.0);
 	float Ca = inputParams("IBM/Ca",1.0);
 	float ksmax = inputParams("IBM/ksmax",0.002);
-	gam = inputParams("IBM/gamma",0.1);
 	ibmFile = inputParams("IBM/ibmFile","sphere.dat");
 	ibmUpdate = inputParams("IBM/ibmUpdate","verlet");
 	initRandom = inputParams("IBM/initRandom",1);
@@ -109,6 +108,21 @@ scsp_3D_sheets_channel::scsp_3D_sheets_channel() : lbm(),ibm()
 	// calculate membrane properties:
 	// ----------------------------------------------
 	
+	float ks = inputParams("IBM/ks",0.0);
+	float kb = inputParams("IBM/kb",0.0);
+	float ka = inputParams("IBM/ka",0.0);
+	ibm.set_sheets_mechanical_props(ks,kb,ka);
+	
+	
+	
+	/*
+	ibm.set_cells_mechanical_props(ks,kb,kv,C,Ca);
+	
+	cout << "  " << endl;
+	cout << "ks = " << ks << endl;
+	cout << "kb = " << kb << endl;
+	cout << "ka = " << ka << endl;
+	
 	cellProps = inputParams("IBM/cellProps","uniform");
 	float stddevCa = inputParams("IBM/stddevCa",0.0);
 	float Kv = inputParams("IBM/kv",0.0);
@@ -119,6 +133,7 @@ scsp_3D_sheets_channel::scsp_3D_sheets_channel() : lbm(),ibm()
 			
 	// set the mechanical properties:
 	ibm.calculate_cell_membrane_props(Re,Ca,stddevCa,a,h,rho,umax,Kv,C,cellProps);	
+	*/
 	
 	// ----------------------------------------------
 	// calculate body-force depending on Re:
@@ -230,15 +245,7 @@ void scsp_3D_sheets_channel::initSystem()
 	ibm.duplicate_cells();
 	ibm.assign_cellIDs_to_nodes();
 	ibm.assign_refNode_to_cells();	
-	
-	// ----------------------------------------------			
-	// rescale capsule sizes for normal distribution: 
-	// ----------------------------------------------
-	
-	cellSizes = inputParams("IBM/cellSizes","uniform");
-	float stddevA = inputParams("IBM/stddevA",0.0);
-	ibm.rescale_cell_radii(a,stddevA,cellSizes);	
-					
+						
 	// ----------------------------------------------
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
@@ -262,7 +269,8 @@ void scsp_3D_sheets_channel::initSystem()
 	// calculate rest geometries for membrane: 
 	// ----------------------------------------------
 	
-	ibm.rest_geometries_skalak(nBlocks,nThreads);
+	//ibm.rest_geometries_skalak(nBlocks,nThreads);
+	ibm.rest_geometries_spring(nBlocks,nThreads);
 	
 	// ----------------------------------------------
 	// set the random number seed: 

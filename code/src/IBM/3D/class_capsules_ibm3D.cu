@@ -327,6 +327,16 @@ void class_capsules_ibm3D::set_cells_mechanical_props(float ks, float kb, float 
 	}
 }
 
+void class_capsules_ibm3D::set_sheets_mechanical_props(float ks, float kb, float ka_in)
+{
+	// set props for ALL sheets:
+	for (int c=0; c<nCells; c++) {
+		cellsH[c].ks = ks;
+		cellsH[c].kb = kb;
+	}
+	ka = ka_in;
+}
+
 void class_capsules_ibm3D::set_cell_mechanical_props(int cID, float ks, float kb, float kv, float C, float Ca)
 {
 	// set props for ONE cell:
@@ -1535,7 +1545,8 @@ void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, in
 		build_bin_lists(nBlocks,nThreads);
 			
 		// update IBM:
-		compute_node_forces_skalak_sheets(nBlocks,nThreads);
+		//compute_node_forces_skalak_sheets(nBlocks,nThreads);
+		compute_node_forces_spring_sheets(nBlocks,nThreads);
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
 		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
 		
@@ -1568,7 +1579,8 @@ void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, in
 		build_bin_lists(nBlocks,nThreads);
 			
 		// update IBM:
-		compute_node_forces_skalak_sheets(nBlocks,nThreads);
+		//compute_node_forces_skalak_sheets(nBlocks,nThreads);
+		compute_node_forces_spring_sheets(nBlocks,nThreads);
 		nonbonded_node_interactions(nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
@@ -2100,6 +2112,45 @@ void class_capsules_ibm3D::compute_node_forces_skalak_sheets(int nBlocks, int nT
 	compute_node_force_membrane_skalak_IBM3D
 	<<<nBlocks,nThreads>>> (faces,nodes,cells,nFaces);
 	
+	// Fourth, compute the bending force for each edge:		
+	compute_node_force_membrane_bending_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);
+					
+	// Sixth, re-wrap node coordinates:
+	wrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,Box,pbcFlag,nNodes);
+			
+}
+
+
+
+// --------------------------------------------------------
+// Calls to kernels that compute forces on nodes based 
+// on the membrane mechanics model (Spring model).  This
+// one assumes elastic sheets, so volume correction is
+// turned off:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::compute_node_forces_spring_sheets(int nBlocks, int nThreads)
+{
+	// First, zero the node forces and the cell volumes:
+	zero_node_forces_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,nNodes);
+			
+	zero_cell_volumes_IBM3D
+	<<<nBlocks,nThreads>>> (cells,nCells);
+	
+	// Second, unwrap node coordinates:
+	unwrap_node_coordinates_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,cells,Box,pbcFlag,nNodes);	
+					
+	// Third, compute the Spring forces for each face:
+	compute_node_force_membrane_area_IBM3D
+	<<<nBlocks,nThreads>>> (faces,nodes,cells,ka,nFaces);
+	
+	compute_node_force_membrane_edge_IBM3D
+	<<<nBlocks,nThreads>>> (nodes,edges,ks,nEdges);
+		
 	// Fourth, compute the bending force for each edge:		
 	compute_node_force_membrane_bending_IBM3D
 	<<<nBlocks,nThreads>>> (faces,nodes,edges,cells,nEdges);

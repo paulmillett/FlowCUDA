@@ -779,6 +779,10 @@ __global__ void compute_node_force_membrane_neohookian_IBM3D(
 
 
 
+
+
+
+
 // --------------------------------------------------------
 // IBM3D kernel to compute force on node based on the 
 // membrane model of Jancigova et al (Int. J. Numer. Meth.

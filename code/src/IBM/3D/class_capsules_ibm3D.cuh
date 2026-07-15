@@ -77,6 +77,7 @@ class class_capsules_ibm3D {
 	void set_kag(float);
 	void set_C(float);
 	void set_cells_mechanical_props(float,float,float,float,float);
+	void set_sheets_mechanical_props(float,float,float);
 	void set_cell_mechanical_props(int,float,float,float,float,float);
 	void set_cells_radii(float);
 	void set_cell_radius(int,float);
@@ -145,6 +146,7 @@ class class_capsules_ibm3D {
 	void compute_node_forces_skalak(int,int);
 	void compute_node_forces_skalak_Janus(float,float,int,int);
 	void compute_node_forces_skalak_sheets(int,int);
+	void compute_node_forces_spring_sheets(int,int);
 	void compute_node_forces_neohookian_sheets(int,int);
 	void compute_node_forces_FENE(float,int,int);
 	void wall_forces_ydir(int,int);
