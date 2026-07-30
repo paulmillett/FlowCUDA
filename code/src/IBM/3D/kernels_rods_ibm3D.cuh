@@ -23,6 +23,10 @@ __global__ void zero_rod_forces_torques_moments_IBM3D(
 __global__ void zero_bead_forces_IBM3D(
 	beadrod*,	
 	int);
+
+
+__global__ void zero_stresslet_IBM3D(
+	tensor*);
 	
 
 __global__ void set_rod_position_orientation_IBM3D(
@@ -120,6 +124,14 @@ __global__ void sum_rod_forces_torques_moments_IBM3D(
 	beadrod*,
 	rod*,
 	int,	
+	int);
+
+
+__global__ void sum_bead_rod_stresslet_IBM3D(
+	beadrod*,
+	rod*,
+	tensor*,
+	int,
 	int);
 
 

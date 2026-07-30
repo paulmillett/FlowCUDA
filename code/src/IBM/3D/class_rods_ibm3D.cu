@@ -107,11 +107,13 @@ void class_rods_ibm3D::allocate()
 	// allocate array memory (host):
 	beadsH = (beadrod*)malloc(nBeads*sizeof(beadrod));
 	rodsH = (rod*)malloc(nRods*sizeof(rod));
+	StressletH =(tensor*)malloc(sizeof(tensor));
 							
 	// allocate array memory (device):	
 	cudaMalloc((void **) &beads, nBeads*sizeof(beadrod));
 	cudaMalloc((void **) &rods, nRods*sizeof(rod));
 	cudaMalloc((void **) &states, nRods*sizeof(curandState));
+	cudaMalloc((void **) &Stresslet, sizeof(tensor));
 	if (binsFlag) {		
 		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
 		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
@@ -163,6 +165,7 @@ void class_rods_ibm3D::memcopy_device_to_host()
 {
 	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
 	cudaMemcpy(rodsH, rods, sizeof(rod)*nRods, cudaMemcpyDeviceToHost);
+	cudaMemcpy(StressletH, Stresslet, sizeof(tensor), cudaMemcpyDeviceToHost);
 	
 	// unwrap coordinate positions:
 	unwrap_bead_coordinates(); 
@@ -730,8 +733,6 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 	
 	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
-	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod);
-	
 	
 	
 	// LOOP over the below code for IBM sub-steps...
@@ -744,13 +745,15 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 	}
 		
 	// calculate IBM forces:
+	zero_stresslet(nBlocks,nThreads);
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
 	if (nRods > 1) nonbonded_bead_interactions(nBlocks,nThreads);	
 	compute_wall_forces(nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
-	sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	sum_rod_forces_torques_moments(nBlocks,nThreads);
+	sum_bead_rod_stresslet(nBlocks,nThreads);	
 			
 	// update IBM positions:
 	enforce_max_rod_force_torque(nBlocks,nThreads);
@@ -760,7 +763,7 @@ void class_rods_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nTh
 	
 	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
 	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);
-		
+
 }
 
 
@@ -779,8 +782,6 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 	
 	// zero fluid forces:
 	lbm.zero_forces(nBlocks,nThreads);
-	//lbm.hydrodynamic_force_bead_rod(nBlocks,nThreads,beads,nBeads,nBeadsPerRod); 	
-	
 	
 	
 	// LOOP over the below code for IBM sub-steps...	
@@ -1395,6 +1396,18 @@ void class_rods_ibm3D::zero_bead_forces(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to "zero_bead_forces_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::zero_stresslet(int nBlocks, int nThreads)
+{
+	zero_stresslet_IBM3D
+	<<<nBlocks,nThreads>>> (Stresslet);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "enforce_max_node_force_IBM3D" kernel:
 // --------------------------------------------------------
 
@@ -1426,6 +1439,18 @@ void class_rods_ibm3D::sum_rod_forces_torques_moments(int nBlocks, int nThreads)
 {
 	sum_rod_forces_torques_moments_IBM3D
 	<<<nBlocks,nThreads>>> (beads,rods,nBeadsPerRod,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "sum_rod_forces_torques_moments_IBM3D" kernel:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::sum_bead_rod_stresslet(int nBlocks, int nThreads)
+{
+	sum_bead_rod_stresslet_IBM3D
+	<<<nBlocks,nThreads>>> (beads,rods,Stresslet,nBeadsPerRod,nBeads);
 }
 
 
@@ -1776,5 +1801,45 @@ void class_rods_ibm3D::orientation_in_cylindrical_channel(int step)
 	}
 
 }
+
+
+
+// --------------------------------------------------------
+// Output the rod orientation, position, and radial position
+// inside cylindrical channel
+// --------------------------------------------------------
+
+void class_rods_ibm3D::output_stresslet_tensor(int step)
+{
+	
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "stresslet.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------------
+	// print stresslet values:
+	// -----------------------------------------
+	
+	float V = Box.x*Box.y*Box.z;
+	float nu = 1.0/6.0;
+	float shearrate = 0.001;  // assumed!
+	float Sigzx = nu*shearrate + StressletH[0].xz/V;
+	float etaEff = Sigzx/nu/shearrate;
+	
+	cout << etaEff << endl;
+	
+	outfile << fixed << setprecision(4) << step << "  " << StressletH[0].xx << "  " << StressletH[0].xy << "  " << StressletH[0].xz 
+		                                        << "  " << StressletH[0].yx << "  " << StressletH[0].yy << "  " << StressletH[0].yz 
+												<< "  " << StressletH[0].zx << "  " << StressletH[0].zy << "  " << StressletH[0].zz << endl;
+
+}
+
+
 
 

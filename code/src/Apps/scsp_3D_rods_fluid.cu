@@ -67,14 +67,22 @@ scsp_3D_rods_fluid::scsp_3D_rods_fluid() : lbm(),rods()
 		
 	int nBeadsPerRod = inputParams("IBM_RODS/nBeadsPerRod",0);
 	nRods = inputParams("IBM_RODS/nRods",1);
-	fp = inputParams("IBM_RODS/fp",0.0);
 	L0 = inputParams("IBM_RODS/L0",0.5);
-	Pe = inputParams("IBM_RODS/Pe",0.0);
-	kT = inputParams("IBM_RODS/kT",0.0);
 	gam = inputParams("IBM_RODS/gamma",0.1);
 	Drod = inputParams("IBM_RODS/diam",1.0);
 	nBeads = nBeadsPerRod*nRods;
 	Lrod = float(nBeadsPerRod-1)*L0;
+		
+	// ----------------------------------------------
+	// calculate particle volume fraction:
+	// ----------------------------------------------
+	
+	float Vp = float(nRods)*(M_PI*Drod*Drod*Lrod/4.0);
+	float V = float(Nx)*float(Ny)*float(Nz);
+	float phi = Vp/V;
+	cout << " " << endl;
+	cout << "particle volume fraction = " << phi << endl;
+	cout << " " << endl;
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -172,7 +180,12 @@ void scsp_3D_rods_fluid::initSystem()
 	rods.set_mobility_coefficients(nu,ar,Lrod);	
 	
 	if (nRods == 1) rods.shift_bead_positions(0,float(Nx-1)/2.0 - Lrod/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0);
-		
+	
+	if (nRods == 2) {
+		rods.rotate_and_shift_bead_positions(0,28.0,31.5,float(Nz-1)/2.0 + Lrod/2.0,0.0,M_PI/2.0,0.0);
+		rods.rotate_and_shift_bead_positions(1,35.0,31.5,float(Nz-1)/2.0 + Lrod/2.0,0.0,M_PI/2.0,0.0);
+	}
+	
 	// ----------------------------------------------			
 	// drag friction coefficients using Broersma's
 	// relations.  See Tsay et al. J. Amer. Chem. Soc.
@@ -234,11 +247,21 @@ void scsp_3D_rods_fluid::initSystem()
 	// randomly disperse filaments: 
 	// ----------------------------------------------
 			
-	if (nRods > 1) {
-		rods.randomize_rods(Lrod+2.0);
+	if (nRods > 2) {
+		rods.randomize_rods_duct(); 
 		//rods.randomize_rods_xdir_alligned_cylinder(10.0,1.0);
 	}
 	rods.set_rod_position_orientation(nBlocks,nThreads);
+	
+	// ----------------------------------------------
+	// push rods inside slit (if 'random'), then
+	// relax rods to eliminate any overlap:
+	// ----------------------------------------------
+	
+	if (nRods > 2) {
+		rods.stepIBM_Euler_push_inside_slit(1000,nBlocks,nThreads);
+		rods.stepIBM_Euler_relax_rods_in_slit(1000,nBlocks,nThreads);
+	}
 		
 	// ----------------------------------------------
 	// write initial output file:
@@ -344,6 +367,9 @@ void scsp_3D_rods_fluid::writeOutput(std::string tagname, int step)
 		
 		// output rod position & orientation: 
 		rods.orientation_in_cylindrical_channel(step);
+		
+		// output rod-suspension stresslet tensor:
+		rods.output_stresslet_tensor(step);
 						
 		// write vtk output for LBM and IBM:
 		int intervalVTK = nSteps/nVTKOutputs;

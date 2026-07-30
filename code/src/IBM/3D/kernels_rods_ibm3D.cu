@@ -73,6 +73,30 @@ __global__ void zero_bead_forces_IBM3D(
 
 
 // --------------------------------------------------------
+// IBM3D kernel to zero stresslet values:
+// --------------------------------------------------------
+
+__global__ void zero_stresslet_IBM3D(
+	tensor* stresslet)
+{
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < 1) {
+		stresslet[i].xx = 0.0;
+		stresslet[i].xy = 0.0;
+		stresslet[i].xz = 0.0;
+		stresslet[i].yx = 0.0;
+		stresslet[i].yy = 0.0;
+		stresslet[i].yz = 0.0;
+		stresslet[i].zx = 0.0;
+		stresslet[i].zy = 0.0;
+		stresslet[i].zz = 0.0;		
+	}
+}
+
+
+
+// --------------------------------------------------------
 // IBM3D kernel to calculate rod orientation:
 // --------------------------------------------------------
 
@@ -477,6 +501,43 @@ __global__ void sum_rod_forces_torques_moments_IBM3D(
 		//atomicAdd(&rods[rodID].Iyz, -m*(ricom.y*ricom.z));		
 	}
 }
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to sum the stresslet associated with all
+// beads:
+// --------------------------------------------------------
+
+__global__ void sum_bead_rod_stresslet_IBM3D(
+	beadrod* beads,
+	rod* rods,
+	tensor* stresslet,
+	int nBeadsPerRod,
+	int nBeads)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		int rodID = beads[i].rodID;
+		float3 com = beads[rods[rodID].centerBead].r;
+		float3 ricom = beads[i].r - com;
+		float3 force = beads[i].f;
+		//tensor sbead = 0.5*(dyadic(ricom,force) + dyadic(force,ricom));
+		tensor sbead = dyadic(ricom,force);
+		// add up stresslet:
+		atomicAdd(&stresslet[0].xx,sbead.xx);
+		atomicAdd(&stresslet[0].xy,sbead.xy);
+		atomicAdd(&stresslet[0].xz,sbead.xz);
+		atomicAdd(&stresslet[0].yx,sbead.yx);
+		atomicAdd(&stresslet[0].yy,sbead.yy);
+		atomicAdd(&stresslet[0].yz,sbead.yz);
+		atomicAdd(&stresslet[0].zx,sbead.zx);
+		atomicAdd(&stresslet[0].zy,sbead.zy);
+		atomicAdd(&stresslet[0].zz,sbead.zz);
+	}
+}
+
 
 
 
@@ -1447,7 +1508,7 @@ __device__ inline void pairwise_bead_interaction_forces(
 	const float r = length(rij);	
 	const float Ri = 0.5*repD;  // bead radius
 	const float Rj = 0.5*repD;  // bead radius 
-	const float gapMax = 0.05;  // max gap for lubrication forces
+	const float gapMax = 0.25;  //0.05;  // max gap for lubrication forces
 	const float cutoff = Ri + Rj + gapMax;		
 		
 	// interaction range:

@@ -102,6 +102,21 @@ inline __host__ __device__ tensor dyadic(float3 a)
 	return c;
 }
 
+inline __host__ __device__ tensor dyadic(float3 a, float3 b)
+{
+    tensor c;
+	float axx = a.x*b.x;
+	float axy = a.x*b.y;
+	float axz = a.x*b.z;
+	float ayy = a.y*b.y;
+	float ayz = a.y*b.z;
+	float azz = a.z*b.z;
+	c.xx = axx; c.xy = axy; c.xz = axz;
+	c.yx = axy; c.yy = ayy; c.yz = ayz;
+	c.zx = axz; c.zy = ayz; c.zz = azz;
+	return c;
+}
+
 inline __host__ __device__ tensor transpose(tensor a)
 {
     tensor c = a;

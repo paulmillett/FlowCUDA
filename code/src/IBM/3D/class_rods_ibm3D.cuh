@@ -10,6 +10,7 @@
 # include "kernels_rods_ibm3D.cuh"
 # include "class_capsules_ibm3D.cuh"
 # include "data_structs/rod_data.h"
+# include "data_structs/tensor.h"
 # include "data_structs/neighbor_bins_data.h"
 # include <cuda.h>
 # include <curand.h>
@@ -45,16 +46,18 @@ class class_rods_ibm3D {
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;
-	bindata bins;
+	bindata bins;	
 				
 	// host arrays:
 	beadrod* beadsH;
 	rod* rodsH;
+	tensor* StressletH;
 		
 	// device arrays:
 	beadrod* beads;
 	rod* rods;
 	curandState* states;
+	tensor* Stresslet;
 	
 	// methods:
 	class_rods_ibm3D();
@@ -113,9 +116,11 @@ class class_rods_ibm3D {
 	void move_rod_back_to_inlet(float,float,int,int);
 	void move_rod_back_to_inlet_random(float,float,float,int,int);
 	void zero_bead_forces(int,int);
+	void zero_stresslet(int,int);
 	void enforce_max_bead_force(int,int);
 	void enforce_max_rod_force_torque(int,int);
 	void sum_rod_forces_torques_moments(int,int);
+	void sum_bead_rod_stresslet(int,int);
 	void unwrap_bead_coordinates(int,int);
 	void wrap_bead_coordinates(int,int);	
 	void add_xdir_force_to_beads(int,int,float);
@@ -139,6 +144,7 @@ class class_rods_ibm3D {
 	void unwrap_bead_coordinates();
 	bool cylinder_overlap(float3,float3,float,float,float);
 	void orientation_in_cylindrical_channel(int);
+	void output_stresslet_tensor(int);
 	
 };
 
