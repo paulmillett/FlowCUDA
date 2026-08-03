@@ -65,6 +65,8 @@
 # include "../Apps/scsp_3D_filaments_capsule_pusher.cuh"
 # include "../Apps/scsp_3D_filaments_capsule_overdamp.cuh"
 # include "../Apps/scsp_3D_rods_fluid.cuh"
+# include "../Apps/scsp_3D_rods_settling.cuh"
+# include "../Apps/scsp_3D_rods_kolmogorov.cuh"
 # include "../Apps/scsp_3D_rods_cylinder.cuh"
 # include "../Apps/scsp_3D_rods_cylinder_binary.cuh"
 # include "../Apps/scsp_3D_rods_duct.cuh"
@@ -160,6 +162,8 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_filaments_capsule_pusher") return new scsp_3D_filaments_capsule_pusher();
 	if (specifier == "scsp_3D_filaments_capsule_overdamp") return new scsp_3D_filaments_capsule_overdamp();
 	if (specifier == "scsp_3D_rods_fluid") return new scsp_3D_rods_fluid();
+	if (specifier == "scsp_3D_rods_settling") return new scsp_3D_rods_settling();
+	if (specifier == "scsp_3D_rods_kolmogorov") return new scsp_3D_rods_kolmogorov();
 	if (specifier == "scsp_3D_rods_cylinder") return new scsp_3D_rods_cylinder();
 	if (specifier == "scsp_3D_rods_cylinder_binary") return new scsp_3D_rods_cylinder_binary();
 	if (specifier == "scsp_3D_rods_duct") return new scsp_3D_rods_duct();

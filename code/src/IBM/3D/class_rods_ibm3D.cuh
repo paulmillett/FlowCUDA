@@ -93,6 +93,8 @@ class class_rods_ibm3D {
 	void semi_randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	float calc_separation_pbc(float3,float3);
 	void stepIBM_Euler(class_scsp_D3Q19&,int,int);
+	void stepIBM_Euler_kolmogorov(class_scsp_D3Q19&,int,int);
+	void stepIBM_Euler_settling(class_scsp_D3Q19&,float,int,int);
 	void stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19&,float,int,int);
 	void stepIBM_Euler_push_inside_cylinder(int,float,int,int);
 	void stepIBM_Euler_push_inside_duct(int,int,int);
@@ -103,6 +105,7 @@ class class_rods_ibm3D {
 	void stepIBM_Euler_relax_rods_in_duct(int,int,int);
 	void stepIBM_Euler_relax_rods_in_slit(int,int,int);
 	void stepIBM_Euler_relax_rods_in_nozzle(int,float,float,float,int,int);
+	void stepIBM_Euler_relax_rods_3D_periodic(int,int,int);
 	void init_rand_kernel(int,int);
 	void zero_rod_forces_torques_moments(int,int);
 	void set_rod_position_orientation(int,int);
@@ -121,6 +124,7 @@ class class_rods_ibm3D {
 	void enforce_max_rod_force_torque(int,int);
 	void sum_rod_forces_torques_moments(int,int);
 	void sum_bead_rod_stresslet(int,int);
+	void add_gravity_force_to_beads(float,int,int);
 	void unwrap_bead_coordinates(int,int);
 	void wrap_bead_coordinates(int,int);	
 	void add_xdir_force_to_beads(int,int,float);
@@ -130,6 +134,7 @@ class class_rods_ibm3D {
 	void build_bin_lists(int,int);
 	void nonbonded_bead_interactions(int,int);
 	void nonbonded_bead_interactions_with_friction(int,int);
+	void nonbonded_bead_interactions_with_virial(int,int);
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);

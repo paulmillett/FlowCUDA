@@ -47,6 +47,12 @@ __global__ void enforce_max_rod_force_torque_IBM3D(
 	float,
 	int);
 
+
+__global__ void add_gravity_force_to_beads_IBM3D(
+	beadrod*,
+	float,
+	int);
+
 	
 __global__ void update_bead_positions_rods_IBM3D(
 	beadrod*,
@@ -316,7 +322,19 @@ __global__ void nonbonded_bead_interactions_with_friction_IBM3D(
 	int,
 	float3,	
 	int3);
-			
+
+
+__global__ void nonbonded_bead_interactions_with_virial_IBM3D(
+	beadrod*,
+	tensor*,
+	bindata,
+	float,
+	float,
+	float,
+	int,
+	float3,	
+	int3);
+		
 			
 __device__ inline void pairwise_bead_interaction_forces(
 	const int, 
@@ -336,6 +354,18 @@ __device__ inline void pairwise_bead_interaction_forces_with_friction(
 	const float,
 	const float,
 	beadrod*,
+	float3,
+	int3);
+
+
+__device__ inline void pairwise_bead_interaction_forces_virial(
+	const int, 
+	const int,
+	const float,
+	const float,
+	const float,
+	beadrod*,
+	tensor*,
 	float3,
 	int3);
 

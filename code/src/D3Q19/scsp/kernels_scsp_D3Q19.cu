@@ -171,6 +171,34 @@ __global__ void scsp_add_body_force_D3Q19(
 
 
 // --------------------------------------------------------
+// D3Q19 add body force to fluid nodes based on Kolmogorov
+// flow: Fx(z) = Fo * sin[2*pi*z/H]:
+// --------------------------------------------------------
+
+__global__ void scsp_add_body_force_kolmogorov_D3Q19(
+	float Fo,
+	float* fx,
+	float* fy,
+	float* fz,
+	int nVoxels,
+	int Nx,
+	int Ny,
+	int Nz)
+{
+	// define current voxel:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
+	if (i < nVoxels) {	
+		int zi = i/(Nx*Ny);
+		float bx = Fo*sin(2.0*M_PI*float(zi)/float(Nz));
+		fx[i] += bx;
+		fy[i] += 0.0;
+		fz[i] += 0.0;
+	}
+}
+
+
+
+// --------------------------------------------------------
 // D3Q19 add body force to fluid nodes.  Nodes above and
 // below 'zdivide' get different body forces
 // --------------------------------------------------------

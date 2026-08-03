@@ -143,7 +143,8 @@ public:
 	void set_boundary_duct_density(int,int);
 	void zero_forces(int,int);
 	void zero_forces_with_IBM(int,int);	
-	void add_body_force(float,float,float,int,int);
+	void add_body_force(float,float,float,int,int);	
+	void add_body_force_kolmogorov(float,int,int);	
 	void add_body_force_divided(float,float,int,int,int);
 	void add_body_force_with_solid(float,float,float,int,int);	
 	void extrapolate_velocity_from_IBM(int,int,node*,int);

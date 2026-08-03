@@ -1031,6 +1031,19 @@ void class_scsp_D3Q19::add_body_force(float bx, float by, float bz, int nBlocks,
 // Call to "scsp_add_body_forces_D3Q19" kernel:
 // --------------------------------------------------------
 
+void class_scsp_D3Q19::add_body_force_kolmogorov(float Fo, int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	scsp_add_body_force_kolmogorov_D3Q19 
+	<<<nBlocks,nThreads>>> (Fo,Fx,Fy,Fz,nVoxels,Nx,Ny,Nz);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_add_body_forces_D3Q19" kernel:
+// --------------------------------------------------------
+
 void class_scsp_D3Q19::add_body_force_divided(float bxL, float bxU, int zdivide, int nBlocks, int nThreads)
 {
 	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
