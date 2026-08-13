@@ -130,7 +130,7 @@ class class_capsules_ibm3D {
 	void stepIBM_spring_cylinders(class_scsp_D3Q19&,float,float,int,int);
 	void stepIBM_no_fluid(int,bool,int,int);
 	void stepIBM_force_one_capsule(class_scsp_D3Q19&,float3,int,int,int) ;
-	void stepIBM_sheets(class_scsp_D3Q19&,int,int);
+	void stepIBM_sheets(class_scsp_D3Q19&,float,int,int);
 	void update_node_positions_vacuum(float,int,int);
 	void interpolate_velocity(float*,float*,float*,int,int);
 	void extrapolate_force(float*,float*,float*,int,int);	
@@ -139,6 +139,7 @@ class class_capsules_ibm3D {
 	void build_bin_lists(int,int);
 	void nonbonded_node_interactions(int,int);
 	void nonbonded_node_lubrication_interactions(float,float,int,int);
+	void nonbonded_node_interactions_sheets(float,int,int);
 	void nonbonded_node_bead_interactions(bead*,bindata,int,int);
 	void nonbonded_node_bead_rod_interactions(beadrod*,bindata,int,int);
 	void compute_node_forces(int,int);

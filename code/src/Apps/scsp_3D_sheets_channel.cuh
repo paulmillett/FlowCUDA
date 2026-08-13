@@ -40,6 +40,7 @@ private:
 	float trainAng;
 	float wavelength;
 	float chRad;
+	float lubforceMax;
 	bool initRandom;
 	bool pulsatile;
 	std::string vtkFormat;

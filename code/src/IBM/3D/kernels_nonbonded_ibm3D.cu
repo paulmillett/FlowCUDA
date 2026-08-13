@@ -184,7 +184,6 @@ __global__ void nonbonded_node_interactions_IBM3D(
 // IBM3D kernel to calculate nonbonded node interactions
 // using the bin lists:
 // --------------------------------------------------------
-
 __global__ void nonbonded_node_lubrication_interactions_IBM3D(
 	node* nodes,
 	cell* cells,
@@ -239,6 +238,73 @@ __global__ void nonbonded_node_lubrication_interactions_IBM3D(
 				int j = bins.binMembers[k];
 				if (nodes[i].cellID == nodes[j].cellID) continue;			
 				pairwise_lubrication_forces(i,j,Ri,Rj,cutoff,nu,nodes,cells,Box,pbcFlag);			
+			}
+		}
+				
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate nonbonded node interactions
+// using the bin lists:
+// --------------------------------------------------------
+
+__global__ void nonbonded_node_interactions_sheets_IBM3D(
+	node* nodes,
+	cell* cells,
+	bindata bins,
+	float Ri,
+	float Rj,
+	float repA,
+	float lubforceMax,
+	int nNodes,
+	float3 Box,	
+	int3 pbcFlag)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nNodes) {		
+		
+		// -------------------------------
+		// calculate bin ID:
+		// -------------------------------
+		
+		int binID = int(floor(nodes[i].r.x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
+			        int(floor(nodes[i].r.y/bins.sizeBins))*bins.numBins.z +
+		            int(floor(nodes[i].r.z/bins.sizeBins));
+		
+		// -------------------------------
+		// loop over nodes in the same bin:
+		// -------------------------------
+				
+		int offst = binID*bins.binMax;
+		int occup = bins.binOccupancy[binID];
+		if (occup > bins.binMax) occup = bins.binMax;
+								
+		for (int k=offst; k<offst+occup; k++) {
+			int j = bins.binMembers[k];
+			if (i==j) continue;
+			if (nodes[i].cellID == nodes[j].cellID) continue;
+			pairwise_interaction_forces_sheets(i,j,Ri,Rj,repA,lubforceMax,nodes,cells,Box,pbcFlag);
+		}
+		
+		// -------------------------------
+		// loop over neighboring bins:
+		// -------------------------------
+		
+        for (int b=0; b<bins.nnbins; b++) {
+            // get neighboring bin ID
+			int naborbinID = bins.binMap[binID*bins.nnbins + b];
+			offst = naborbinID*bins.binMax;
+			occup = bins.binOccupancy[naborbinID];
+			if (occup > bins.binMax) occup = bins.binMax;
+			// loop over nodes in this bin:
+			for (int k=offst; k<offst+occup; k++) {
+				int j = bins.binMembers[k];
+				if (nodes[i].cellID == nodes[j].cellID) continue;			
+				pairwise_interaction_forces_sheets(i,j,Ri,Rj,repA,lubforceMax,nodes,cells,Box,pbcFlag);			
 			}
 		}
 				
@@ -303,8 +369,7 @@ __global__ void nonbonded_node_bead_interactions_IBM3D(
 				int j = bins.binMembers[k];
 				pairwise_node_bead_interaction_forces_WCA(i,j,repA,repD,nodes,beads,Box,pbcFlag);	
 			}
-		}
-				
+		}				
 	}
 }
 
@@ -482,6 +547,69 @@ __device__ inline void pairwise_lubrication_forces(
 		// add force to node i:
 		nodes[i].f += fij;
 	
+	} 	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j lubrication force.  The 
+// model comes from Ladd & Verberg, Journal of Statistical
+// Physics, 104 (2001) 1191.  See Eq. (74).
+// --------------------------------------------------------
+
+__device__ inline void pairwise_interaction_forces_sheets(
+	const int i, 
+	const int j,
+	const float Ri,
+	const float Rj,
+	const float repA,
+	const float lubforceMax,
+	node* nodes,
+	cell* cells,	
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = nodes[i].r - nodes[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);
+	const float gapMax = 0.25;  // max gap for lubrication forces
+	const float cutoff = Ri + Rj + gapMax;
+	
+	// interaction range:
+	if (r < cutoff) {
+		
+		float3 uij = rij/r;
+		float3 vij = nodes[i].v - nodes[j].v;
+		
+		// lubrication force:
+		if (r > (Ri+Rj)) {
+			const float nu = 0.1666666667;
+			// normal lubrication force:
+			float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);
+			float udotv = dot(uij,vij);
+			float gap = r - Ri - Rj;
+			if (gap < 0.001) gap = 0.001;
+			float invgap = 1.0/gap - 1.0/gapMax;		
+			float lubforce = -6.0*M_PI*nu*coeff*udotv*invgap;
+			float lubforcemag = abs(lubforce);
+			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
+			nodes[i].f += lubforce*(uij);
+			// tangential lubrication force:
+			float3 uTanij = vij - udotv*uij;  // tangential relative velocity
+			float3 lubforceTan = -6.0*M_PI*nu*Ri*log(gapMax/gap)*uTanij;
+			float lubforceTanmag = length(lubforceTan);
+			if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
+			nodes[i].f += lubforceTan;					
+		}
+		
+		// contact force:
+		if (r < (Ri+Rj)) {
+			// normal force
+			float repD = Ri+Rj;
+			float forceN = repA - (repA/repD)*r;
+			nodes[i].f += forceN*uij;				
+		}
 	} 	
 }
 

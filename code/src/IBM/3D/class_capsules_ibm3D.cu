@@ -1526,7 +1526,7 @@ void class_capsules_ibm3D::stepIBM_force_one_capsule(class_scsp_D3Q19& lbm, floa
 // Take step forward for IBM using LBM object:
 // --------------------------------------------------------
 
-void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, int nThreads) 
+void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, float lubforceMax, int nBlocks, int nThreads) 
 {
 	
 	// ----------------------------------------------------------
@@ -1548,9 +1548,8 @@ void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, in
 		//compute_node_forces_skalak_sheets(nBlocks,nThreads);
 		compute_node_forces_spring_sheets(nBlocks,nThreads);
 		lbm.interpolate_velocity_to_IBM(nBlocks,nThreads,nodes,nNodes);
-		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);
-		
-		nonbonded_node_interactions(nBlocks,nThreads);
+		lbm.extrapolate_forces_from_IBM(nBlocks,nThreads,nodes,nNodes);		
+		if (nCells > 1) nonbonded_node_interactions_sheets(lubforceMax,nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
 		
@@ -1581,7 +1580,7 @@ void class_capsules_ibm3D::stepIBM_sheets(class_scsp_D3Q19& lbm, int nBlocks, in
 		// update IBM:
 		//compute_node_forces_skalak_sheets(nBlocks,nThreads);
 		compute_node_forces_spring_sheets(nBlocks,nThreads);
-		nonbonded_node_interactions(nBlocks,nThreads);
+		if (nCells > 1) nonbonded_node_interactions_sheets(lubforceMax,nBlocks,nThreads);
 		compute_wall_forces(nBlocks,nThreads);
 		enforce_max_node_force(nBlocks,nThreads);
 		lbm.viscous_force_IBM_LBM(nBlocks,nThreads,gam,nodes,nNodes);
@@ -1903,6 +1902,22 @@ void class_capsules_ibm3D::nonbonded_node_lubrication_interactions(float Rad, fl
 	if (binsFlag) {	
 		nonbonded_node_lubrication_interactions_IBM3D
 		<<<nBlocks,nThreads>>> (nodes,cells,bins,Rad,Rad,nu,repD,nNodes,Box,pbcFlag);		
+	} else {
+		cout << "IBM bin arrays have not been initialized" << endl;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces:
+// --------------------------------------------------------
+
+void class_capsules_ibm3D::nonbonded_node_interactions_sheets(float lubforceMax, int nBlocks, int nThreads)
+{
+	if (binsFlag) {	
+		nonbonded_node_interactions_sheets_IBM3D
+		<<<nBlocks,nThreads>>> (nodes,cells,bins,repD/2.0,repD/2.0,repA,lubforceMax,nNodes,Box,pbcFlag);		
 	} else {
 		cout << "IBM bin arrays have not been initialized" << endl;
 	}

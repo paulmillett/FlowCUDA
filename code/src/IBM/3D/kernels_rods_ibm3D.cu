@@ -837,7 +837,7 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 			beads[i].f.z -= lubforceN*(zi/ri);
 			// tangential lubrication force:
 			float velT = beads[i].v.x;
-			float lubforceT = 6.0*M_PI*nu*d*log(d/gap)*velT;
+			float lubforceT = 6.0*M_PI*nu*d*log(gapMax/gap)*velT;
 			float lubforceTmag = abs(lubforceT);
 			if (lubforceTmag > lubforceMax) lubforceT *= (lubforceMax/lubforceTmag);
 			beads[i].f.x -= lubforceT;
@@ -1618,15 +1618,11 @@ __device__ inline void pairwise_bead_interaction_forces(
 			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
 			beads[i].f += lubforce*(uij);
 			// tangential lubrication force:
-			/*
-			if (gap < Ri && gap > 0.0) {
-				float3 uTanij = vij - udotv*uij;  // tangential relative velocity
-				float3 lubforceTan = -6.0*M_PI*nu*Ri*log(Ri/gap)*uTanij;
-				float lubforceTanmag = length(lubforceTan);
-				if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
-				beads[i].f += lubforceTan;
-			}
-			*/			
+			float3 uTanij = vij - udotv*uij;  // tangential relative velocity
+			float3 lubforceTan = -6.0*M_PI*nu*Ri*log(gapMax/gap)*uTanij;
+			float lubforceTanmag = length(lubforceTan);
+			if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
+			beads[i].f += lubforceTan;					
 		}
 		
 		// contact force:
@@ -1684,13 +1680,11 @@ __device__ inline void pairwise_bead_interaction_forces_with_friction(
 			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
 			beads[i].f += lubforce*(uij);
 			// tangential lubrication force:
-			if (gap < Ri && gap > 0.0) {
-				float3 uTanij = vij - udotv*uij;  // tangential relative velocity
-				float3 lubforceTan = -6.0*M_PI*nu*Ri*log(Ri/gap)*uTanij;
-				float lubforceTanmag = length(lubforceTan);
-				if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
-				beads[i].f += lubforceTan;
-			}		
+			float3 uTanij = vij - udotv*uij;  // tangential relative velocity
+			float3 lubforceTan = -6.0*M_PI*nu*Ri*log(gapMax/gap)*uTanij;
+			float lubforceTanmag = length(lubforceTan);
+			if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
+			beads[i].f += lubforceTan;
 		}
 		
 		// contact force:

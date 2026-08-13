@@ -299,7 +299,7 @@ void scsp_3D_sheets_duct_trains::cycleForward(int stepsPerCycle, int currentCycl
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			ibm.stepIBM_sheets(lbm,nBlocks,nThreads);
+			ibm.stepIBM_sheets(lbm,0.0,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			cudaDeviceSynchronize();					
@@ -320,7 +320,7 @@ void scsp_3D_sheets_duct_trains::cycleForward(int stepsPerCycle, int currentCycl
 		float bodyForxPul = bodyForx;
 		if (pulsatile) bodyForxPul *= sin(2*M_PI*float(cummulativeSteps)/wavelength);
 		// update IBM & LBM:
-		ibm.stepIBM_sheets(lbm,nBlocks,nThreads);
+		ibm.stepIBM_sheets(lbm,0.0,nBlocks,nThreads);
 		lbm.add_body_force(bodyForxPul,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 		cudaDeviceSynchronize();				

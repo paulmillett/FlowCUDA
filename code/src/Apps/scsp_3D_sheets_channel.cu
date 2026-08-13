@@ -71,6 +71,7 @@ scsp_3D_sheets_channel::scsp_3D_sheets_channel() : lbm(),ibm()
 	initRandom = inputParams("IBM/initRandom",1);
 	trainRij = inputParams("IBM/trainRij",2.8*a);
 	trainAng = inputParams("IBM/trainAng",15.0);
+	lubforceMax = inputParams("IBM/lubforceMax",0.0);
 	
 	// ----------------------------------------------
 	// IBM set flags for PBC's:
@@ -355,7 +356,7 @@ void scsp_3D_sheets_channel::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			ibm.stepIBM_sheets(lbm,nBlocks,nThreads);
+			ibm.stepIBM_sheets(lbm,lubforceMax,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 			cudaDeviceSynchronize();					
@@ -376,7 +377,7 @@ void scsp_3D_sheets_channel::cycleForward(int stepsPerCycle, int currentCycle)
 		float bodyForxPul = bodyForx;
 		if (pulsatile) bodyForxPul *= sin(2*M_PI*float(cummulativeSteps)/wavelength);
 		// update IBM & LBM:
-		ibm.stepIBM_sheets(lbm,nBlocks,nThreads);
+		ibm.stepIBM_sheets(lbm,lubforceMax,nBlocks,nThreads);
 		lbm.add_body_force(bodyForxPul,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);	
 		cudaDeviceSynchronize();				
