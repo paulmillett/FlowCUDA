@@ -280,9 +280,12 @@ void scsp_3D_sheets_channel::initSystem()
 	srand(time(NULL));
 	
 	// ----------------------------------------------
-	// shrink and randomly disperse cells: 
+	// randomly disperse sheets: 
 	// ----------------------------------------------
 	
+	ibm.randomize_sheets_inside_cylinder(chRad,a);
+	
+	/*
 	if (initRandom) {
 		float scale = 1.0;   // 0.7;
 		ibm.shrink_and_randomize_cells(scale,2.5,a+4.5,a+4.5);
@@ -300,7 +303,8 @@ void scsp_3D_sheets_channel::initSystem()
 		cout << "-----------------------------------------------" << endl;
 		cout << " " << endl;	
 		
-	}	
+	}
+	*/
 	
 	// ----------------------------------------------
 	// line up cells in a single-file line: 

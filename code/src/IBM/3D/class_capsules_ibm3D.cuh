@@ -104,6 +104,7 @@ class class_capsules_ibm3D {
 	void randomize_cells_above_plane(float,float,float,float);
 	void randomize_capsules_xdir_alligned_cylinder(float,float,float,float);
 	void semi_randomize_capsules_xdir_alligned_cylinder(float,float,float,float);
+	void randomize_sheets_inside_cylinder(float,float);
 	void define_Janus_capsule_geometry(float,float);
 	float calc_separation_pbc(float3,float3);
 	void write_output(std::string,int);
