@@ -7,21 +7,21 @@
 	App = scsp_3D_rods_nozzle
 	nu = 0.1666666667
 	bodyForx = 0.00001
-	Re = 0.004 #0.02 #0.05 #0.2
+	Re = 0.2  #0.01
 []
 
 
 [IBM_RODS]
-	initStruct = random  #aligned
-	nBeadsPerRod = 61
-	nRods = 3000
+	initStruct = random
+	nBeadsPerRod = 81
+	nRods = 2000
 	L0 = 0.25
 	diam = 0.5
 	sizeBins = 2.0
 	binMax = 200
-	repA = 0.005
+	repA = 0.02   #0.005
 	repD = 0.5
-	lubforceMax = 0.00005
+	lubforceMax = 0.0002
 	repWall = 0.1
 	fricWall = 0.5
 	rodFmax = 0.1
@@ -33,16 +33,18 @@
 	D = 3
 	Q = 19
 	source = box
-	nVoxels = 520200
-	Nx = 200
-	Ny = 51
-	Nz = 51
+	nVoxels = 1968300  #780300
+	Nx = 300
+	Ny = 81            #51
+	Nz = 81            #51
 	flowDir = 0
 	numIolets = 2
 	xLBC = 1
 	xUBC = 2
-	radInlet = 24.5
-	radOutlet = 6.5 #10.5
+	lenInlet = 35.0
+	radInlet = 39.5
+	radOutlet = 6.5
+	lenCylinder = 100.0 #135.0
 []
 
 
