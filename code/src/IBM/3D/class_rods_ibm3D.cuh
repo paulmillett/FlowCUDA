@@ -84,11 +84,13 @@ class class_rods_ibm3D {
 	void shift_bead_positions(int,float,float,float);
 	void rotate_and_shift_bead_positions(int,float,float,float);
 	void rotate_and_shift_bead_positions(int,float,float,float,float,float,float);
+	void rotate_and_shift_bead_positions_using_orientation_vector(int);
 	void randomize_rods(float);
 	void randomize_rods_inside_sphere(float,float,float,float,float);
 	void randomize_rods_cylinder();
 	void randomize_rods_duct();
 	void randomize_rods_nozzle(float,float,float,float);
+	void randomize_rods_nozzle_backfill(float,float,float,float);
 	void randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	void semi_randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	float calc_separation_pbc(float3,float3);
@@ -96,11 +98,11 @@ class class_rods_ibm3D {
 	void stepIBM_Euler_kolmogorov(class_scsp_D3Q19&,int,int);
 	void stepIBM_Euler_settling(class_scsp_D3Q19&,float,int,int);
 	void stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19&,float,int,int);
+	void stepIBM_Euler_nozzle_channel(class_scsp_D3Q19&,float,float,float,float,float,int,int);
 	void stepIBM_Euler_push_inside_cylinder(int,float,int,int);
 	void stepIBM_Euler_push_inside_duct(int,int,int);
 	void stepIBM_Euler_push_inside_slit(int,int,int);
 	void stepIBM_Euler_push_inside_nozzle(int,float,float,float,int,int);
-	void stepIBM_Euler_nozzle_channel(class_scsp_D3Q19&,float,float,float,float,int,int);
 	void stepIBM_Euler_relax_rods_in_cylinder(int,float,int,int);
 	void stepIBM_Euler_relax_rods_in_duct(int,int,int);
 	void stepIBM_Euler_relax_rods_in_slit(int,int,int);
@@ -116,6 +118,7 @@ class class_rods_ibm3D {
 	void update_rod_position_orientation_fluid(int,int);
 	void update_rod_position_orientation_no_fluid(int,int);
 	void update_rod_position_fluid(int,int);
+	void assign_velocity_to_backfill_rods(float,int,int);
 	void move_rod_back_to_inlet(float,float,int,int);
 	void move_rod_back_to_inlet_random(float,float,float,int,int);
 	void zero_bead_forces(int,int);

@@ -94,7 +94,7 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	rods.set_pbcFlag(1,0,0);
+	rods.set_pbcFlag(0,0,0);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -138,7 +138,7 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	}
 	bodyForx = umax*(4*nu)/radOutlet/radOutlet;
 	Q0 = M_PI*radOutlet*radOutlet*radOutlet*radOutlet*bodyForx/(8.0*nu);
-	
+		
 	cout << "  " << endl;
 	cout << "Re = " << Re << endl;
 	cout << "Body Force X-dir = " << bodyForx << endl;
@@ -146,6 +146,18 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	cout << "umax = " << umax << endl;
 	cout << "Q0 = " << Q0 << endl; 
 	cout << "  " << endl;	
+	
+	// ----------------------------------------------
+	// calculate rod velocity for backfill zone:
+	// Note: for some reason 'umax' is close to the
+	// maximum velocity at the channel inlet instead
+	// of outlet...?
+	// ----------------------------------------------
+	
+	backfillVel = umax/2.0;
+	
+	cout << "backfill rod velocity = " << backfillVel << endl; 
+	cout << "  " << endl;
 	
 	// ----------------------------------------------
 	// write VTK file for nozzle wall viz:
@@ -284,11 +296,14 @@ void scsp_3D_rods_nozzle::initSystem()
 	// ----------------------------------------------
 	
 	string initStruct = inputParams("IBM_RODS/initStruct","random");
-	
+		
 	if (initStruct == "random") {
-		if (nRods > 1) rods.randomize_rods_nozzle(lenCylinder,radInlet,radOutlet,Lrod); 
+		if (nRods > 1) {
+			//rods.randomize_rods_nozzle(lenCylinder,radInlet,radOutlet,Lrod); 
+			rods.randomize_rods_nozzle_backfill(lenCylinder,radInlet,radOutlet,Lrod); 
+		}
 		if (nRods == 1) {
-			rods.rotate_and_shift_bead_positions(0,154.0,25.0,33.0,0.0,M_PI/2,0.0);
+			rods.rotate_and_shift_bead_positions(0,250.0,40.0,40.0+Lrod/2.0-0.5,0.0,M_PI/2,0.0);
 			rods.memcopy_host_to_device();
 		}
 	}
@@ -303,12 +318,14 @@ void scsp_3D_rods_nozzle::initSystem()
 	// push rods inside cylinder (if 'random'), then
 	// relax rods to eliminate any overlap:
 	// ----------------------------------------------
-		
+	
+	/*
 	if (initStruct == "random"){
 		rods.stepIBM_Euler_push_inside_nozzle(1000,lenCylinder,radInlet,radOutlet,nBlocks,nThreads);
 	}
 	
 	rods.stepIBM_Euler_relax_rods_in_nozzle(1000,lenCylinder,radInlet,radOutlet,nBlocks,nThreads);
+	*/
 		
 	// ----------------------------------------------
 	// write initial output file:
@@ -357,7 +374,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,nBlocks,nThreads);
+			rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);	
 			cudaDeviceSynchronize();
@@ -374,7 +391,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;
-		rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,nBlocks,nThreads);
+		rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);
 		cudaDeviceSynchronize();

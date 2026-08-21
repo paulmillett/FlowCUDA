@@ -283,7 +283,7 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 		tensor ppT = dyadic(rods[i].p);
 		tensor Imppt = identity() - ppT;
 		tensor mobTensor = rods[i].mobPar*ppT + rods[i].mobPer*Imppt;
-				
+	
 		// rod translation:	
 		rods[i].r += dt*(rods[i].uf + mobTensor*rods[i].f);
 		
@@ -349,6 +349,30 @@ __global__ void update_rod_position_fluid_IBM3D(
 	if (i < nRods) {		
 		// only update position (if nBeadsPerRod==1)
 		rods[i].r += dt*(rods[i].uf + rods[i].f/fricT);
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to assign rods in the backfill zone a set
+// velocity:
+// --------------------------------------------------------
+
+__global__ void assign_velocity_to_backfill_rods_IBM3D(
+	rod* rods,
+	float ufx,
+	int nRods)
+{
+	// define rod:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nRods) {
+		// if rod is in backfill zone:
+		if (rods[i].r.x < 0.0f) {
+			rods[i].uf.x = ufx;
+			rods[i].uf.y = 0.0;
+			rods[i].uf.z = 0.0;
+		}
 	}
 }
 
@@ -806,7 +830,92 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 	float fric,
 	float lubforceMax,
 	int nBeads)
-{
+{	
+	// define node:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		
+		// parameters:
+		const float d = repD;   // this should be = bead radius
+		const float A = repA;
+		
+		// distance to channel centerline 
+		const float ymid = (Box.y-1.0)/2.0;
+		const float zmid = (Box.z-1.0)/2.0;
+		const float yi = beads[i].r.y - ymid;  
+		const float zi = beads[i].r.z - zmid;
+		const float ri = sqrt(yi*yi + zi*zi);
+		
+		// nozzle half-angle alpha:
+		const float dR = radIn - radOut;
+		const float Lnoz = Box.x - lenCyl;
+		const float inv_hyp = 1.0f / sqrtf(Lnoz*Lnoz + dR*dR);
+		float cos_alpha = inv_hyp*Lnoz;
+		float sin_alpha = inv_hyp*dR;
+		if (beads[i].r.x < lenCyl) {   // if we're in the straight cylinder section
+			cos_alpha = 1.0f;
+			sin_alpha = 0.0f;
+		}
+		
+		// nozzle radius at bead's position:
+		float Rad = radIn;
+		if (beads[i].r.x > lenCyl) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenCyl)/(Box.x-lenCyl);
+		
+		// distance from bead center to wall along direction normal to wall:
+		const float gap = (Rad - ri)*cos_alpha - d;
+						
+		// lubrication force with wall
+		if (gap > 0.0 && gap < d) {
+			// fluid kinematic viscosity:
+			float nu = 0.1666666667;
+			// outward unit normal vector pointing into the wall:
+			float3 n = make_float3(sin_alpha, cos_alpha*(yi/ri), cos_alpha*(zi/ri));			
+			// normal lubrication force:
+			float gapMax = d;
+			float invgap = 1.0/gap - 1.0/gapMax;
+			float velN = dot(beads[i].v,n);						
+			float lubforceN = 6.0*M_PI*nu*d*d*invgap*velN;
+			float lubforceNmag = abs(lubforceN);
+			if (lubforceNmag > lubforceMax) lubforceN *= (lubforceMax/lubforceNmag);
+			beads[i].f -= lubforceN*n;
+			// tangential lubrication force:
+			float3 velT = beads[i].v - velN*n;
+			float velTmag = length(velT);
+			if (velTmag > 1.0e-9){
+				float lubforceT = 6.0*M_PI*nu*d*log(gapMax/gap)*velTmag;
+				float lubforceTmag = abs(lubforceT);
+				if (lubforceTmag > lubforceMax) lubforceT *= (lubforceMax/lubforceTmag);
+				beads[i].f -= lubforceT*(velT/velTmag);
+			}			
+		}
+		
+		// contact force with wall		
+		if (gap < 0.0) {
+			// outward unit normal vector pointing into the wall:
+			float3 n = make_float3(sin_alpha, cos_alpha*(yi/ri), cos_alpha*(zi/ri));		
+			// linear normal force:
+			const float deltaN = abs(gap);
+			const float forceN = A*deltaN;
+			beads[i].f -= forceN*n;		
+			// tangential friction force:
+			float velN = dot(beads[i].v,n);
+			float3 velT = beads[i].v - velN*n;
+			float velTmag = length(velT);
+			float3 deltaT = beads[i].wallContactHist;
+			deltaT += velT*1.0;      // assume timestep dt = 1.0
+			beads[i].f -= A*deltaT;  // may want to cap forceT by fric*forceN
+			beads[i].wallContactHist = deltaT;			
+		}
+		// no contact with wall
+		else {
+			// reset contact wall history:
+			beads[i].wallContactHist = make_float3(0.0f);
+		}		
+					
+	}
+	
+	
+	/*
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
@@ -846,14 +955,29 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		// contact force with wall		
 		if (ri > Rad - d) {			
 			// linear normal force:
-			const float delta = (ri + d) - Rad;  // distance protruding into wall
-			const float force = A*delta;
-			beads[i].f.y -= force*(yi/ri);
-			beads[i].f.z -= force*(zi/ri);			
+			const float deltaN = (ri + d) - Rad;  // distance protruding into wall
+			const float forceN = A*deltaN;
+			beads[i].f.y -= forceN*(yi/ri);
+			beads[i].f.z -= forceN*(zi/ri);			
 			// friction force:
-			beads[i].f.x -= fric*force;	
-		}				
+			const float velT = beads[i].v.x;
+			float deltaT = beads[i].wallContactHist.x;
+			deltaT += velT*1.0;         // assume timestep dt = 1.0
+			float forceT = A*deltaT;  	// may want to cap forceT by fric*forceN		
+			beads[i].f.x -= forceT;	
+			beads[i].wallContactHist.x = deltaT;
+					
+			//printf("bead %i: normal force = %f, friction force = %f \n",i,forceN,forceT);
+						
+		}
+		// no contact with wall
+		else {
+			// reset contact wall history:
+			beads[i].wallContactHist = make_float3(0.0f);
+		}		
+					
 	}
+	*/
 }
 
 
@@ -1075,56 +1199,64 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 		int k0 = int(floor(beads[i].r.z));
 		
 		// --------------------------------------
-		// loop over footprint to get 
-		// interpolated LBM velocity:
+		// only do this if bead is in LBM domain:
 		// --------------------------------------
-				
-		float vxLBMi = 0.0;
-		float vyLBMi = 0.0;
-		float vzLBMi = 0.0;
+		
+		if (i0 >= 0 && j0 >= 0 && k0 >= 0) {
 			
-		for (int kk=k0; kk<=k0+1; kk++) {
-			for (int jj=j0; jj<=j0+1; jj++) {
-				for (int ii=i0; ii<=i0+1; ii++) {				
-					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
-					float rx = beads[i].r.x - float(ii);
-					float ry = beads[i].r.y - float(jj);
-					float rz = beads[i].r.z - float(kk);
-					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
-					vxLBMi += del*uLBM[ndx];
-					vyLBMi += del*vLBM[ndx];
-					vzLBMi += del*wLBM[ndx];			
-				}
-			}
-		}
+			// --------------------------------------
+			// loop over footprint to get 
+			// interpolated LBM velocity:
+			// --------------------------------------
 				
-		// --------------------------------------
-		// calculate hydrodynamic forces 
-		// --------------------------------------
-		
-		float fx = (vxLBMi - beads[i].v.x)/dt/100.0; // /float(nBeadsPerRod);
-		float fy = (vyLBMi - beads[i].v.y)/dt/100.0; // /float(nBeadsPerRod);
-		float fz = (vzLBMi - beads[i].v.z)/dt/100.0; // /float(nBeadsPerRod);
-						
-		// --------------------------------------
-		// distribute the !negative! of the 
-		// hydrodynamic bead force to the LBM
-		// fluid:
-		// --------------------------------------
-		
-		for (int kk=k0; kk<=k0+1; kk++) {
-			for (int jj=j0; jj<=j0+1; jj++) {
-				for (int ii=i0; ii<=i0+1; ii++) {				
-					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
-					float rx = beads[i].r.x - float(ii);
-					float ry = beads[i].r.y - float(jj);
-					float rz = beads[i].r.z - float(kk);
-					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
-					atomicAdd(&fxLBM[ndx],-del*fx);
-					atomicAdd(&fyLBM[ndx],-del*fy);
-					atomicAdd(&fzLBM[ndx],-del*fz);				
+			float vxLBMi = 0.0;
+			float vyLBMi = 0.0;
+			float vzLBMi = 0.0;
+			
+			for (int kk=k0; kk<=k0+1; kk++) {
+				for (int jj=j0; jj<=j0+1; jj++) {
+					for (int ii=i0; ii<=i0+1; ii++) {				
+						int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+						float rx = beads[i].r.x - float(ii);
+						float ry = beads[i].r.y - float(jj);
+						float rz = beads[i].r.z - float(kk);
+						float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+						vxLBMi += del*uLBM[ndx];
+						vyLBMi += del*vLBM[ndx];
+						vzLBMi += del*wLBM[ndx];			
+					}
 				}
 			}
+				
+			// --------------------------------------
+			// calculate hydrodynamic forces 
+			// --------------------------------------
+		
+			float fx = (vxLBMi - beads[i].v.x)/dt/100.0; // /float(nBeadsPerRod);
+			float fy = (vyLBMi - beads[i].v.y)/dt/100.0; // /float(nBeadsPerRod);
+			float fz = (vzLBMi - beads[i].v.z)/dt/100.0; // /float(nBeadsPerRod);
+						
+			// --------------------------------------
+			// distribute the !negative! of the 
+			// hydrodynamic bead force to the LBM
+			// fluid:
+			// --------------------------------------
+		
+			for (int kk=k0; kk<=k0+1; kk++) {
+				for (int jj=j0; jj<=j0+1; jj++) {
+					for (int ii=i0; ii<=i0+1; ii++) {				
+						int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+						float rx = beads[i].r.x - float(ii);
+						float ry = beads[i].r.y - float(jj);
+						float rz = beads[i].r.z - float(kk);
+						float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+						atomicAdd(&fxLBM[ndx],-del*fx);
+						atomicAdd(&fyLBM[ndx],-del*fy);
+						atomicAdd(&fzLBM[ndx],-del*fz);				
+					}
+				}
+			}		
+			
 		}		
 	}	
 }
@@ -1190,23 +1322,28 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 		int k0 = int(floor(beads[i].r.z));
 		
 		// --------------------------------------
-		// loop over footprint
+		// loop over footprint (only if bead is in
+		// LBM domain)
 		// --------------------------------------
 		
-		for (int kk=k0; kk<=k0+1; kk++) {
-			for (int jj=j0; jj<=j0+1; jj++) {
-				for (int ii=i0; ii<=i0+1; ii++) {				
-					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
-					float rx = beads[i].r.x - float(ii);
-					float ry = beads[i].r.y - float(jj);
-					float rz = beads[i].r.z - float(kk);
-					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
-					atomicAdd(&fxLBM[ndx],del*beadForce.x);
-					atomicAdd(&fyLBM[ndx],del*beadForce.y);
-					atomicAdd(&fzLBM[ndx],del*beadForce.z);
-				}
-			}		
-		}		
+		if (i0 >= 0 && j0 >= 0 && k0 >= 0) {
+		
+			for (int kk=k0; kk<=k0+1; kk++) {
+				for (int jj=j0; jj<=j0+1; jj++) {
+					for (int ii=i0; ii<=i0+1; ii++) {				
+						int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);
+						float rx = beads[i].r.x - float(ii);
+						float ry = beads[i].r.y - float(jj);
+						float rz = beads[i].r.z - float(kk);
+						float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));
+						atomicAdd(&fxLBM[ndx],del*beadForce.x);
+						atomicAdd(&fyLBM[ndx],del*beadForce.y);
+						atomicAdd(&fzLBM[ndx],del*beadForce.z);
+					}
+				}		
+			}
+			
+		}	
 	}	
 }
 
@@ -1244,61 +1381,84 @@ __global__ void interpolate_gradient_of_velocity_bead_IBM3D(
 		// loop over footprint to get 
 		// interpolated LBM velocity:
 		// --------------------------------------
-				
-		float dudx = 0.0;
-		float dudy = 0.0;
-		float dudz = 0.0;
-		float dvdx = 0.0;
-		float dvdy = 0.0;
-		float dvdz = 0.0;
-		float dwdx = 0.0;
-		float dwdy = 0.0;
-		float dwdz = 0.0;
-		float uLBMi = 0.0;
-		float vLBMi = 0.0;
-		float wLBMi = 0.0;
 		
-		for (int kk=k0; kk<=k0+1; kk++) {
-			for (int jj=j0; jj<=j0+1; jj++) {
-				for (int ii=i0; ii<=i0+1; ii++) {				
-					float rx = beads[i].r.x - float(ii);
-					float ry = beads[i].r.y - float(jj);
-					float rz = beads[i].r.z - float(kk);
-					float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));								
-					dudx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
-					dudy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
-					dudz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
-					dvdx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
-					dvdy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
-					dvdz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
-					dwdx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
-					dwdy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
-					dwdz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
-					int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);	
-					uLBMi += del*uLBM[ndx];
-					vLBMi += del*vLBM[ndx];
-					wLBMi += del*wLBM[ndx];					
+		if (i0 >= 0 && j0 >= 0 && k0 >= 0) {
+			
+			float dudx = 0.0;
+			float dudy = 0.0;
+			float dudz = 0.0;
+			float dvdx = 0.0;
+			float dvdy = 0.0;
+			float dvdz = 0.0;
+			float dwdx = 0.0;
+			float dwdy = 0.0;
+			float dwdz = 0.0;
+			float uLBMi = 0.0;
+			float vLBMi = 0.0;
+			float wLBMi = 0.0;
+		
+			for (int kk=k0; kk<=k0+1; kk++) {
+				for (int jj=j0; jj<=j0+1; jj++) {
+					for (int ii=i0; ii<=i0+1; ii++) {				
+						float rx = beads[i].r.x - float(ii);
+						float ry = beads[i].r.y - float(jj);
+						float rz = beads[i].r.z - float(kk);
+						float del = (1.0-abs(rx))*(1.0-abs(ry))*(1.0-abs(rz));								
+						dudx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
+						dudy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
+						dudz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,uLBM);
+						dvdx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
+						dvdy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
+						dvdz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,vLBM);
+						dwdx += del*x_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
+						dwdy += del*y_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
+						dwdz += del*z_deriv(ii,jj,kk,Nx,Ny,Nz,wLBM);
+						int ndx = rod_voxel_ndx(ii,jj,kk,Nx,Ny,Nz);	
+						uLBMi += del*uLBM[ndx];
+						vLBMi += del*vLBM[ndx];
+						wLBMi += del*wLBM[ndx];					
+					}
 				}
 			}
+			
+			// --------------------------------------
+			// assign grad(u) to bead
+			// --------------------------------------
+				
+			beads[i].uf.x = uLBMi;
+			beads[i].uf.y = vLBMi;
+			beads[i].uf.z = wLBMi;
+			beads[i].gradu.xx = dudx;
+			beads[i].gradu.xy = dudy;
+			beads[i].gradu.xz = dudz;
+			beads[i].gradu.yx = dvdx;
+			beads[i].gradu.yy = dvdy;
+			beads[i].gradu.yz = dvdz;
+			beads[i].gradu.zx = dwdx;
+			beads[i].gradu.zy = dwdy;
+			beads[i].gradu.zz = dwdz;
+			
 		}
 		
 		// --------------------------------------
-		// assign grad(u) to bead
+		// if bead is outside LBM domain, assign
+		// zeros to u and gradu:
 		// --------------------------------------
-				
-		beads[i].uf.x = uLBMi;
-		beads[i].uf.y = vLBMi;
-		beads[i].uf.z = wLBMi;
-		beads[i].gradu.xx = dudx;
-		beads[i].gradu.xy = dudy;
-		beads[i].gradu.xz = dudz;
-		beads[i].gradu.yx = dvdx;
-		beads[i].gradu.yy = dvdy;
-		beads[i].gradu.yz = dvdz;
-		beads[i].gradu.zx = dwdx;
-		beads[i].gradu.zy = dwdy;
-		beads[i].gradu.zz = dwdz;
-						
+			
+		else {
+			beads[i].uf.x = 0.0;
+			beads[i].uf.y = 0.0;
+			beads[i].uf.z = 0.0;
+			beads[i].gradu.xx = 0.0;
+			beads[i].gradu.xy = 0.0;
+			beads[i].gradu.xz = 0.0;
+			beads[i].gradu.yx = 0.0;
+			beads[i].gradu.yy = 0.0;
+			beads[i].gradu.yz = 0.0;
+			beads[i].gradu.zx = 0.0;
+			beads[i].gradu.zy = 0.0;
+			beads[i].gradu.zz = 0.0;
+		}						
 	}	
 }
 
@@ -1321,6 +1481,8 @@ __global__ void build_bin_lists_for_beads_IBM3D(
 		// calculate bin ID:
 		// -------------------------------
 		
+		if (beads[i].r.x < 0.0) return;
+		
 		int binID = int(floor(beads[i].r.x/bins.sizeBins))*bins.numBins.z*bins.numBins.y +  
 			        int(floor(beads[i].r.y/bins.sizeBins))*bins.numBins.z +
 		            int(floor(beads[i].r.z/bins.sizeBins));		
@@ -1329,7 +1491,7 @@ __global__ void build_bin_lists_for_beads_IBM3D(
 		// update the lists:
 		// -------------------------------
 		
-		if (binID >= 0 && binID < bins.nBins) {
+		if (binID >= 0 && binID < bins.nBins-1) {
 			atomicAdd(&bins.binOccupancy[binID],1);
 			int offst = binID*bins.binMax;
 			for (int k=offst; k<offst+bins.binMax; k++) {
@@ -1370,6 +1532,8 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 			        int(floor(beads[i].r.y/bins.sizeBins))*bins.numBins.z +
 		            int(floor(beads[i].r.z/bins.sizeBins));		
 		
+		if (binID < 0 || binID > bins.nBins-1) return; 
+		
 		// -------------------------------
 		// loop over beads in the same bin:
 		// -------------------------------
@@ -1377,7 +1541,7 @@ __global__ void nonbonded_bead_interactions_IBM3D(
 		int offst = binID*bins.binMax;
 		int occup = bins.binOccupancy[binID];
 		if (occup > bins.binMax) {
-			printf("occup = %i \n", occup);
+			printf("occup = %i in Bin %i\n", occup, binID);
 			occup = bins.binMax;
 		}
 								
@@ -1438,6 +1602,8 @@ __global__ void nonbonded_bead_interactions_with_friction_IBM3D(
 			        int(floor(beads[i].r.y/bins.sizeBins))*bins.numBins.z +
 		            int(floor(beads[i].r.z/bins.sizeBins));		
 		
+		if (binID < 0 || binID > bins.nBins-1) return;
+		
 		// -------------------------------
 		// loop over beads in the same bin:
 		// -------------------------------
@@ -1445,7 +1611,7 @@ __global__ void nonbonded_bead_interactions_with_friction_IBM3D(
 		int offst = binID*bins.binMax;
 		int occup = bins.binOccupancy[binID];
 		if (occup > bins.binMax) {
-			printf("occup = %i \n", occup);
+			printf("occup = %i in Bin %i\n", occup, binID);
 			occup = bins.binMax;
 		}
 								
@@ -1507,6 +1673,8 @@ __global__ void nonbonded_bead_interactions_with_virial_IBM3D(
 			        int(floor(beads[i].r.y/bins.sizeBins))*bins.numBins.z +
 		            int(floor(beads[i].r.z/bins.sizeBins));		
 		
+		if (binID < 0 || binID > bins.nBins-1) return;
+		
 		// -------------------------------
 		// loop over beads in the same bin:
 		// -------------------------------
@@ -1514,7 +1682,7 @@ __global__ void nonbonded_bead_interactions_with_virial_IBM3D(
 		int offst = binID*bins.binMax;
 		int occup = bins.binOccupancy[binID];
 		if (occup > bins.binMax) {
-			printf("occup = %i \n", occup);
+			printf("occup = %i in Bin %i\n", occup, binID);
 			occup = bins.binMax;
 		}
 								

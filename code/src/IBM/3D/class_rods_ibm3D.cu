@@ -214,6 +214,7 @@ void class_rods_ibm3D::create_first_rod()
 		
 	// set up indices for ALL rods:
 	for (int f=0; f<nRods; f++) {
+		rodsH[f].rodType = 0;
 		rodsH[f].nBeads = nBeadsPerRod;
 		rodsH[f].indxB0 = f*nBeadsPerRod;      // start index for beads
 		rodsH[f].headBead = f*nBeadsPerRod;    // head bead (first bead)
@@ -515,6 +516,77 @@ void class_rods_ibm3D::randomize_rods_nozzle(float lenCylinder, float radInlet, 
 
 
 // --------------------------------------------------------
+// randomize rod positions for nozzle, but place rods
+// in the cylinder and backfill zones only:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::randomize_rods_nozzle_backfill(float lenCylinder, float radInlet, float radOutlet, float Lrod)
+{
+	// copy bead positions from device to host:
+	cudaMemcpy(beadsH, beads, sizeof(beadrod)*nBeads, cudaMemcpyDeviceToHost);
+	
+	// find length of backfill zone such that volume of backfill zone is equal to volume of nozzle zone:
+	float Vnozzle = M_PI*(Box.x-lenCylinder)*(radInlet*radInlet + radOutlet*radOutlet + radInlet*radOutlet)/3.0;	
+	float lenBackfill = Vnozzle/(M_PI*radInlet*radInlet);
+	float offset = Lrod/2.0 + 1.0;   // rod half-length plus a little
+
+	// loop over rods:
+	for (int i=0; i<nRods; i++) {
+		
+		// find new rod position & orientation in loading zone or backfill zone:
+		while (true) {
+			
+			// get random position in loading zone:
+			float ran1 = (float)rand()/RAND_MAX;
+			float ran2 = (float)rand()/RAND_MAX;
+			float ran3 = (float)rand()/RAND_MAX;
+			float lenRange = lenBackfill + lenCylinder;
+			float xpo = -lenBackfill + offset + ran1*(lenRange - 2.0*offset);
+			float rad = ran2*(radInlet);
+			float ang = ran3*(2*M_PI);
+			rodsH[i].r.x = xpo;
+			rodsH[i].r.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+			rodsH[i].r.z = rad*sin(ang) + (Box.z-1.0)/2.0;
+		
+			// get random orientation:
+			float ran4 = (float)rand()/RAND_MAX;
+			float ran5 = (float)rand()/RAND_MAX;
+			float phi = ran4*(2*M_PI);  // azimuthal angle
+			float psi = 2.0*ran5 - 1.0; // random num from -1 to 1
+			rodsH[i].p.x = sqrt(1.0-psi*psi)*cos(phi);
+			rodsH[i].p.y = sqrt(1.0-psi*psi)*sin(phi);
+			rodsH[i].p.z = psi;
+				
+			// radial position of rod head:
+			float3 head = rodsH[i].r + offset*rodsH[i].p;		
+			float ymid = (Box.y-1.0)/2.0;
+			float zmid = (Box.z-1.0)/2.0;
+			float hyi = head.y - ymid;  // distance to channel centerline
+			float hzi = head.z - zmid;  // "                            "
+			float hri = sqrt(hyi*hyi + hzi*hzi);
+					
+			// radial position of rod tail:
+			float3 tail = rodsH[i].r - offset*rodsH[i].p;			
+			float tyi = tail.y - ymid;  // distance to channel centerline
+			float tzi = tail.z - zmid;  // "                            "
+			float tri = sqrt(tyi*tyi + tzi*tzi);
+			
+			// if head and tail are inside the radial wall, then accept and exit:
+			if (hri < radInlet && tri < radInlet) {
+				rotate_and_shift_bead_positions_using_orientation_vector(i);
+				break;
+			}
+			
+		}		
+	}
+		
+	// copy bead positions from host to device:
+	cudaMemcpy(beads, beadsH, sizeof(beadrod)*nBeads, cudaMemcpyHostToDevice);	
+}
+
+
+
+// --------------------------------------------------------
 // randomize rod positions, but all oriented in x-dir:
 // --------------------------------------------------------
 
@@ -701,6 +773,24 @@ void class_rods_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float
 		beadsH[i].r.y = yrot + ysh;
 		beadsH[i].r.z = zrot + zsh;
 		beadsH[i].rm1 = beadsH[i].r;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// Shift IBM start positions by specified amount:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::rotate_and_shift_bead_positions_using_orientation_vector(int fID)
+{
+	// update node positions:
+	int istr = rodsH[fID].indxB0;
+	int iend = istr + rodsH[fID].nBeads;
+	
+	for (int i=istr; i<iend; i++) {
+		float offset = float(rodsH[fID].centerBead - i);
+		beadsH[i].r = rodsH[fID].r + L0*offset*rodsH[fID].p;
 	}
 }
 
@@ -916,7 +1006,8 @@ void class_rods_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, 
 // --------------------------------------------------------
 
 void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float lenCylinder, 
-                                                    float lenInlet, float radInlet, float radOutlet, int nBlocks, int nThreads) 
+                                                    float lenInlet, float radInlet, float radOutlet,
+													float backfillVel, int nBlocks, int nThreads) 
 {
 		
 	// ----------------------------------------------------------
@@ -938,8 +1029,8 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	if (nRods > 1) {
 		reset_bin_lists(nBlocks,nThreads);
 		build_bin_lists(nBlocks,nThreads);
-	}	
-	
+	}
+		
 	// calculate IBM forces:
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
@@ -951,8 +1042,8 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	
 	// update IBM positions:
 	enforce_max_rod_force_torque(nBlocks,nThreads);
+	assign_velocity_to_backfill_rods(backfillVel,nBlocks,nThreads);
 	update_rod_position_orientation_fluid(nBlocks,nThreads);
-	//move_rod_back_to_inlet(radInlet,radOutlet,nBlocks,nThreads);
 	move_rod_back_to_inlet_random(lenInlet,radInlet,radOutlet,nBlocks,nThreads);
 	update_bead_position_rods(nBlocks,nThreads);
 	update_bead_velocity_rods(nBlocks,nThreads);
@@ -1491,6 +1582,18 @@ void class_rods_ibm3D::update_rod_position_fluid(int nBlocks, int nThreads)
 	
 	wrap_rod_coordinates_IBM3D
 	<<<nBlocks,nThreads>>> (rods,Box,pbcFlag,nRods);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "assign_velocity_to_backfill_rods_IBM3D" kernel: 
+// --------------------------------------------------------
+
+void class_rods_ibm3D::assign_velocity_to_backfill_rods(float backfillVel, int nBlocks, int nThreads)
+{
+	assign_velocity_to_backfill_rods_IBM3D
+	<<<nBlocks,nThreads>>> (rods,backfillVel,nRods);	
 }
 
 

@@ -104,6 +104,12 @@ __global__ void update_rod_position_fluid_IBM3D(
 	int);
 
 
+__global__ void assign_velocity_to_backfill_rods_IBM3D(
+	rod*,
+	float,
+	int);
+		
+
 __global__ void move_rod_back_to_inlet_IBM3D(
 	rod*,
 	float3,

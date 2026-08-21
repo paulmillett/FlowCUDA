@@ -41,6 +41,7 @@ private:
 	float lenInlet;
 	float lenCylinder;
 	float Q0;
+	float backfillVel;
 	bool initRandom;
 	
 	// objects:
