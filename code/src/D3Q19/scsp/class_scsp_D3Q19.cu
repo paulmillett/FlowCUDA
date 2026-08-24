@@ -958,6 +958,21 @@ void class_scsp_D3Q19::extrapolate_force_bead_rod(int nBlocks, int nThreads,
 
 
 // --------------------------------------------------------
+// Call to "extrapolate_force_bead_disc_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::extrapolate_force_bead_disc(int nBlocks, int nThreads,
+	                                               beaddisc* beads, disc* discs, int nBeads)
+{
+	extrapolate_force_bead_disc_IBM3D
+	<<<nBlocks,nThreads>>> (beads,discs,Fx,Fy,Fz,Nx,Ny,Nz,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
 // Call to "hydrodynamic_force_rigid_node_IBM3D" kernel.  
 // Note: this kernel is in the IBM/3D folder, and one
 //       should use nBlocks as if calling an IBM kernel.
@@ -980,6 +995,21 @@ void class_scsp_D3Q19::hydrodynamic_force_rigid_node(int nBlocks, int nThreads,
 
 void class_scsp_D3Q19::interpolate_gradient_of_velocity_rod(int nBlocks, int nThreads,
 	                                                        beadrod* beads, int nBeads)
+{
+	interpolate_gradient_of_velocity_bead_IBM3D
+	<<<nBlocks,nThreads>>> (beads,u,v,w,Nx,Ny,Nz,nBeads);	
+}
+
+
+
+// --------------------------------------------------------
+// Call to "interpolate_gradient_of_velocity_bead_IBM3D" kernel.  
+// Note: this kernel is in the IBM/3D folder, and one
+//       should use nBlocks as if calling an IBM kernel.
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::interpolate_gradient_of_velocity_disc(int nBlocks, int nThreads,
+	                                                         beaddisc* beads, int nBeads)
 {
 	interpolate_gradient_of_velocity_bead_IBM3D
 	<<<nBlocks,nThreads>>> (beads,u,v,w,Nx,Ny,Nz,nBeads);	

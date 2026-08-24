@@ -13,11 +13,13 @@
 # include "../../IBM/3D/kernels_filaments_ibm3D.cuh"
 # include "../../IBM/3D/kernels_fibers_ibm3D.cuh"
 # include "../../IBM/3D/kernels_rods_ibm3D.cuh"
+# include "../../IBM/3D/kernels_discs_ibm3D.cuh"
 # include "../../IBM/3D/kernels_rigids_ibm3D.cuh"
 # include "../../IBM/3D/data_structs/cell_data.h"
 # include "../../IBM/3D/data_structs/filament_data.h"
 # include "../../IBM/3D/data_structs/fiber_data.h"
 # include "../../IBM/3D/data_structs/rod_data.h"
+# include "../../IBM/3D/data_structs/disc_data.h"
 # include "../../IBM/3D/data_structs/rigid_data.h"
 # include "kernels_scsp_D3Q19.cuh"
 # include <cuda.h>
@@ -156,8 +158,10 @@ public:
 	void hydrodynamic_forces_fibers_IBM_LBM(int,int,float,beadfiber*,int);
 	void hydrodynamic_force_bead_rod(int,int,beadrod*,int,int);
 	void extrapolate_force_bead_rod(int,int,beadrod*,rod*,float,int,int);
+	void extrapolate_force_bead_disc(int,int,beaddisc*,disc*,int);
 	void hydrodynamic_force_rigid_node(int,int,rigidnode*,int);
 	void interpolate_gradient_of_velocity_rod(int,int,beadrod*,int);
+	void interpolate_gradient_of_velocity_disc(int,int,beaddisc*,int);
 	void inside_hemisphere(int,int);
 	void calculate_flow_rate_xdir(std::string,int);
 	void calculate_relative_viscosity(std::string,float,int);

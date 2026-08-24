@@ -79,15 +79,36 @@ struct quaternion {
 		z *= norm;
 	}
 	
+	// assuming omega_body is angular velocity in the world frame
 	inline __host__ __device__ void update(float dt, float3 omega_body) {
 		float dw = 0.5 * (-x*omega_body.x - y*omega_body.y - z*omega_body.z);
-		float dx = 0.5 * ( w*omega_body.x - z*omega_body.y + y*omega_body.z);
-		float dy = 0.5 * ( z*omega_body.x + w*omega_body.y - x*omega_body.z);
-		float dz = 0.5 * (-y*omega_body.x + x*omega_body.y + w*omega_body.z);
+		float dx = 0.5 * ( w*omega_body.x + z*omega_body.y - y*omega_body.z);
+		float dy = 0.5 * (-z*omega_body.x + w*omega_body.y + x*omega_body.z);
+		float dz = 0.5 * ( y*omega_body.x - x*omega_body.y + w*omega_body.z);
 		w += dt*dw;
 		x += dt*dx;
 		y += dt*dy;
 		z += dt*dz;
+	}
+	
+	// extract orientation vector "p" from quaternion 
+	// assuming initial "p" was along z-axis (0,0,1) (this is used for rigid discs simulations)
+	inline __host__ __device__ float3 orientation_vec() {
+		float3 p;
+		p.x = 2.0f*(x*z + w*y);
+		p.y = 2.0f*(y*z - w*x);
+		p.z = w*w - x*x - y*y + z*z;
+		return p;
+	}
+	
+	// overload operator* for (quaternion * float3)
+	// implementation uses the Goldsmith's optimized formula: 
+	// v' = v + 2 * cross(q.vec, cross(q.vec, v) + q.w * v)
+	inline __host__ __device__ float3 operator*(float3 v) {
+		float3 q_vec = make_float3(x,y,z);
+		float3 t = cross(q_vec,v)*2.0f;
+		float3 rotated_vector = v + (t*w) + cross(q_vec,t);
+		return rotated_vector;
 	}
 	
 };
