@@ -46,8 +46,8 @@ class_discs_ibm3D::class_discs_ibm3D()
 	GetPot inputParams("input.dat");
 	
 	// mesh attributes
-	nDiscs = inputParams("IBM_RODS/nDiscs",1);
-	nBeadsPerDisc = inputParams("IBM_RODS/nBeadsPerDisc",0);
+	nDiscs = inputParams("IBM_DISCS/nDiscs",1);
+	nBeadsPerDisc = inputParams("IBM_DISCS/nBeadsPerDisc",0);
 	nBeads = nBeadsPerDisc*nDiscs;
 	
 	// mechanical properties	
@@ -199,25 +199,37 @@ void class_discs_ibm3D::memcopy_device_to_host()
 
 void class_discs_ibm3D::create_first_disc()
 {
-	/*
-	// set up the bead information for first rod:
-	for (int i=0; i<nBeadsPerDisc; i++) {
-		beadsH[i].r.x = 0.0 + float(i)*L0;
-		beadsH[i].r.y = 0.0;
-		beadsH[i].r.z = 0.0;
+	// read bead information for the first disc:
+	std::string fname = "disc.dat";
+	ifstream infile;
+	infile.open(fname, ios::in);
+	int nB,centerBead;
+	
+	infile >> nB >> centerBead;
+	if (nB != nBeadsPerDisc) cout << "number of IBM beads is NOT consistent with input file = " << nB << endl;
+	
+	for (int i=0; i<nB; i++) {
+		infile >> beadsH[i].r.x >> beadsH[i].r.y >> beadsH[i].r.z;
 		beadsH[i].rm1 = beadsH[i].r;
 		beadsH[i].f = make_float3(0.0f);
-		beadsH[i].rodID = 0;
+		beadsH[i].v = make_float3(0.0f);
+		beadsH[i].uf = make_float3(0.0f);
+		beadsH[i].wallContactHist = make_float3(0.0f);
+		beadsH[i].discID = 0;
 	}
-	*/
-		
+	
+	// each bead calculates distance to disc center-of-mass:
+	for (int i=0; i<nB; i++) {
+		beadsH[i].rrel = beadsH[i].r - beadsH[centerBead].r;
+	}	
+			
 	// set up indices for ALL discs:
 	for (int i=0; i<nDiscs; i++) {
 		discsH[i].discType = 0;
 		discsH[i].nBeads = nBeadsPerDisc;
-		discsH[i].indxB0 = i*nBeadsPerDisc;      // start index for beads
-		//discsH[i].centerBead = i*nBeadsPerRod + nBeadsPerRod/2;  // center-of-mass, assuming nBeadsPerRod is odd
-		discsH[i].q.set_values(0.0f,0.0f,0.0f,1.0f);
+		discsH[i].indxB0 = i*nBeadsPerDisc;                   // start index for beads
+		discsH[i].centerBead = i*nBeadsPerDisc + centerBead;  // center-of-mass
+		discsH[i].q.set_values(0.0f,0.0f,0.0f,1.0f);          // initial normal vector is along z (0,0,1)
 	}
 }
 
@@ -234,7 +246,7 @@ void class_discs_ibm3D::set_pbcFlag(int x, int y, int z)
 
 void class_discs_ibm3D::set_discs_radii(float rad)
 {
-	// set radius for ALL cells:
+	// set radius for ALL discs:
 	for (int i=0; i<nDiscs; i++) discsH[i].rad = rad;
 }
 
@@ -242,6 +254,18 @@ void class_discs_ibm3D::set_disc_radius(int dID, float rad)
 {
 	// set radius for ONE disc:
 	discsH[dID].rad = rad;
+}
+
+void class_discs_ibm3D::set_discs_half_thickness(float val)
+{
+	// set h2 for ALL discs:
+	for (int i=0; i<nDiscs; i++) discsH[i].h2 = val;
+}
+
+void class_discs_ibm3D::set_disc_half_thickness(int dID, float val)
+{
+	// set h2 for ONE disc:
+	discsH[dID].h2 = val;
 }
 
 void class_discs_ibm3D::set_discs_types(int val)
@@ -302,12 +326,17 @@ void class_discs_ibm3D::duplicate_discs()
 				cout << "duplicate discs error: discs have different nBeads" << endl;
 				continue;
 			}
+			
 			// copy bead information:
 			for (int i=0; i<discsH[0].nBeads; i++) {
 				int ii = i + discsH[d].indxB0;
 				beadsH[ii].r = beadsH[i].r;
 				beadsH[ii].f = beadsH[i].f;
+				beadsH[ii].v = beadsH[i].v;
+				beadsH[ii].uf = beadsH[i].uf;
+				beadsH[ii].wallContactHist = beadsH[i].wallContactHist;
 				beadsH[ii].rm1 = beadsH[i].rm1;
+				beadsH[ii].rrel = beadsH[i].rrel;
 				beadsH[ii].discID = d;
 			}
 		}
@@ -320,32 +349,47 @@ void class_discs_ibm3D::duplicate_discs()
 // Set mobility coefficients based on disc aspect ratio:
 // --------------------------------------------------------
 
-void class_discs_ibm3D::set_mobility_coefficients(float nu, float ar, float Lrod)
+void class_discs_ibm3D::set_mobility_coefficients(float nu, float ar, float discR)
 {
 	// ----------------------------------------------			
-	// mobility coefficients.  See Luders et al. 
-	// J. Chem. Phys. 159:054901 (2023) Eqs. (15-17)
-	// (note: mobility = diffusivity/kT)
+	// mobility coefficients.  
+	// (note: mobility = diffusivity/kT = (friction coeff)^-1)
 	// (assume fluid density = 1)
+	// (note: sending ar=1 will cause NaN)
 	// ----------------------------------------------
-		
-	float mobPar = (log(ar) - 0.207 + 0.980/ar - 0.133/(ar*ar)) / (2.0*M_PI*nu*Lrod); 
-	float mobPer = (log(ar) + 0.839 + 0.185/ar + 0.233/(ar*ar)) / (4.0*M_PI*nu*Lrod);
-	float mobRot = (log(ar) - 0.662 + 0.917/ar - 0.050/(ar*ar)) / (M_PI*nu*Lrod*Lrod*Lrod) * 3.0;
+	
+	float ar2 = ar*ar;                // aspect ratio squared
+	float a = discR;                  // disc radius
+	float e = sqrtf(1.0f - ar2);      // eccentricity
+	float S = (2.0f/e)*std::asin(e);  // integral shape factor = Perrin shape factor
+	
+	// friction coefficients:
+	float KparT = 16.0f*M_PI*nu*a*(1.0f-ar2)/(S + ar2*S - 2*ar);
+	float KperT = 32.0f*M_PI*nu*a*(1.0f-ar2)/(2.0f*ar + (1.0f - 3.0f*ar2)*S);
+	float KparR = 32.0f*M_PI*nu*a*a*a*(1.0f-ar2)/(2.0f*ar - ar2*S)/3.0f;
+	float KperR = 32.0f*M_PI*nu*a*a*a*(1.0f-ar2*ar2)/((1.0f+ar2)*S - 2.0f*ar)/3.0f;
+	
+	// mobility coefficients (inverse of friction coefficients):	
+	float mobParT = 1.0f/KparT;
+	float mobPerT = 1.0f/KperT;
+	float mobParR = 1.0f/KparR;
+	float mobPerR = 1.0f/KperR;
 		
 	// set mobility coefficients for ALL discs:
 	for (int d=0; d<nDiscs; d++) {
-		discsH[d].mobPar = mobPar;
-		discsH[d].mobPer = mobPer;
-		discsH[d].mobRot = mobRot;
+		discsH[d].mobParT = mobParT;
+		discsH[d].mobPerT = mobPerT;
+		discsH[d].mobParR = mobParR;
+		discsH[d].mobPerR = mobPerR;
 	}
 	
 	// output the numbers:
 	cout << " " << endl;
 	cout << "Disc aspect ratio = " << ar << endl;
-	cout << "Disc mobility coeff (parallel) = " << mobPar << endl;
-	cout << "Disc mobility coeff (perpendicular) = " << mobPer << endl;
-	cout << "Disc mobility coeff (rotational) = " << mobRot << endl;	
+	cout << "Disc mobility coeff (Translational parallel) = "      << mobParT << endl;
+	cout << "Disc mobility coeff (Translational perpendicular) = " << mobPerT << endl;
+	cout << "Disc mobility coeff (Rotational parallel) = "         << mobParR << endl;
+	cout << "Disc mobility coeff (Rotational perpendicular) = "    << mobPerR << endl;	
 }
 
 
@@ -560,10 +604,10 @@ float class_discs_ibm3D::calc_separation_pbc(float3 r1, float3 r2)
 // Shift IBM start positions by specified amount:
 // --------------------------------------------------------
 
-void class_discs_ibm3D::shift_bead_positions(int fID, float xsh, float ysh, float zsh)
+void class_discs_ibm3D::shift_bead_positions(int dID, float xsh, float ysh, float zsh)
 {
-	int istr = discsH[fID].indxB0;
-	int iend = istr + discsH[fID].nBeads;
+	int istr = discsH[dID].indxB0;
+	int iend = istr + discsH[dID].nBeads;
 	for (int i=istr; i<iend; i++) {
 		beadsH[i].r.x += xsh;
 		beadsH[i].r.y += ysh;
@@ -578,7 +622,7 @@ void class_discs_ibm3D::shift_bead_positions(int fID, float xsh, float ysh, floa
 // Shift IBM start positions by specified amount:
 // --------------------------------------------------------
 
-void class_discs_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float ysh, float zsh)
+void class_discs_ibm3D::rotate_and_shift_bead_positions(int dID, float xsh, float ysh, float zsh)
 {
 	// random rotation angles:
 	float a = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // alpha
@@ -586,8 +630,8 @@ void class_discs_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, floa
 	float g = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // gamma
 	
 	// update node positions:
-	int istr = discsH[fID].indxB0;
-	int iend = istr + discsH[fID].nBeads;
+	int istr = discsH[dID].indxB0;
+	int iend = istr + discsH[dID].nBeads;
 	
 	for (int i=istr; i<iend; i++) {
 		// rotate:
@@ -605,26 +649,35 @@ void class_discs_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, floa
 
 
 // --------------------------------------------------------
-// Shift IBM start positions by specified amount:
+// Shift bead positions by specified amount:
 // --------------------------------------------------------
 
-void class_discs_ibm3D::rotate_and_shift_bead_positions(int fID, float xsh, float ysh, float zsh, float a, float b, float g)
+void class_discs_ibm3D::rotate_and_shift_bead_positions(int dID, float xsh, float ysh, float zsh, float a, float b, float g)
 {
-	// update node positions:
-	int istr = discsH[fID].indxB0;
-	int iend = istr + discsH[fID].nBeads;
+	// rotation tensor:
+	tensor R;
+	R.xx = cos(a)*cos(b); R.xy = cos(a)*sin(b)*sin(g)-sin(a)*cos(g); R.xz = cos(a)*sin(b)*cos(g)+sin(a)*sin(g);
+	R.yx = sin(a)*cos(b); R.yy = sin(a)*sin(b)*sin(g)+cos(a)*cos(g); R.yz = sin(a)*sin(b)*cos(g)-cos(a)*sin(g);
+	R.zx = -sin(b);       R.zy = cos(b)*sin(g);                      R.zz = cos(b)*cos(g);
 	
+	// translation vector:
+	float3 rtrans = make_float3(xsh,ysh,zsh);
+	
+	// update bead positions:
+	int istr = discsH[dID].indxB0;
+	int iend = istr + discsH[dID].nBeads;
 	for (int i=istr; i<iend; i++) {
 		// rotate:
-		float xrot = beadsH[i].r.x*(cos(a)*cos(b)) + beadsH[i].r.y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + beadsH[i].r.z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
-		float yrot = beadsH[i].r.x*(sin(a)*cos(b)) + beadsH[i].r.y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + beadsH[i].r.z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
-		float zrot = beadsH[i].r.x*(-sin(b))       + beadsH[i].r.y*(cos(b)*sin(g))                      + beadsH[i].r.z*(cos(b)*cos(g));
-		// shift:		 
-		beadsH[i].r.x = xrot + xsh;
-		beadsH[i].r.y = yrot + ysh;
-		beadsH[i].r.z = zrot + zsh;
+		float3 rrot = R*beadsH[i].r;
+		// shift:
+		beadsH[i].r = rrot + rtrans;
 		beadsH[i].rm1 = beadsH[i].r;
 	}
+	
+	// update disc quaternion by a global rotation: q = dq * q;
+	quaternion dq;
+	dq.set_values(R);
+	discsH[dID].q = discsH[dID].q.premultiply(dq);
 }
 
 
@@ -1158,10 +1211,8 @@ void class_discs_ibm3D::push_discs_inside_nozzle(float lenCylinder, float radInl
 
 void class_discs_ibm3D::write_output(std::string tagname, int tagnum)
 {
-	/*
 	write_vtk_immersed_boundary_3D_discs(tagname,tagnum,
-	nBeads,nBeadsPerRod,nDiscs,beadsH,discsH);
-	*/
+	nBeads,nBeadsPerDisc,nDiscs,beadsH,discsH);
 }
 
 

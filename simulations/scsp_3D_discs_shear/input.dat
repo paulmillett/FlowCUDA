@@ -1,0 +1,60 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_discs_shear
+	nu = 0.1666666667
+	bodyForx = 0.00001
+	Re = 0.5
+	shearRate = 0.001
+[]
+
+
+[IBM_DISCS]
+	nBeadsPerDisc = 362
+	nDiscs = 1
+	diam = 6.0
+	thickness = 0.5
+	sizeBins = 2.0
+	binMax = 200
+	repA = 0.005
+	repD = 0.5
+	lubforceMax = 0.001
+	repWall = 0.1
+	fricWall = 0.15
+	rodFmax = 0.1
+	rodTmax = 0.1
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 262144
+	Nx = 64
+	Ny = 64
+	Nz = 64
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 127000 
+	nStepsEquilibrate = 0
+[]
+
+
+[Output]
+	nOutputs = 40 #200
+	nVTKOutputs = 40 #200
+	format = structured
+	fName = macros
+	iskip = 2
+	jskip = 2
+	kskip = 2 
+[]
+
+

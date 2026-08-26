@@ -64,6 +64,7 @@
 # include "../Apps/scsp_3D_filaments_capsule.cuh"
 # include "../Apps/scsp_3D_filaments_capsule_pusher.cuh"
 # include "../Apps/scsp_3D_filaments_capsule_overdamp.cuh"
+# include "../Apps/scsp_3D_discs_shear.cuh"
 # include "../Apps/scsp_3D_rods_fluid.cuh"
 # include "../Apps/scsp_3D_rods_settling.cuh"
 # include "../Apps/scsp_3D_rods_kolmogorov.cuh"
@@ -161,6 +162,7 @@ FlowBase* FlowBase::FlowObjectFactory(string specifier)
 	if (specifier == "scsp_3D_filaments_capsule") return new scsp_3D_filaments_capsule();
 	if (specifier == "scsp_3D_filaments_capsule_pusher") return new scsp_3D_filaments_capsule_pusher();
 	if (specifier == "scsp_3D_filaments_capsule_overdamp") return new scsp_3D_filaments_capsule_overdamp();
+	if (specifier == "scsp_3D_discs_shear") return new scsp_3D_discs_shear();
 	if (specifier == "scsp_3D_rods_fluid") return new scsp_3D_rods_fluid();
 	if (specifier == "scsp_3D_rods_settling") return new scsp_3D_rods_settling();
 	if (specifier == "scsp_3D_rods_kolmogorov") return new scsp_3D_rods_kolmogorov();

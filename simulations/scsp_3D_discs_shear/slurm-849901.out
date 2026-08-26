@@ -1,0 +1,55 @@
+scsp_3D_rods_fluid
+binsFlag = true
+largest array size = 262144
+nBlocks = 512, nThreads = 512
+  
+Rod kT = 0.001
+Rod fp = 0.00631579
+Rod up = 0.00804559
+Rod fricT = 3.37334
+Rod noiseT = 0.0821382
+Rod fricR = 12.193
+Rod noiseR = 0.15616
+start binMap...
+finish binMap...
+start memcopy for rods
+nBeads = 950
+nRods = 50
+end memcopy for rods
+ 
+-----------------------------------------------
+Equilibrating for 0 steps...
+ 
+... done equilibrating!
+-----------------------------------------------
+ 
+3000
+6000
+9000
+12000
+15000
+18000
+21000
+24000
+27000
+30000
+33000
+36000
+39000
+42000
+45000
+48000
+51000
+54000
+57000
+60000
+63000
+66000
+69000
+72000
+75000
+78000
+81000
+84000
+87000
+90000

@@ -63,6 +63,8 @@ class class_discs_ibm3D {
 	void set_pbcFlag(int,int,int);	
 	void set_discs_radii(float);
 	void set_disc_radius(int,float);
+	void set_discs_half_thickness(float);
+	void set_disc_half_thickness(int,float);
 	void set_discs_types(int);
 	void set_disc_type(int,int);
 	void set_aspect_ratio(float);

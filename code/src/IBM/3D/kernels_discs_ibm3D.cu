@@ -205,24 +205,27 @@ __global__ void update_disc_position_orientation_fluid_IBM3D(
 		// mobility coefficients
 		tensor ppT = dyadic(discs[i].p);
 		tensor Imppt = identity() - ppT;
-		tensor mobTensor = discs[i].mobPar*ppT + discs[i].mobPer*Imppt;
+		tensor mobTensorT = discs[i].mobParT*ppT + discs[i].mobPerT*Imppt;
+		tensor mobTensorR = discs[i].mobParR*ppT + discs[i].mobPerR*Imppt;
 	
 		// disc translation:	
-		discs[i].r += dt*(discs[i].uf + mobTensor*discs[i].f);
+		discs[i].r += dt*(discs[i].uf + mobTensorT*discs[i].f);
 		
 		// disc shape factor for rotation:
+		// the effective aspect ratio of a thin disk is taken from
+		// Singh et al. POF 26:033303 (2014) see bottom of p. 28
 		float ar = discs[i].ar;
-		//if (ar > 5.0) ar = (1.24*ar)/sqrt(log(ar));  // correction factor for discs vs spheroids: Cox, JFM (1971) 45:625-657 
-		float shape = (ar*ar - 1.0)/(ar*ar + 1.0);   // Bretherton constant
+		ar *= 1.12f*std::pow(ar,-0.25f)*sqrtf(1.0f + 0.21f*sqrtf(ar));;
+		float shape = (ar*ar - 1.0f)/(ar*ar + 1.0f);  // Bretherton constant
 		
 		// fluid strain rate tensor (E) and vorticity tensor (W):
-		tensor E = 0.5*(discs[i].gradu + transpose(discs[i].gradu));
-		tensor W = 0.5*(discs[i].gradu - transpose(discs[i].gradu));
+		tensor E = 0.5f*(discs[i].gradu + transpose(discs[i].gradu));
+		tensor W = 0.5f*(discs[i].gradu - transpose(discs[i].gradu));
 		float3 Wvec = make_float3(-W.yz,W.xz,-W.xy);  // vorticity vector
 		
 		// angular velocity of disc:
 		float3 p = discs[i].p;
-		float3 omegaDisc = Wvec + shape*(cross(p,E*p));   // WHAT ABOUT TORQUES...!
+		float3 omegaDisc = Wvec + shape*(cross(p,E*p)) + mobTensorR*discs[i].t;
 		
 		// update disc quaternion:
 		discs[i].q.update(dt,omegaDisc);

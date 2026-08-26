@@ -32,21 +32,22 @@ struct disc {
 	int discType;
 	int centerBead;
 	int nBeads;
-	int indxB0;   // starting bead index for disc
-	float rad;    // radius of disc 
-	float h2;     // half of disc thickness
-	float ar;     // aspect ratio of disc
-	float mobPar; // mobility coefficient (parallel)
-	float mobPer; // mobility coefficient (perpendicular)
-	float mobRot; // mobility coefficient (rotational)
-	float3 r;     // position
-	float3 v;     // velocity
-	float3 f;     // force	
-	float3 t;     // torque
-	float3 p;     // orientation vector
-	float3 uf;    // fluid velocity at rod position
-	tensor gradu; // gradient of fluid velocity
-	quaternion q; // quaternion that fully defines disc orientation
+	int indxB0;    // starting bead index for disc
+	float rad;     // radius of disc 
+	float h2;      // half of disc thickness
+	float ar;      // aspect ratio of disc
+	float mobParT; // mobility coefficient translational (parallel)
+	float mobPerT; // mobility coefficient translational (perpendicular)
+	float mobParR; // mobility coefficient rotational    (parallel)
+	float mobPerR; // mobility coefficient rotational    (parallel)
+	float3 r;      // position
+	float3 v;      // velocity
+	float3 f;      // force	
+	float3 t;      // torque
+	float3 p;      // orientation vector
+	float3 uf;     // fluid velocity at rod position
+	tensor gradu;  // gradient of fluid velocity
+	quaternion q;  // quaternion that fully defines disc orientation
 };
 
 
