@@ -91,6 +91,17 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	cout << " " << endl;
 	
 	// ----------------------------------------------
+	// calculate nozzle half angle:
+	// ----------------------------------------------
+	
+	float dR = radInlet - radOutlet;
+	float Lnoz = float(Nx) - lenCylinder;
+	float alpha = asin(dR/Lnoz)*(180.0f/M_PI);
+	cout << " " << endl;
+	cout << "nozzle half-angle alpha = " << alpha << endl;
+	cout << " " << endl;
+	
+	// ----------------------------------------------
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
@@ -154,7 +165,7 @@ scsp_3D_rods_nozzle::scsp_3D_rods_nozzle() : lbm(),rods()
 	// of outlet...?
 	// ----------------------------------------------
 	
-	backfillVel = umax/2.0;
+	backfillVel = umax/3.0;     // this seems to be a good approximation
 	
 	cout << "backfill rod velocity = " << backfillVel << endl; 
 	cout << "  " << endl;

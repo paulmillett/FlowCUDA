@@ -840,8 +840,8 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		const float A = repA;
 		
 		// distance to channel centerline 
-		const float ymid = (Box.y-1.0)/2.0;
-		const float zmid = (Box.z-1.0)/2.0;
+		const float ymid = (Box.y-1.0f)/2.0f;
+		const float zmid = (Box.z-1.0f)/2.0f;
 		const float yi = beads[i].r.y - ymid;  
 		const float zi = beads[i].r.z - zmid;
 		const float ri = sqrt(yi*yi + zi*zi);
@@ -865,24 +865,28 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		const float gap = (Rad - ri)*cos_alpha - d;
 						
 		// lubrication force with wall
-		if (gap > 0.0 && gap < d) {
+		if (gap > 0.0f && gap < d) {
+			
 			// fluid kinematic viscosity:
-			float nu = 0.1666666667;
+			float nu = 0.1666666667f;
+			
 			// outward unit normal vector pointing into the wall:
 			float3 n = make_float3(sin_alpha, cos_alpha*(yi/ri), cos_alpha*(zi/ri));			
+			
 			// normal lubrication force:
 			float gapMax = d;
-			float invgap = 1.0/gap - 1.0/gapMax;
+			float invgap = 1.0f/gap - 1.0f/gapMax;
 			float velN = dot(beads[i].v,n);						
-			float lubforceN = 6.0*M_PI*nu*d*d*invgap*velN;
+			float lubforceN = 6.0f*M_PI*nu*d*d*invgap*velN;
 			float lubforceNmag = abs(lubforceN);
 			if (lubforceNmag > lubforceMax) lubforceN *= (lubforceMax/lubforceNmag);
 			beads[i].f -= lubforceN*n;
+			
 			// tangential lubrication force:
 			float3 velT = beads[i].v - velN*n;
 			float velTmag = length(velT);
 			if (velTmag > 1.0e-9){
-				float lubforceT = 6.0*M_PI*nu*d*log(gapMax/gap)*velTmag;
+				float lubforceT = 6.0f*M_PI*nu*d*log(gapMax/gap)*velTmag;
 				float lubforceTmag = abs(lubforceT);
 				if (lubforceTmag > lubforceMax) lubforceT *= (lubforceMax/lubforceTmag);
 				beads[i].f -= lubforceT*(velT/velTmag);
@@ -890,20 +894,42 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		}
 		
 		// contact force with wall		
-		if (gap < 0.0) {
+		if (gap < 0.0f) {
+			
+			// spring-dashpot coefficients:
+			const float kN = A;
+			const float kT = kN;
+			const float cN = 0.0706f*sqrtf(kN);  // assuming: coef. of rest = 0.6 and bead_mass = 0.0484			
+			const float cT = 0.0706f*sqrtf(kT);  // assuming: coef. of rest = 0.6 and bead_mass = 0.0484
+			
 			// outward unit normal vector pointing into the wall:
 			float3 n = make_float3(sin_alpha, cos_alpha*(yi/ri), cos_alpha*(zi/ri));		
-			// linear normal force:
-			const float deltaN = abs(gap);
-			const float forceN = A*deltaN;
-			beads[i].f -= forceN*n;		
-			// tangential friction force:
+			
+			// linear normal force:			
 			float velN = dot(beads[i].v,n);
+			const float deltaN = abs(gap);
+			const float forceN = kN*deltaN + cN*velN;
+			beads[i].f -= forceN*n;		
+			
+			// tangential friction force:			
 			float3 velT = beads[i].v - velN*n;
-			float velTmag = length(velT);
 			float3 deltaT = beads[i].wallContactHist;
-			deltaT += velT*1.0;      // assume timestep dt = 1.0
-			beads[i].f -= A*deltaT;  // may want to cap forceT by fric*forceN
+			deltaT += velT*1.0f;      // assume timestep dt = 1.0
+			float3 forceT = kT*deltaT + cT*velT;
+			float forceT_norm = length(forceT);
+			
+			// Coulomb friction: make sure tangential friction force
+			// does not exceed max static friction:
+			/*
+			float forceT_max = fric*forceN;
+			if (forceT_norm > forceT_max && forceT_norm > 1.0e-9) {
+				forceT = (forceT/forceT_norm)*forceT_max;
+				deltaT = (forceT - cT * velT) / kT;
+			}
+			*/
+			
+			// apply tangential force:
+			beads[i].f -= forceT;
 			beads[i].wallContactHist = deltaT;			
 		}
 		// no contact with wall
@@ -1774,7 +1800,9 @@ __device__ inline void pairwise_bead_interaction_forces(
 		
 		// lubrication force:
 		if (r > (Ri+Rj)) {
+			
 			const float nu = 0.1666666667;
+			
 			// normal lubrication force:
 			float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);
 			float udotv = dot(uij,vij);
@@ -1785,12 +1813,14 @@ __device__ inline void pairwise_bead_interaction_forces(
 			float lubforcemag = abs(lubforce);
 			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
 			beads[i].f += lubforce*(uij);
+			
 			// tangential lubrication force:
 			float3 uTanij = vij - udotv*uij;  // tangential relative velocity
 			float3 lubforceTan = -6.0*M_PI*nu*Ri*log(gapMax/gap)*uTanij;
 			float lubforceTanmag = length(lubforceTan);
 			if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
-			beads[i].f += lubforceTan;					
+			beads[i].f += lubforceTan;
+							
 		}
 		
 		// contact force:
@@ -1823,9 +1853,9 @@ __device__ inline void pairwise_bead_interaction_forces_with_friction(
 	float3 rij = beads[i].r - beads[j].r;
 	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
 	const float r = length(rij);	
-	const float Ri = 0.5*repD;  // bead radius
-	const float Rj = 0.5*repD;  // bead radius 
-	const float gapMax = 0.25;  // 0.05 (max gap for lubrication forces)
+	const float Ri = 0.5f*repD;  // bead radius
+	const float Rj = 0.5f*repD;  // bead radius 
+	const float gapMax = 0.25f;  // 0.05 (max gap for lubrication forces)
 	const float cutoff = Ri + Rj + gapMax;		
 		
 	// interaction range:
@@ -1837,38 +1867,50 @@ __device__ inline void pairwise_bead_interaction_forces_with_friction(
 		
 		// lubrication force:
 		if (r > (Ri+Rj)) {
-			const float nu = 0.1666666667;
+			
+			const float nu = 0.1666666667f;
+			
 			// normal lubrication force:
 			float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);			
 			float gap = r - Ri - Rj;
-			if (gap < 0.001) gap = 0.001;
-			float invgap = 1.0/gap - 1.0/gapMax;		
-			float lubforce = -6.0*M_PI*nu*coeff*udotv*invgap;
+			if (gap < 0.001f) gap = 0.001f;
+			float invgap = 1.0f/gap - 1.0f/gapMax;		
+			float lubforce = -6.0f*M_PI*nu*coeff*udotv*invgap;
 			float lubforcemag = abs(lubforce);
 			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
 			beads[i].f += lubforce*(uij);
+			
 			// tangential lubrication force:
 			float3 uTanij = vij - udotv*uij;  // tangential relative velocity
-			float3 lubforceTan = -6.0*M_PI*nu*Ri*log(gapMax/gap)*uTanij;
+			float3 lubforceTan = -6.0f*M_PI*nu*Ri*log(gapMax/gap)*uTanij;
 			float lubforceTanmag = length(lubforceTan);
 			if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
 			beads[i].f += lubforceTan;
+			
 		}
 		
 		// contact force:
 		if (r < (Ri+Rj)) {
+			
 			// normal force
-			float forceN = repA - (repA/repD)*r;
+			const float cN = 0.1f*repA;
+			const float forceN_elastic = repA - (repA/repD)*r;
+			float forceN_damping = cN*udotv;
+			if (forceN_damping < 0.0f) forceN_damping = 0.0;
+			const float forceN = forceN_elastic + forceN_damping;
 			beads[i].f += forceN*uij;
+			
 			// tangential (friction) force
-			float dt = 1.0;  // assumed time step
+			const float dt = 1.0f;  // assumed time step
 			float3 uTij = (vij - udotv*uij)*dt;
-			float uT = length(uTij);	
-			if (uT > 0.0f) {
-				float fric = 0.5;
-				float forceT = min(0.1*uT,fric*forceN);
-				beads[i].f -= forceT*(uTij/uT);		
-			}							
+			float deltaT = length(uTij);	
+			if (deltaT > 0.0f) {
+				const float kT = repA;
+				const float fric = 0.5f;
+				float forceT = min(kT*deltaT,fric*forceN);
+				beads[i].f -= forceT*(uTij/deltaT);		
+			}
+			
 		}
 	}	
 }
