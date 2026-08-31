@@ -44,6 +44,7 @@ __global__ void zero_rod_forces_torques_moments_IBM3D(
 		rods[i].gradu.zx = 0.0;
 		rods[i].gradu.zy = 0.0;
 		rods[i].gradu.zz = 0.0;
+		rods[i].wallContact = false;
 		//rods[i].Ixx = 0.0;
 		//rods[i].Iyy = 0.0;
 		//rods[i].Izz = 0.0;
@@ -821,13 +822,15 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 
 __global__ void bead_wall_forces_nozzle_IBM3D(
 	beadrod* beads,
+	rod* rods,
 	float3 Box,
 	float lenCyl,
 	float radIn,
 	float radOut,
 	float repA,
 	float repD,
-	float fric,
+	float fric_smooth,
+	float fric_anchor,
 	float lubforceMax,
 	int nBeads)
 {	
@@ -835,10 +838,14 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
 		
-		// parameters:
+		// -----------------------------------------------------
+		// parameters & geometry:
+		// -----------------------------------------------------
+		
 		const float d = repD;   // this should be = bead radius
 		const float A = repA;
-		
+		const int rID = beads[i].rodID;
+				
 		// distance to channel centerline 
 		const float ymid = (Box.y-1.0f)/2.0f;
 		const float zmid = (Box.z-1.0f)/2.0f;
@@ -863,39 +870,52 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		
 		// distance from bead center to wall along direction normal to wall:
 		const float gap = (Rad - ri)*cos_alpha - d;
-						
+		
+		// -----------------------------------------------------	
 		// lubrication force with wall
+		// -----------------------------------------------------
+		
 		if (gap > 0.0f && gap < d) {
 			
-			// fluid kinematic viscosity:
-			float nu = 0.1666666667f;
+			// check if this rod is already contacting the wall, if not then 
+			// calculate the lubrication force:
 			
-			// outward unit normal vector pointing into the wall:
-			float3 n = make_float3(sin_alpha, cos_alpha*(yi/ri), cos_alpha*(zi/ri));			
+			if (rods[rID].wallContact==false) {
+				
+				// fluid kinematic viscosity:
+				float nu = 0.1666666667f;
 			
-			// normal lubrication force:
-			float gapMax = d;
-			float invgap = 1.0f/gap - 1.0f/gapMax;
-			float velN = dot(beads[i].v,n);						
-			float lubforceN = 6.0f*M_PI*nu*d*d*invgap*velN;
-			float lubforceNmag = abs(lubforceN);
-			if (lubforceNmag > lubforceMax) lubforceN *= (lubforceMax/lubforceNmag);
-			beads[i].f -= lubforceN*n;
+				// outward unit normal vector pointing into the wall:
+				float3 n = make_float3(sin_alpha, cos_alpha*(yi/ri), cos_alpha*(zi/ri));			
 			
-			// tangential lubrication force:
-			float3 velT = beads[i].v - velN*n;
-			float velTmag = length(velT);
-			if (velTmag > 1.0e-9){
-				float lubforceT = 6.0f*M_PI*nu*d*log(gapMax/gap)*velTmag;
-				float lubforceTmag = abs(lubforceT);
-				if (lubforceTmag > lubforceMax) lubforceT *= (lubforceMax/lubforceTmag);
-				beads[i].f -= lubforceT*(velT/velTmag);
-			}			
+				// normal lubrication force:
+				float gapMax = d;
+				float invgap = 1.0f/gap - 1.0f/gapMax;
+				float velN = dot(beads[i].v,n);						
+				float lubforceN = 6.0f*M_PI*nu*d*d*invgap*velN;
+				float lubforceNmag = abs(lubforceN);
+				if (lubforceNmag > lubforceMax) lubforceN *= (lubforceMax/lubforceNmag);
+				beads[i].f -= lubforceN*n;
+			
+				// tangential lubrication force:
+				float3 velT = beads[i].v - velN*n;
+				float velTmag = length(velT);
+				if (velTmag > 1.0e-9){
+					float lubforceT = 6.0f*M_PI*nu*d*log(gapMax/gap)*velTmag;
+					float lubforceTmag = abs(lubforceT);
+					if (lubforceTmag > lubforceMax) lubforceT *= (lubforceMax/lubforceTmag);
+					beads[i].f -= lubforceT*(velT/velTmag);
+				}		
+			}
+			
 		}
 		
+		// -----------------------------------------------------	
 		// contact force with wall		
+		// -----------------------------------------------------
+		
 		if (gap < 0.0f) {
-			
+						
 			// spring-dashpot coefficients:
 			const float kN = A;
 			const float kT = kN;
@@ -904,7 +924,7 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 			
 			// outward unit normal vector pointing into the wall:
 			float3 n = make_float3(sin_alpha, cos_alpha*(yi/ri), cos_alpha*(zi/ri));		
-			
+						
 			// linear normal force:			
 			float velN = dot(beads[i].v,n);
 			const float deltaN = abs(gap);
@@ -918,20 +938,24 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 			float3 forceT = kT*deltaT + cT*velT;
 			float forceT_norm = length(forceT);
 			
+			// calculate orientation-dependent friction coefficient:
+			float3 p = rods[rID].p;
+			float pdotn = abs(dot(p,n));
+			const float fric = fric_smooth + (fric_anchor - fric_smooth)*pdotn;
+				
 			// Coulomb friction: make sure tangential friction force
-			// does not exceed max static friction:
-			/*
+			// does not exceed max static friction:			
 			float forceT_max = fric*forceN;
 			if (forceT_norm > forceT_max && forceT_norm > 1.0e-9) {
 				forceT = (forceT/forceT_norm)*forceT_max;
 				deltaT = (forceT - cT * velT) / kT;
-			}
-			*/
+			}			
 			
 			// apply tangential force:
 			beads[i].f -= forceT;
-			beads[i].wallContactHist = deltaT;			
+			beads[i].wallContactHist = deltaT;				
 		}
+		
 		// no contact with wall
 		else {
 			// reset contact wall history:
@@ -939,72 +963,64 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 		}		
 					
 	}
-	
-	
-	/*
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to check if a rod is contacting a nozzle
+// wall (this is done to turn off lubrication forces if 
+// the rod is already in contact).
+// --------------------------------------------------------
+
+__global__ void check_if_rod_contacting_nozzle_IBM3D(
+	beadrod* beads,
+	rod* rods,
+	float3 Box,
+	float lenCyl,
+	float radIn,
+	float radOut,
+	float repD,
+	int nBeads)
+{	
 	// define node:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
-		const float d = repD;                  // this should be = bead radius
-		const float A = repA;
-		const float ymid = (Box.y-1.0)/2.0;
-		const float zmid = (Box.z-1.0)/2.0;
-		const float yi = beads[i].r.y - ymid;  // distance to channel centerline
-		const float zi = beads[i].r.z - zmid;  // "                            "
+		
+		// this should be = bead radius
+		const float d = repD;
+		
+		// distance to channel centerline 
+		const float ymid = (Box.y-1.0f)/2.0f;
+		const float zmid = (Box.z-1.0f)/2.0f;
+		const float yi = beads[i].r.y - ymid;  
+		const float zi = beads[i].r.z - zmid;
 		const float ri = sqrt(yi*yi + zi*zi);
+		
+		// nozzle half-angle alpha:
+		const float dR = radIn - radOut;
+		const float Lnoz = Box.x - lenCyl;
+		const float inv_hyp = 1.0f / sqrtf(Lnoz*Lnoz + dR*dR);
+		float cos_alpha = inv_hyp*Lnoz;
+		if (beads[i].r.x < lenCyl) {   // if we're in the straight cylinder section
+			cos_alpha = 1.0f;
+		}
 		
 		// nozzle radius at bead's position:
 		float Rad = radIn;
 		if (beads[i].r.x > lenCyl) Rad = radIn + (radOut - radIn)*(beads[i].r.x-lenCyl)/(Box.x-lenCyl);
 		
-		// lubrication force with wall
-		if (ri > (Rad - 2*d) && ri < (Rad - d)) {
-			float nu = 0.1666666667;
-			float gap = Rad - ri - d;
-			// normal lubrication force:
-			float gapMax = d;
-			float invgap = 1.0/gap - 1.0/gapMax;			
-			float velN = beads[i].v.y*(yi/ri) + beads[i].v.z*(zi/ri);
-			float lubforceN = 6.0*M_PI*nu*d*d*invgap*velN;
-			float lubforceNmag = abs(lubforceN);
-			if (lubforceNmag > lubforceMax) lubforceN *= (lubforceMax/lubforceNmag);
-			beads[i].f.y -= lubforceN*(yi/ri);
-			beads[i].f.z -= lubforceN*(zi/ri);
-			// tangential lubrication force:
-			float velT = beads[i].v.x;
-			float lubforceT = 6.0*M_PI*nu*d*log(gapMax/gap)*velT;
-			float lubforceTmag = abs(lubforceT);
-			if (lubforceTmag > lubforceMax) lubforceT *= (lubforceMax/lubforceTmag);
-			beads[i].f.x -= lubforceT;
-		}
+		// distance from bead center to wall along direction normal to wall:
+		const float gap = (Rad - ri)*cos_alpha - d;
 		
-		// contact force with wall		
-		if (ri > Rad - d) {			
-			// linear normal force:
-			const float deltaN = (ri + d) - Rad;  // distance protruding into wall
-			const float forceN = A*deltaN;
-			beads[i].f.y -= forceN*(yi/ri);
-			beads[i].f.z -= forceN*(zi/ri);			
-			// friction force:
-			const float velT = beads[i].v.x;
-			float deltaT = beads[i].wallContactHist.x;
-			deltaT += velT*1.0;         // assume timestep dt = 1.0
-			float forceT = A*deltaT;  	// may want to cap forceT by fric*forceN		
-			beads[i].f.x -= forceT;	
-			beads[i].wallContactHist.x = deltaT;
-					
-			//printf("bead %i: normal force = %f, friction force = %f \n",i,forceN,forceT);
-						
+		// if this bead is contacting the wall, the fiber is contacting the wall:
+		if (gap < 0.0f) {
+			const int rID = beads[i].rodID;
+			rods[rID].wallContact = true;
 		}
-		// no contact with wall
-		else {
-			// reset contact wall history:
-			beads[i].wallContactHist = make_float3(0.0f);
-		}		
-					
 	}
-	*/
 }
+
 
 
 

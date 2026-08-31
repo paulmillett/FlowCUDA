@@ -33,6 +33,8 @@ class class_rods_ibm3D {
 	float lubforceMax;
 	float repWall;
 	float fricWall;
+	float fricWall_smooth;
+	float fricWall_anchor;
 	float repA_bn;
 	float repD_bn;
 	float beadFmax;
@@ -143,6 +145,7 @@ class class_rods_ibm3D {
 	void wall_forces_ydir_zdir(int,int);
 	void compute_wall_forces_cylinder(float,int,int);
 	void compute_wall_forces_nozzle(float,float,float,int,int);
+	void check_if_rod_contacting_nozzle(float,float,float,int,int);
 	void push_beads_inside_sphere(float,float,float,float,int,int);
 	void push_rods_inside_cylinder(float,int,int);
 	void push_rods_inside_duct(int,int);

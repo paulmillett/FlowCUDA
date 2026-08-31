@@ -56,6 +56,8 @@ class_rods_ibm3D::class_rods_ibm3D()
 	lubforceMax = inputParams("IBM_RODS/lubforceMax",0.0);
 	repWall = inputParams("IBM_RODS/repWall",0.0);
 	fricWall = inputParams("IBM_RODS/fricWall",0.0);
+	fricWall_smooth = inputParams("IBM_RODS/fricWall_smooth",0.0);
+	fricWall_anchor = inputParams("IBM_RODS/fricWall_anchor",0.0);
 	beadFmax = inputParams("IBM_RODS/beadFmax",1000.0);
 	rodFmax = inputParams("IBM_RODS/rodFmax",1000.0);
 	rodTmax = inputParams("IBM_RODS/rodTmax",1000.0);
@@ -1035,7 +1037,8 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	zero_bead_forces(nBlocks,nThreads);
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
-	if (nRods > 1) nonbonded_bead_interactions_with_friction(nBlocks,nThreads); 
+	if (nRods > 1) nonbonded_bead_interactions_with_friction(nBlocks,nThreads);
+	check_if_rod_contacting_nozzle(lenCylinder,radInlet,radOutlet,nBlocks,nThreads);
 	compute_wall_forces_nozzle(lenCylinder,radInlet,radOutlet,nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_rod_forces_torques_moments(nBlocks,nThreads);	
@@ -1878,7 +1881,20 @@ void class_rods_ibm3D::compute_wall_forces_cylinder(float chRad, int nBlocks, in
 void class_rods_ibm3D::compute_wall_forces_nozzle(float lenCylinder, float radInlet, float radOutlet, int nBlocks, int nThreads)
 {
 	bead_wall_forces_nozzle_IBM3D
-	<<<nBlocks,nThreads>>> (beads,Box,lenCylinder,radInlet,radOutlet,repWall,repD/2.0,fricWall,lubforceMax,nBeads);
+	<<<nBlocks,nThreads>>> (beads,rods,Box,lenCylinder,radInlet,radOutlet,repWall,repD/2.0,
+	                        fricWall_smooth,fricWall_anchor,lubforceMax,nBeads);
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that checks if a rod is touching nozzle wall:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::check_if_rod_contacting_nozzle(float lenCylinder, float radInlet, float radOutlet, int nBlocks, int nThreads)
+{
+	check_if_rod_contacting_nozzle_IBM3D
+	<<<nBlocks,nThreads>>> (beads,rods,Box,lenCylinder,radInlet,radOutlet,repD/2.0,nBeads);
 }
 
 

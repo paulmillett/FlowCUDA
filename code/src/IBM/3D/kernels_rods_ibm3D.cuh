@@ -205,7 +205,9 @@ __global__ void bead_wall_forces_cylinder_IBM3D(
 
 __global__ void bead_wall_forces_nozzle_IBM3D(
 	beadrod*,
+	rod*,
 	float3,
+	float,
 	float,
 	float,
 	float,
@@ -216,6 +218,17 @@ __global__ void bead_wall_forces_nozzle_IBM3D(
 	int);
 
 
+__global__ void check_if_rod_contacting_nozzle_IBM3D(
+	beadrod*,
+	rod*,
+	float3,
+	float,
+	float,
+	float,
+	float,
+	int);
+			
+			
 __global__ void push_beads_into_sphere_IBM3D(
 	beadrod*,
 	float,

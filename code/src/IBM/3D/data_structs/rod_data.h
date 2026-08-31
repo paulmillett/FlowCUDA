@@ -45,6 +45,7 @@ struct rod {
 	float3 p;     // orientation vector
 	float3 uf;    // fluid velocity at rod position
 	tensor gradu;         // gradient of fluid velocity
+	bool wallContact;     // is the fiber contacting the wall?
 	//float Ixx,Iyy,Izz;  // moments of inertia
 	//float Ixy,Ixz,Iyz;  // products of inertia
 };
