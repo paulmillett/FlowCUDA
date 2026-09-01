@@ -1,5 +1,5 @@
 
-# include "scsp_3D_discs_shear.cuh"
+# include "scsp_3D_discs_cylinder.cuh"
 # include "../IO/GetPot"
 # include <string>
 # include <math.h>
@@ -11,7 +11,7 @@ using namespace std;
 // Constructor:
 // --------------------------------------------------------
 
-scsp_3D_discs_shear::scsp_3D_discs_shear() : lbm(),discs()
+scsp_3D_discs_cylinder::scsp_3D_discs_cylinder() : lbm(),discs()
 {		
 	
 	// ----------------------------------------------
@@ -28,7 +28,8 @@ scsp_3D_discs_shear::scsp_3D_discs_shear() : lbm(),discs()
 	Q = inputParams("Lattice/Q",19);
 	Nx = inputParams("Lattice/Nx",1);
 	Ny = inputParams("Lattice/Ny",1);
-	Nz = inputParams("Lattice/Nz",1);	
+	Nz = inputParams("Lattice/Nz",1);
+	chRad = inputParams("Lattice/chRad",float(Nz-1)/2.0);
 	
 	// ----------------------------------------------
 	// GPU parameters:
@@ -54,15 +55,11 @@ scsp_3D_discs_shear::scsp_3D_discs_shear() : lbm(),discs()
 	// ----------------------------------------------
 	
 	nu = inputParams("LBM/nu",0.1666666);
-	float shearRate = inputParams("LBM/shearRate",0.0);
-	shearVel = shearRate*float(Nz-1)/2.0;
-	
-	//shearVel = inputParams("LBM/shearVel",0.0);
-	//float Re = inputParams("LBM/Re",2.0);
-	//shearVel = 2.0*Re*nu/float(Nz);
+	float Re = inputParams("LBM/Re",2.0);
+	umax = inputParams("LBM/umax",0.03);
 	
 	// ----------------------------------------------
-	// Rods Immersed-Boundary parameters:
+	// Discs Immersed-Boundary parameters:
 	// ----------------------------------------------
 		
 	int nBeadsPerDisc = inputParams("IBM_DISCS/nBeadsPerDisc",0);
@@ -77,7 +74,7 @@ scsp_3D_discs_shear::scsp_3D_discs_shear() : lbm(),discs()
 	// ----------------------------------------------
 	
 	float Vp = float(nDiscs)*(M_PI*Ddisc*Ddisc*Hdisc/4.0);
-	float V = float(Nx)*float(Ny)*float(Nz);
+	float V = M_PI*chRad*chRad*float(Nx);
 	float phi = Vp/V;
 	cout << " " << endl;
 	cout << "particle volume fraction = " << phi << endl;
@@ -87,7 +84,7 @@ scsp_3D_discs_shear::scsp_3D_discs_shear() : lbm(),discs()
 	// IBM set flags for PBC's:
 	// ----------------------------------------------
 	
-	discs.set_pbcFlag(1,1,0);
+	discs.set_pbcFlag(1,0,0);
 		
 	// ----------------------------------------------
 	// iolets parameters:
@@ -111,7 +108,34 @@ scsp_3D_discs_shear::scsp_3D_discs_shear() : lbm(),discs()
 	
 	lbm.allocate();
 	lbm.allocate_forces();
-	discs.allocate();	
+	lbm.allocate_solid();
+	discs.allocate();
+	
+	// ----------------------------------------------
+	// calculate body-force depending on Re:
+	// ----------------------------------------------
+	
+	float Dh = 2.0*chRad;
+	umax = Re*nu/Dh;
+	
+	// modify if umax is too high due to high Re:
+	if (umax > 0.03) {
+		umax = 0.03;
+		nu = umax*Dh/Re;
+		lbm.setNu(nu);
+		cout << "  " << endl;
+		cout << "nu = " << nu << endl;	
+	}
+	bodyForx = umax*(4*nu)/chRad/chRad;
+	Q0 = M_PI*chRad*chRad*chRad*chRad*bodyForx/(8.0*nu);
+	
+	cout << "  " << endl;
+	cout << "Re = " << Re << endl;
+	cout << "Body Force X-dir = " << bodyForx << endl;
+	cout << "nu = " << nu << endl;
+	cout << "umax = " << umax << endl;
+	cout << "Q0 = " << Q0 << endl; 
+	cout << "  " << endl;	
 	
 }
 
@@ -121,7 +145,7 @@ scsp_3D_discs_shear::scsp_3D_discs_shear() : lbm(),discs()
 // Destructor:
 // --------------------------------------------------------
 
-scsp_3D_discs_shear::~scsp_3D_discs_shear()
+scsp_3D_discs_cylinder::~scsp_3D_discs_cylinder()
 {
 	lbm.deallocate();
 	discs.deallocate();
@@ -133,7 +157,7 @@ scsp_3D_discs_shear::~scsp_3D_discs_shear()
 // Initialize system:
 // --------------------------------------------------------
 
-void scsp_3D_discs_shear::initSystem()
+void scsp_3D_discs_cylinder::initSystem()
 {
 		
 	// ----------------------------------------------
@@ -144,10 +168,28 @@ void scsp_3D_discs_shear::initSystem()
 	string latticeSource = inputParams("Lattice/source","box");	
 	
 	// ----------------------------------------------
-	// create the lattice assuming shear flow.
-	// ----------------------------------------------	
+	// define the solid walls:
+	// ----------------------------------------------
 	
-	lbm.create_lattice_box_slit();
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = k*Nx*Ny + j*Nx + i;
+				int Si = 0;				
+				// set up solid walls
+				float y = float(j) - float(Ny-1)/2.0;
+				float z = float(k) - float(Nz-1)/2.0;
+				if ((y*y + z*z)/chRad/chRad > 1.0) Si = 1;				
+				lbm.setS(ndx,Si);
+			}
+		}
+	}
+	
+	// ----------------------------------------------
+	// create the lattice for channel flow:
+	// ----------------------------------------------		
+	
+	lbm.create_lattice_box_periodic_solid_walls();
 	
 	// ----------------------------------------------		
 	// build the streamIndex[] array.  
@@ -167,7 +209,7 @@ void scsp_3D_discs_shear::initSystem()
 	}
 	
 	// ----------------------------------------------			
-	// initialize rod immersed boundary info: 
+	// initialize disc immersed boundary info: 
 	// ----------------------------------------------
 	
 	discs.create_first_disc();
@@ -180,8 +222,8 @@ void scsp_3D_discs_shear::initSystem()
 	discs.set_mobility_coefficients(nu,ar,Ddisc/2.0);	
 	
 	if (nDiscs == 1) {
-		discs.rotate_and_shift_bead_positions(0,float(Nx-1)/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0,0.0,M_PI/2.0,0.0);
-//		discs.rotate_and_shift_bead_positions(0,float(Nx-1)/2.0,float(Ny-1)/2.0,float(Nz-1)/2.0,0.0,0.0,0.0);
+		discs.rotate_and_shift_bead_positions(0,float(Nx-1)/2.0,float(Ny-1)/4.0,float(Nz-1)/2.0,0.0,M_PI/2.0,0.0);
+		//discs.rotate_and_shift_bead_positions(0,float(Nx-1)/2.0,float(Ny-1)/2.0,float(Nz-1)/4.0,0.0,0.0,0.0);
 	}
 		
 	// ----------------------------------------------
@@ -195,6 +237,7 @@ void scsp_3D_discs_shear::initSystem()
 	// ----------------------------------------------
 	
 	lbm.memcopy_host_to_device();
+	lbm.memcopy_host_to_device_solid();
 	discs.memcopy_host_to_device();
 		
 	// ----------------------------------------------
@@ -210,11 +253,11 @@ void scsp_3D_discs_shear::initSystem()
 	srand(time(NULL));
 	
 	// ----------------------------------------------
-	// randomly disperse filaments: 
+	// randomly disperse discs: 
 	// ----------------------------------------------
 			
 	if (nDiscs > 1) {
-		discs.randomize_discs(Ddisc); 
+		discs.randomize_discs_cylinder(Ddisc); 
 	}
 	discs.set_disc_position_orientation(nBlocks,nThreads);
 	
@@ -240,6 +283,9 @@ void scsp_3D_discs_shear::initSystem()
 	// ----------------------------------------------
 	
 	discs.zero_bead_forces(nBlocks,nThreads);
+	
+	cout << "  " << endl;
+	cout << "Done with Initializtion" << endl;
 			
 }
 
@@ -251,7 +297,7 @@ void scsp_3D_discs_shear::initSystem()
 //  number of time steps between print-outs):
 // --------------------------------------------------------
 
-void scsp_3D_discs_shear::cycleForward(int stepsPerCycle, int currentCycle)
+void scsp_3D_discs_cylinder::cycleForward(int stepsPerCycle, int currentCycle)
 {
 		
 	// ----------------------------------------------
@@ -272,9 +318,9 @@ void scsp_3D_discs_shear::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			discs.stepIBM_Euler(lbm,nBlocks,nThreads);
+			discs.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
+			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing(nBlocks,nThreads);
-			lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 			cudaDeviceSynchronize();
 		}
 		cout << " " << endl;
@@ -289,9 +335,9 @@ void scsp_3D_discs_shear::cycleForward(int stepsPerCycle, int currentCycle)
 		
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;		
-		discs.stepIBM_Euler(lbm,nBlocks,nThreads);
+		discs.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
+		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
-		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
 	
@@ -318,7 +364,7 @@ void scsp_3D_discs_shear::cycleForward(int stepsPerCycle, int currentCycle)
 // Write output to file
 // --------------------------------------------------------
 
-void scsp_3D_discs_shear::writeOutput(std::string tagname, int step)
+void scsp_3D_discs_cylinder::writeOutput(std::string tagname, int step)
 {				
 	
 	if (step == 0) {

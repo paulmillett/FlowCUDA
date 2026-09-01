@@ -77,14 +77,15 @@ class class_discs_ibm3D {
 	void rotate_and_shift_bead_positions(int,float,float,float,float,float,float);
 	void rotate_and_shift_bead_positions_using_orientation_vector(int);
 	void randomize_discs(float);
-	void randomize_discs_cylinder();
+	void randomize_discs_cylinder(float);
 	void randomize_discs_duct();
 	void randomize_discs_nozzle(float,float,float,float);
 	void randomize_discs_nozzle_backfill(float,float,float,float);
 	void randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	void semi_randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	float calc_separation_pbc(float3,float3);
-	void stepIBM_Euler(class_scsp_D3Q19&,int,int);		
+	void stepIBM_Euler(class_scsp_D3Q19&,int,int);
+	void stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19&,float,int,int);	
 	void init_rand_kernel(int,int);
 	void zero_disc_forces_torques_moments(int,int);
 	void set_disc_position_orientation(int,int);

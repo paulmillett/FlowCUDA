@@ -403,18 +403,48 @@ void class_discs_ibm3D::randomize_discs(float sepWall)
 	// copy bead positions from device to host:
 	cudaMemcpy(beadsH, beads, sizeof(beaddisc)*nBeads, cudaMemcpyDeviceToHost);
 	
-	// assign random position and orientation to each filament:
-	for (int f=0; f<nDiscs; f++) {
+	// assign random position and orientation to each disc:
+	const float sepMin = sepWall;
+	float3* discCOM = (float3*)malloc(nDiscs*sizeof(float3));
+	
+	// loop over discs
+	for (int d=0; d<nDiscs; d++) {
+		
+		// initialize values
+		discCOM[d] = make_float3(0.0);
 		float3 shift = make_float3(0.0,0.0,0.0);
-		// get random position
-		shift.x = (float)rand()/RAND_MAX*Box.x;
-		shift.y = sepWall + (float)rand()/RAND_MAX*(Box.y-2.0*sepWall);
-		shift.z = sepWall + (float)rand()/RAND_MAX*(Box.z-2.0*sepWall);
-		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
+		bool tooClose = true;
+		
+		while (tooClose) {
+			
+			// reset tooClose to false
+			tooClose = false;
+			
+			// get random position
+			float ran1 = (float)rand()/RAND_MAX;
+			float ran2 = (float)rand()/RAND_MAX;
+			float ran3 = (float)rand()/RAND_MAX;
+			shift.x = ran1*Box.x;
+			shift.y = sepWall + ran2*(Box.y-2.0*sepWall);
+			shift.z = sepWall + ran3*(Box.z-2.0*sepWall);
+						
+			// check with other discs
+			for (int e=0; e<d; e++) {
+				float sep = calc_separation_pbc(shift,discCOM[e]);
+                if (sep < sepMin) {
+                    tooClose = true;
+                    break;
+                }
+			}					
+		}		
+		discCOM[d] = shift;		
+		// update bead positions and quaternion:
+		rotate_and_shift_bead_positions(d,shift.x,shift.y,shift.z);
 	}
 	
-	// copy node positions from host to device:
+	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beaddisc)*nBeads, cudaMemcpyHostToDevice);	
+	cudaMemcpy(discs, discsH, sizeof(disc)*nDiscs,     cudaMemcpyHostToDevice);	
 }
 
 
@@ -423,26 +453,54 @@ void class_discs_ibm3D::randomize_discs(float sepWall)
 // randomize rod positions in cylinder:
 // --------------------------------------------------------
 
-void class_discs_ibm3D::randomize_discs_cylinder()
+void class_discs_ibm3D::randomize_discs_cylinder(float sepWall)
 {
 	
 	// copy bead positions from device to host:
 	cudaMemcpy(beadsH, beads, sizeof(beaddisc)*nBeads, cudaMemcpyDeviceToHost);
-			
-	// assign random position and orientation to each rod:
-	for (int f=0; f<nDiscs; f++) {
+	
+	// assign random position and orientation to each disc:
+	const float sepMin = sepWall;
+	float3* discCOM = (float3*)malloc(nDiscs*sizeof(float3));
+				
+	// loop over discs
+	for (int d=0; d<nDiscs; d++) {
+		
+		// initialize values
+		discCOM[d] = make_float3(0.0);
 		float3 shift = make_float3(0.0,0.0,0.0);
-		// get random position
-		float rad = (float)rand()/RAND_MAX*(chRad);
-		float ang = (float)rand()/RAND_MAX*(2*M_PI);
-		shift.x = (float)rand()/RAND_MAX*Box.x;		
-		shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
-		shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;		
-		rotate_and_shift_bead_positions(f,shift.x,shift.y,shift.z);
+		bool tooClose = true;
+		
+		while (tooClose) {
+			
+			// reset tooClose to false
+			tooClose = false;
+				
+			// get random position
+			float rad = (float)rand()/RAND_MAX*(chRad - sepWall);
+			float ang = (float)rand()/RAND_MAX*(2*M_PI);
+			shift.x = (float)rand()/RAND_MAX*Box.x;		
+			shift.y = rad*cos(ang) + (Box.y-1.0)/2.0;
+			shift.z = rad*sin(ang) + (Box.z-1.0)/2.0;
+			
+			// check with other discs
+			for (int e=0; e<d; e++) {
+				float sep = calc_separation_pbc(shift,discCOM[e]);
+                if (sep < sepMin) {
+                    tooClose = true;
+                    break;
+                }
+			}
+		}		
+			
+		discCOM[d] = shift;		
+		// update bead positions and quaternion:
+		rotate_and_shift_bead_positions(d,shift.x,shift.y,shift.z);
 	}	
 	
 	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beaddisc)*nBeads, cudaMemcpyHostToDevice);
+	cudaMemcpy(discs, discsH, sizeof(disc)*nDiscs,     cudaMemcpyHostToDevice);	
 		
 }
 
@@ -472,6 +530,7 @@ void class_discs_ibm3D::randomize_discs_duct()
 	
 	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beaddisc)*nBeads, cudaMemcpyHostToDevice);
+	cudaMemcpy(discs, discsH, sizeof(disc)*nDiscs,     cudaMemcpyHostToDevice);	
 		
 }
 
@@ -512,6 +571,7 @@ void class_discs_ibm3D::randomize_discs_nozzle(float lenCylinder, float radInlet
 	
 	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beaddisc)*nBeads, cudaMemcpyHostToDevice);	
+	cudaMemcpy(discs, discsH, sizeof(disc)*nDiscs,     cudaMemcpyHostToDevice);	
 }
 
 
@@ -583,6 +643,7 @@ void class_discs_ibm3D::randomize_discs_nozzle_backfill(float lenCylinder, float
 		
 	// copy bead positions from host to device:
 	cudaMemcpy(beads, beadsH, sizeof(beaddisc)*nBeads, cudaMemcpyHostToDevice);	
+	cudaMemcpy(discs, discsH, sizeof(disc)*nDiscs,     cudaMemcpyHostToDevice);	
 }
 
 
@@ -625,25 +686,45 @@ void class_discs_ibm3D::shift_bead_positions(int dID, float xsh, float ysh, floa
 void class_discs_ibm3D::rotate_and_shift_bead_positions(int dID, float xsh, float ysh, float zsh)
 {
 	// random rotation angles:
-	float a = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // alpha
-	float b = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // beta
-	float g = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // gamma
+	//float a = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // alpha
+	//float b = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // beta
+	//float g = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // gamma
 	
-	// update node positions:
+	/*	
+	float a = 2.0*M_PI*((float)rand()/RAND_MAX);    // alpha
+	float u = 2.0*((float)rand()/RAND_MAX - 1.0f);  	
+	float b = acos(u);                              // beta
+	float g = 2.0*M_PI*((float)rand()/RAND_MAX);    // gamma
+	*/
+	
+	float a = 0.0;
+	float b = M_PI/2.0;
+	float g = 0.0;
+	
+	// rotation tensor:
+	tensor R;
+	R.xx = cos(a)*cos(b); R.xy = cos(a)*sin(b)*sin(g)-sin(a)*cos(g); R.xz = cos(a)*sin(b)*cos(g)+sin(a)*sin(g);
+	R.yx = sin(a)*cos(b); R.yy = sin(a)*sin(b)*sin(g)+cos(a)*cos(g); R.yz = sin(a)*sin(b)*cos(g)-cos(a)*sin(g);
+	R.zx = -sin(b);       R.zy = cos(b)*sin(g);                      R.zz = cos(b)*cos(g);
+	
+	// translation vector:
+	float3 rtrans = make_float3(xsh,ysh,zsh);
+	
+	// update bead positions:
 	int istr = discsH[dID].indxB0;
 	int iend = istr + discsH[dID].nBeads;
-	
 	for (int i=istr; i<iend; i++) {
 		// rotate:
-		float xrot = beadsH[i].r.x*(cos(a)*cos(b)) + beadsH[i].r.y*(cos(a)*sin(b)*sin(g)-sin(a)*cos(g)) + beadsH[i].r.z*(cos(a)*sin(b)*cos(g)+sin(a)*sin(g));
-		float yrot = beadsH[i].r.x*(sin(a)*cos(b)) + beadsH[i].r.y*(sin(a)*sin(b)*sin(g)+cos(a)*cos(g)) + beadsH[i].r.z*(sin(a)*sin(b)*cos(g)-cos(a)*sin(g));
-		float zrot = beadsH[i].r.x*(-sin(b))       + beadsH[i].r.y*(cos(b)*sin(g))                      + beadsH[i].r.z*(cos(b)*cos(g));
-		// shift:		 
-		beadsH[i].r.x = xrot + xsh;
-		beadsH[i].r.y = yrot + ysh;
-		beadsH[i].r.z = zrot + zsh;
-		beadsH[i].rm1 = beadsH[i].r;		
+		float3 rrot = R*beadsH[i].r;
+		// shift:
+		beadsH[i].r = rrot + rtrans;
+		beadsH[i].rm1 = beadsH[i].r;
 	}
+	
+	// update disc quaternion by a global rotation: q = dq * q;
+	quaternion dq;
+	dq.set_values(R);
+	discsH[dID].q = discsH[dID].q.premultiply(dq);
 }
 
 
@@ -741,6 +822,49 @@ void class_discs_ibm3D::stepIBM_Euler(class_scsp_D3Q19& lbm, int nBlocks, int nT
 	lbm.interpolate_gradient_of_velocity_disc(nBlocks,nThreads,beads,nBeads);
 	if (nDiscs > 1) nonbonded_bead_interactions(nBlocks,nThreads);
 	compute_wall_forces(nBlocks,nThreads);	
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	sum_disc_forces_torques_moments(nBlocks,nThreads);
+			
+	// update IBM positions:
+	enforce_max_disc_force_torque(nBlocks,nThreads);
+	update_disc_position_orientation_fluid(nBlocks,nThreads);
+	update_bead_position_discs(nBlocks,nThreads);
+	update_bead_velocity_discs(nBlocks,nThreads);
+	
+	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
+	lbm.extrapolate_force_bead_disc(nBlocks,nThreads,beads,discs,nBeads);
+
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for discs IBM in a cylinder channel:
+// --------------------------------------------------------
+
+void class_discs_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm, float chRad, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  rod positions 
+	// ----------------------------------------------------------
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// re-build bin lists for rod beads:
+	if (nDiscs > 1) {
+		reset_bin_lists(nBlocks,nThreads);
+		build_bin_lists(nBlocks,nThreads);
+	}
+		
+	// calculate IBM forces:
+	zero_bead_forces(nBlocks,nThreads);
+	zero_disc_forces_torques_moments(nBlocks,nThreads);
+	lbm.interpolate_gradient_of_velocity_disc(nBlocks,nThreads,beads,nBeads);
+	if (nDiscs > 1) nonbonded_bead_interactions(nBlocks,nThreads);
+	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
 	sum_disc_forces_torques_moments(nBlocks,nThreads);
 			
@@ -1213,6 +1337,11 @@ void class_discs_ibm3D::write_output(std::string tagname, int tagnum)
 {
 	write_vtk_immersed_boundary_3D_discs(tagname,tagnum,
 	nBeads,nBeadsPerDisc,nDiscs,beadsH,discsH);
+	
+	
+	cout << "quaternion 1: " << discsH[0].q.w << " " << discsH[0].q.x << " " << discsH[0].q.y << " " << discsH[0].q.z << endl;
+	
+	
 }
 
 
