@@ -685,46 +685,36 @@ void class_discs_ibm3D::shift_bead_positions(int dID, float xsh, float ysh, floa
 
 void class_discs_ibm3D::rotate_and_shift_bead_positions(int dID, float xsh, float ysh, float zsh)
 {
-	// random rotation angles:
-	//float a = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // alpha
-	//float b = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // beta
-	//float g = 2.0*M_PI*((float)rand()/RAND_MAX - 0.5);  // gamma
+	// generate a random quaternion using Shoemake's algorithm
+    float r1 = (float)rand()/RAND_MAX;
+	float r2 = (float)rand()/RAND_MAX;
+	float r3 = (float)rand()/RAND_MAX;
+	float two_pi = 2.0 * M_PI;
+	float w = std::sqrt(1.0 - r1) * std::sin(two_pi * r2);
+	float x = std::sqrt(1.0 - r1) * std::cos(two_pi * r2);
+	float y = std::sqrt(r1) * std::sin(two_pi * r3);
+	float z = std::sqrt(r1) * std::cos(two_pi * r3);
+	discsH[dID].q.set_values(w,x,y,z);
+	discsH[dID].q.normalize();	
 	
-	/*	
-	float a = 2.0*M_PI*((float)rand()/RAND_MAX);    // alpha
-	float u = 2.0*((float)rand()/RAND_MAX - 1.0f);  	
-	float b = acos(u);                              // beta
-	float g = 2.0*M_PI*((float)rand()/RAND_MAX);    // gamma
-	*/
-	
-	float a = 0.0;
-	float b = M_PI/2.0;
-	float g = 0.0;
-	
-	// rotation tensor:
-	tensor R;
-	R.xx = cos(a)*cos(b); R.xy = cos(a)*sin(b)*sin(g)-sin(a)*cos(g); R.xz = cos(a)*sin(b)*cos(g)+sin(a)*sin(g);
-	R.yx = sin(a)*cos(b); R.yy = sin(a)*sin(b)*sin(g)+cos(a)*cos(g); R.yz = sin(a)*sin(b)*cos(g)-cos(a)*sin(g);
-	R.zx = -sin(b);       R.zy = cos(b)*sin(g);                      R.zz = cos(b)*cos(g);
+	// update disc orientation vector:
+	discsH[dID].p = discsH[dID].q.orientation_vec();
+	discsH[dID].p = normalize(discsH[dID].p);
 	
 	// translation vector:
 	float3 rtrans = make_float3(xsh,ysh,zsh);
+	
+	// update disc position:
+	discsH[dID].r = rtrans;
 	
 	// update bead positions:
 	int istr = discsH[dID].indxB0;
 	int iend = istr + discsH[dID].nBeads;
 	for (int i=istr; i<iend; i++) {
-		// rotate:
-		float3 rrot = R*beadsH[i].r;
-		// shift:
-		beadsH[i].r = rrot + rtrans;
-		beadsH[i].rm1 = beadsH[i].r;
-	}
-	
-	// update disc quaternion by a global rotation: q = dq * q;
-	quaternion dq;
-	dq.set_values(R);
-	discsH[dID].q = discsH[dID].q.premultiply(dq);
+		quaternion q = discsH[dID].q;
+		float3 rrel = beadsH[i].rrel;		
+		beadsH[i].r = q*rrel + discsH[dID].r;
+	}	
 }
 
 
@@ -744,21 +734,27 @@ void class_discs_ibm3D::rotate_and_shift_bead_positions(int dID, float xsh, floa
 	// translation vector:
 	float3 rtrans = make_float3(xsh,ysh,zsh);
 	
+	// update disc quaternion by a global rotation: q = dq * q
+	quaternion dq;
+	dq.set_values(R);
+	discsH[dID].q = discsH[dID].q.premultiply(dq);
+	discsH[dID].q.normalize();
+	
+	// update disc orientation vector:
+	discsH[dID].p = discsH[dID].q.orientation_vec();
+	discsH[dID].p = normalize(discsH[dID].p);
+	
+	// update disc position:
+	discsH[dID].r = rtrans;
+	
 	// update bead positions:
 	int istr = discsH[dID].indxB0;
 	int iend = istr + discsH[dID].nBeads;
 	for (int i=istr; i<iend; i++) {
-		// rotate:
-		float3 rrot = R*beadsH[i].r;
-		// shift:
-		beadsH[i].r = rrot + rtrans;
-		beadsH[i].rm1 = beadsH[i].r;
+		quaternion q = discsH[dID].q;
+		float3 rrel = beadsH[i].rrel;		
+		beadsH[i].r = q*rrel + discsH[dID].r;
 	}
-	
-	// update disc quaternion by a global rotation: q = dq * q;
-	quaternion dq;
-	dq.set_values(R);
-	discsH[dID].q = discsH[dID].q.premultiply(dq);
 }
 
 
@@ -1337,11 +1333,6 @@ void class_discs_ibm3D::write_output(std::string tagname, int tagnum)
 {
 	write_vtk_immersed_boundary_3D_discs(tagname,tagnum,
 	nBeads,nBeadsPerDisc,nDiscs,beadsH,discsH);
-	
-	
-	cout << "quaternion 1: " << discsH[0].q.w << " " << discsH[0].q.x << " " << discsH[0].q.y << " " << discsH[0].q.z << endl;
-	
-	
 }
 
 

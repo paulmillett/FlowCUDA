@@ -140,7 +140,7 @@ __global__ void update_bead_positions_discs_IBM3D(
 	// define bead:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
-		int discID = beads[i].discID;
+		int discID = beads[i].discID;		
 		quaternion q = discs[discID].q;
 		float3 rrel = beads[i].rrel;		
 		beads[i].r = q*rrel + discs[discID].r;
