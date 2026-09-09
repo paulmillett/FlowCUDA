@@ -17,6 +17,7 @@ struct beadrod {
 	float3 uf;     // fluid velocity at bead position	
 	tensor gradu;  // gradient of fluid velocity at bead position
 	float3 wallContactHist;   // accumulated tangential distance during contact with wall 
+	int centerOffset;         // initial integer offset from rod's centerBead
 	int rodID;
 };
 

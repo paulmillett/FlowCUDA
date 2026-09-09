@@ -10,6 +10,9 @@
 # include <sstream>
 # include <stdlib.h>
 # include <time.h>
+# include <thrust/device_ptr.h>
+# include <thrust/sort.h>
+# include <thrust/gather.h>
 using namespace std;  
 
 
@@ -61,7 +64,7 @@ class_rods_ibm3D::class_rods_ibm3D()
 	beadFmax = inputParams("IBM_RODS/beadFmax",1000.0);
 	rodFmax = inputParams("IBM_RODS/rodFmax",1000.0);
 	rodTmax = inputParams("IBM_RODS/rodTmax",1000.0);
-		
+
 	// domain attributes
 	dt = inputParams("Time/dt",1.0);	
 	N.x = inputParams("Lattice/Nx",1);
@@ -77,6 +80,7 @@ class_rods_ibm3D::class_rods_ibm3D()
 	binsFlag = false;
 	if (nRods > 1) binsFlag = true;
 	if (binsFlag) {		
+		// linked-list cells data
 		bins.sizeBins = inputParams("IBM_RODS/sizeBins",2.0);
 		bins.binMax = inputParams("IBM_RODS/binMax",1);			
 		bins.numBins.x = int(floor(N.x/bins.sizeBins));
@@ -84,6 +88,14 @@ class_rods_ibm3D::class_rods_ibm3D()
 	    bins.numBins.z = int(floor(N.z/bins.sizeBins));
 		bins.nBins = bins.numBins.x*bins.numBins.y*bins.numBins.z;
 		bins.nnbins = 26;
+		// radix-sort data
+		radix.sizeCells = inputParams("IBM_RODS/sizeBins",2.0);
+		radix.cellMax = inputParams("IBM_RODS/binMax",1);
+		radix.numCells.x = int(floor(N.x/radix.sizeCells));
+	    radix.numCells.y = int(floor(N.y/radix.sizeCells));
+	    radix.numCells.z = int(floor(N.z/radix.sizeCells));
+		radix.nCells = radix.numCells.x*radix.numCells.y*radix.numCells.z;
+		radix.nncells = 26;
 	}	
 }
 
@@ -116,10 +128,18 @@ void class_rods_ibm3D::allocate()
 	cudaMalloc((void **) &rods, nRods*sizeof(rod));
 	cudaMalloc((void **) &states, nRods*sizeof(curandState));
 	cudaMalloc((void **) &Stresslet, sizeof(tensor));
-	if (binsFlag) {		
+	if (binsFlag) {	
+		// linked-list cells data	
 		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
 		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
-		cudaMalloc((void **) &bins.binMap, bins.nBins*26*sizeof(int));		
+		cudaMalloc((void **) &bins.binMap, bins.nBins*26*sizeof(int));
+		// radix-sort data
+		cudaMalloc((void **) &radix.particleCellIDs, nBeads*sizeof(int));
+		cudaMalloc((void **) &radix.particleIndices, nBeads*sizeof(int));
+		cudaMalloc((void **) &radix.cellStart, radix.nCells*sizeof(int));
+		cudaMalloc((void **) &radix.cellEnd, radix.nCells*sizeof(int));		
+		cudaMalloc((void **) &radix.cellMap, radix.nCells*26*sizeof(int));
+		cudaMalloc((void **) &radix.newParticleIndices, nBeads*sizeof(int));
 	}	
 }
 
@@ -138,10 +158,18 @@ void class_rods_ibm3D::deallocate()
 	// free array memory (device):
 	cudaFree(beads);
 	cudaFree(rods);
-	if (binsFlag) {		
+	if (binsFlag) {
+		// linked-list cells data	
 		cudaFree(bins.binMembers);
 		cudaFree(bins.binOccupancy);
-		cudaFree(bins.binMap);				
+		cudaFree(bins.binMap);
+		// radix-sort data
+		cudaFree(radix.particleCellIDs);
+		cudaFree(radix.particleIndices);
+		cudaFree(radix.cellStart);
+		cudaFree(radix.cellEnd);
+		cudaFree(radix.cellMap);
+		cudaFree(radix.newParticleIndices);
 	}		
 }
 
@@ -212,6 +240,7 @@ void class_rods_ibm3D::create_first_rod()
 		beadsH[i].rm1 = beadsH[i].r;
 		beadsH[i].f = make_float3(0.0f);
 		beadsH[i].rodID = 0;
+		beadsH[i].centerOffset = nBeadsPerRod/2 - i;
 	}
 		
 	// set up indices for ALL rods:
@@ -323,6 +352,7 @@ void class_rods_ibm3D::duplicate_rods()
 				beadsH[ii].f = beadsH[i].f;
 				beadsH[ii].rm1 = beadsH[i].rm1;
 				beadsH[ii].rodID = r;
+				beadsH[ii].centerOffset = beadsH[i].centerOffset;
 			}
 		}
 	}
@@ -1038,6 +1068,48 @@ void class_rods_ibm3D::stepIBM_Euler_nozzle_channel(class_scsp_D3Q19& lbm, float
 	zero_rod_forces_torques_moments(nBlocks,nThreads);
 	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
 	if (nRods > 1) nonbonded_bead_interactions_with_friction(nBlocks,nThreads);
+	check_if_rod_contacting_nozzle(lenCylinder,radInlet,radOutlet,nBlocks,nThreads);
+	compute_wall_forces_nozzle(lenCylinder,radInlet,radOutlet,nBlocks,nThreads);	
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	sum_rod_forces_torques_moments(nBlocks,nThreads);	
+	
+	// update IBM positions:
+	enforce_max_rod_force_torque(nBlocks,nThreads);
+	assign_velocity_to_backfill_rods(backfillVel,nBlocks,nThreads);
+	update_rod_position_orientation_fluid(nBlocks,nThreads);
+	move_rod_back_to_inlet_random(lenInlet,radInlet,radOutlet,nBlocks,nThreads);
+	update_bead_position_rods(nBlocks,nThreads);
+	update_bead_velocity_rods(nBlocks,nThreads);
+	
+	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
+	lbm.extrapolate_force_bead_rod(nBlocks,nThreads,beads,rods,L0,nBeads,nBeadsPerRod);
+			
+}
+
+
+
+// --------------------------------------------------------
+// Take step forward for rods IBM:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::stepIBM_Euler_nozzle_channel_radix(class_scsp_D3Q19& lbm, float lenCylinder, 
+                                                          float lenInlet, float radInlet, float radOutlet,
+													      float backfillVel, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  rod positions 
+	// ----------------------------------------------------------
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+	
+	// calculate IBM forces:
+	zero_bead_forces(nBlocks,nThreads);
+	zero_rod_forces_torques_moments(nBlocks,nThreads);
+	lbm.interpolate_gradient_of_velocity_rod(nBlocks,nThreads,beads,nBeads);
+	radix_nonbonded_bead_interactions_with_friction(nBlocks,nThreads);
 	check_if_rod_contacting_nozzle(lenCylinder,radInlet,radOutlet,nBlocks,nThreads);
 	compute_wall_forces_nozzle(lenCylinder,radInlet,radOutlet,nBlocks,nThreads);	
 	unwrap_bead_coordinates(nBlocks,nThreads);
@@ -1818,6 +1890,107 @@ void class_rods_ibm3D::nonbonded_bead_interactions_with_virial(int nBlocks, int 
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
 		nonbonded_bead_interactions_with_virial_IBM3D
 		<<<nBlocks,nThreads>>> (beads,Stresslet,bins,repA,repD,lubforceMax,nBeads,Box,pbcFlag);
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces using
+// radix-sort:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::radix_nonbonded_bead_interactions_with_friction(int nBlocks, int nThreads)
+{
+	if (nRods > 1) {
+		
+		if (!binsFlag) cout << "Warning: IBM radix arrays have not been initialized" << endl;								
+		
+		// calculate new cell hashes and reset particle indices
+		calculate_radix_cellIDs_per_bead_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,nBeads);
+		cudaDeviceSynchronize();
+		
+		// sort bead indices by their updated cell hash
+	    thrust::device_ptr<int> th_hashes_ptr(radix.particleCellIDs);
+	    thrust::device_ptr<int> th_indices_ptr(radix.particleIndices);    
+	    thrust::sort_by_key(th_hashes_ptr, th_hashes_ptr + nBeads, th_indices_ptr);
+		cudaDeviceSynchronize();
+		
+		// reset cell start & end indices to -1 every step
+		cudaMemset(radix.cellStart, -1, radix.nCells*sizeof(int));
+		cudaMemset(radix.cellEnd,   -1, radix.nCells*sizeof(int));
+		cudaDeviceSynchronize();
+		
+		// find starting and ending indices for occupied cells
+		calculate_radix_cell_offsets_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,nBeads);
+		cudaDeviceSynchronize();
+		
+		// calculate non-bonded forces		
+		nonbonded_bead_interactions_with_friction_radix_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,repA,repD,lubforceMax,nBeads,Box,pbcFlag);
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Re-order the beads array so that beads near one another
+// are close together in memory, which is good for radix-sort:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::radix_reorder_beads(int nBlocks, int nThreads)
+{
+	if (nRods > 1) {
+		
+		if (!binsFlag) cout << "Warning: IBM radix arrays have not been initialized" << endl;								
+				
+		// calculate new cell hashes and reset particle indices
+		calculate_radix_cellIDs_per_bead_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,nBeads);
+		cudaDeviceSynchronize();
+		
+		// sort bead indices by their updated cell hash
+	    thrust::device_ptr<int> th_hashes_ptr(radix.particleCellIDs);
+	    thrust::device_ptr<int> th_indices_ptr(radix.particleIndices);    
+	    thrust::sort_by_key(th_hashes_ptr, th_hashes_ptr + nBeads, th_indices_ptr);
+		cudaDeviceSynchronize();
+		
+		// allocate temporary buffer just for this reordering step:
+		beadrod* beads_sorted = nullptr;
+		cudaMalloc(&beads_sorted, nBeads*sizeof(beadrod));
+		cudaDeviceSynchronize();
+		
+	    // gather beads into contiguous sorted layout
+	    thrust::device_ptr<beadrod> beads_ptr(beads);
+	    thrust::device_ptr<beadrod> beads_sorted_ptr(beads_sorted);
+		//thrust::device_ptr<int> th_indices_ptr(radix.particleIndices);  // already declared
+	    thrust::gather(th_indices_ptr, th_indices_ptr + nBeads, beads_ptr, beads_sorted_ptr);
+		cudaDeviceSynchronize();
+		
+	    // swap pointer and free temporary memory
+	    cudaFree(beads);
+	    beads = beads_sorted;
+		cudaDeviceSynchronize();
+		
+		// update bead index mapping
+		update_new_bead_indices_IBM3D
+		<<<nBlocks,nThreads>>> (radix,nBeads);
+		cudaDeviceSynchronize();
+		
+		// update rod data
+		update_rod_bead_indices_IBM3D
+		<<<nBlocks,nThreads>>> (rods,radix,nRods);
+		cudaDeviceSynchronize();
+		
+		/*
+		// find starting and ending indices for occupied cells
+		calculate_radix_cell_offsets_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,nBeads);
+		cudaDeviceSynchronize();
+		*/
+		
 	}	
 }
 

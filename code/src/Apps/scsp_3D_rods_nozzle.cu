@@ -337,6 +337,7 @@ void scsp_3D_rods_nozzle::initSystem()
 	
 	rods.stepIBM_Euler_relax_rods_in_nozzle(1000,lenCylinder,radInlet,radOutlet,nBlocks,nThreads);
 	*/
+	
 		
 	// ----------------------------------------------
 	// write initial output file:
@@ -383,9 +384,11 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << " " << endl;
 		cout << "-----------------------------------------------" << endl;
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
-		for (int i=0; i<nStepsEquilibrate; i++) {
+		for (int i=0; i<nStepsEquilibrate; i++) {			
+			if (i == 0) rods.radix_reorder_beads(nBlocks,nThreads);			
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
+//			rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
+			rods.stepIBM_Euler_nozzle_channel_radix(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);	
 			cudaDeviceSynchronize();
@@ -401,8 +404,10 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 		
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;
-		rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
+		cummulativeSteps++;		
+		if (step == 0) rods.radix_reorder_beads(nBlocks,nThreads);		
+//		rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
+		rods.stepIBM_Euler_nozzle_channel_radix(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);
 		cudaDeviceSynchronize();
@@ -420,9 +425,9 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 	// write output from this cycle:
 	// ----------------------------------------------
-	
-	writeOutput("macros",cummulativeSteps);
 		
+	writeOutput("macros",cummulativeSteps);	
+	
 }
 
 
@@ -433,7 +438,6 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 
 void scsp_3D_rods_nozzle::writeOutput(std::string tagname, int step)
 {				
-	
 	if (step == 0) {
 		// only print out vtk files
 		rods.orientation_in_cylindrical_channel(step);

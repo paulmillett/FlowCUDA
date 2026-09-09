@@ -12,6 +12,7 @@
 # include "data_structs/rod_data.h"
 # include "data_structs/tensor.h"
 # include "data_structs/neighbor_bins_data.h"
+# include "data_structs/radix_sort_data.h"
 # include <cuda.h>
 # include <curand.h>
 # include <curand_kernel.h>
@@ -48,7 +49,8 @@ class class_rods_ibm3D {
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;
-	bindata bins;	
+	bindata bins;
+	radixdata radix;	
 				
 	// host arrays:
 	beadrod* beadsH;
@@ -101,6 +103,7 @@ class class_rods_ibm3D {
 	void stepIBM_Euler_settling(class_scsp_D3Q19&,float,int,int);
 	void stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19&,float,int,int);
 	void stepIBM_Euler_nozzle_channel(class_scsp_D3Q19&,float,float,float,float,float,int,int);
+	void stepIBM_Euler_nozzle_channel_radix(class_scsp_D3Q19&,float,float,float,float,float,int,int);
 	void stepIBM_Euler_push_inside_cylinder(int,float,int,int);
 	void stepIBM_Euler_push_inside_duct(int,int,int);
 	void stepIBM_Euler_push_inside_slit(int,int,int);
@@ -140,6 +143,8 @@ class class_rods_ibm3D {
 	void nonbonded_bead_interactions(int,int);
 	void nonbonded_bead_interactions_with_friction(int,int);
 	void nonbonded_bead_interactions_with_virial(int,int);
+	void radix_nonbonded_bead_interactions_with_friction(int,int);
+	void radix_reorder_beads(int,int);
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);

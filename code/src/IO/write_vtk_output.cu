@@ -1514,7 +1514,7 @@ void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nB
 	outfile << "POINTS " << 2*nRods << " float" << endl;
 	for (int i=0; i<nRods; i++) {
 		int head = rods[i].headBead;
-		int tail = rods[i].tailBead;
+		int tail = rods[i].tailBead;		
 		outfile << fixed << setprecision(3) << beads[head].r.x << "  " << beads[head].r.y << "  " << beads[head].r.z << endl;
 		outfile << fixed << setprecision(3) << beads[tail].r.x << "  " << beads[tail].r.y << "  " << beads[tail].r.z << endl;
 	}

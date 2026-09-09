@@ -175,7 +175,7 @@ __global__ void update_bead_positions_rods_IBM3D(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nBeads) {
 		int rodID = beads[i].rodID;
-		float offset = float(rods[rodID].centerBead - i);
+		float offset = beads[i].centerOffset;  // float(rods[rodID].centerBead - i);
 		beads[i].rm1 = beads[i].r;
 		beads[i].r = rods[rodID].r + L0*offset*rods[rodID].p;	
 	}
@@ -1273,10 +1273,11 @@ __global__ void hydrodynamic_force_bead_rod_IBM3D(
 			// --------------------------------------
 			// calculate hydrodynamic forces 
 			// --------------------------------------
-		
-			float fx = (vxLBMi - beads[i].v.x)/dt/100.0; // /float(nBeadsPerRod);
-			float fy = (vyLBMi - beads[i].v.y)/dt/100.0; // /float(nBeadsPerRod);
-			float fz = (vzLBMi - beads[i].v.z)/dt/100.0; // /float(nBeadsPerRod);
+			
+			float bead_mass = 0.0484;  // assuming bead_radius = 0.25		
+			float fx = bead_mass*(vxLBMi - beads[i].v.x)/dt;
+			float fy = bead_mass*(vyLBMi - beads[i].v.y)/dt;
+			float fz = bead_mass*(vzLBMi - beads[i].v.z)/dt;
 						
 			// --------------------------------------
 			// distribute the !negative! of the 
@@ -1346,6 +1347,7 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 		// the rod
 		// --------------------------------------
 		
+		/*
 		float Lrod = float(rods[rodID].nBeads-1)*L0;  //float(nBeadsPerRod-1)*L0;
 		float Lrod2 = Lrod/2.0;
 		float3 FcoupleSep = Lrod2*rods[rodID].p;
@@ -1354,7 +1356,21 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 		Fcouple /= nBeadsPerRod2;
 		if (i > rods[rodID].centerBead) Fcouple *= -1.0;
 		beadForce += Fcouple;
-				
+		*/
+		
+		// --------------------------------------
+		// the rod torque is converted to a force
+		// per bead that is linearly proportional
+		// to the distance that the bead is from
+		// the rod center: 
+		// F^rot = (T x (X_k - X_com)) / SUM(|X-X_com|^2) 
+		// --------------------------------------
+		
+		float denom = L0*L0*nBeadsPerRod*(nBeadsPerRod*nBeadsPerRod - 1.0f)/12.0f;
+		float3 rrel = beads[i].r - rods[rodID].r;
+		float3 Frot = cross(rods[rodID].t,rrel)/denom;
+		beadForce += Frot;		
+		
 		// --------------------------------------
 		// find nearest LBM voxel (rounded down)
 		// --------------------------------------
@@ -1502,6 +1518,156 @@ __global__ void interpolate_gradient_of_velocity_bead_IBM3D(
 			beads[i].gradu.zz = 0.0;
 		}						
 	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to build the cellMap array for radix:
+// --------------------------------------------------------
+
+__global__ void build_radix_cellMap_IBM3D(
+	radixdata radix)
+{
+	// define cell:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < radix.nCells) {	
+		// calculate cell's x,y,z coordinates:				
+		int cellx = i/(radix.numCells.y*radix.numCells.z);
+		int celly = (i/radix.numCells.z)%radix.numCells.y;
+		int cellz = i%radix.numCells.z;
+				
+		// determine neighboring cells:		
+		int cnt = 0;
+		int offst = i*radix.nncells;		
+		for (int cx = cellx-1; cx < cellx+2; cx++) {
+			for (int cy = celly-1; cy < celly+2; cy++) {
+				for (int cz = cellz-1; cz < cellz+2; cz++) {
+					// do not include current bin
+					if (cx==cellx && cy==celly && cz==cellz) continue;
+					// cell index of neighbor (re-using the bin_index function)
+					radix.cellMap[offst+cnt] = cell_index(cx,cy,cz,radix.numCells);
+					// update counter
+					cnt++;
+				}
+			}
+		}		
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to find cellIDs for each bead for radix-sort:
+// --------------------------------------------------------
+
+__global__ void calculate_radix_cellIDs_per_bead_IBM3D(
+	beadrod* beads,
+	radixdata radix,
+	int nBeads)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {		
+		int cellID = int(floor(beads[i].r.x/radix.sizeCells))*radix.numCells.z*radix.numCells.y +  
+			         int(floor(beads[i].r.y/radix.sizeCells))*radix.numCells.z +
+		             int(floor(beads[i].r.z/radix.sizeCells));
+		if (cellID < 0 || cellID > radix.nCells-1) cellID = radix.nCells;  // for beads in backfill zone
+		radix.particleCellIDs[i] = cellID;
+		radix.particleIndices[i] = i;			
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to find the starting and ending indices
+// for each cell block:
+// --------------------------------------------------------
+
+__global__ void calculate_radix_cell_offsets_IBM3D(
+	beadrod* beads,
+	radixdata radix,
+	int nBeads)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {
+		int cell = radix.particleCellIDs[i];  // this should be sorted
+		// ignore out-of-bounds sentinel hash:
+	    if (cell < 0 || cell >= radix.nCells) return;
+		// find start and end index:
+		if (i == 0 || cell != radix.particleCellIDs[i-1]) radix.cellStart[cell] = i;
+		if (i == nBeads-1 || cell != radix.particleCellIDs[i+1]) radix.cellEnd[cell] = i+1;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to map bead indices after a re-order:
+// --------------------------------------------------------
+
+__global__ void update_new_bead_indices_IBM3D(
+	radixdata radix,
+	int nBeads)
+{
+	// define bead:
+	int newIndex = blockIdx.x*blockDim.x + threadIdx.x;
+	if (newIndex < nBeads) {
+	    // Read which original bead ID was moved to 'newIndex'
+	    int originalID = radix.particleIndices[newIndex];
+	    // Write the mapping: originalID -> newIndex
+		radix.newParticleIndices[originalID] = newIndex;		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to update the relevent bead indices stored
+// by every rod:
+// --------------------------------------------------------
+
+__global__ void update_rod_bead_indices_IBM3D(
+	rod* rods,
+	radixdata radix,
+	int nRods)
+{
+	// define rod:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (i < nRods) {
+		// original bead indices:
+		int originalheadBead = rods[i].headBead;
+		int originaltailBead = rods[i].tailBead;
+		int originalcenterBead = rods[i].centerBead;
+		int originalindxB0 = rods[i].indxB0;				
+		// new bead indices:
+		rods[i].headBead = radix.newParticleIndices[originalheadBead];
+		rods[i].tailBead = radix.newParticleIndices[originaltailBead];
+		rods[i].centerBead = radix.newParticleIndices[originalcenterBead];
+		rods[i].indxB0 = radix.newParticleIndices[originalindxB0];
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to print out bead info after a reorder
+// (just for debugging):
+// --------------------------------------------------------
+
+__global__ void check_bead_info_IBM3D(
+	beadrod* beads,
+	int bID)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i == bID) {		
+		printf("bead %i position = [%f, %f, %f] \n", i, beads[i].r.x, beads[i].r.y, beads[i].r.z);
+		printf("bead %i rodID = %i \n", i, beads[i].rodID);			
+	}
 }
 
 
@@ -1755,6 +1921,81 @@ __global__ void nonbonded_bead_interactions_with_virial_IBM3D(
 				
 	}
 }
+
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate nonbonded bead interactions
+// using the radix-sort lists:
+// --------------------------------------------------------
+
+__global__ void nonbonded_bead_interactions_with_friction_radix_IBM3D(
+	beadrod* beads,
+	radixdata radix,
+	float repA,
+	float repD,
+	float lubforceMax,
+	int nBeads,
+	float3 Box,	
+	int3 pbcFlag)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nBeads) {		
+		
+		// -------------------------------
+		// calculate cell ID:
+		// -------------------------------
+		
+		int cellID = int(floor(beads[i].r.x/radix.sizeCells))*radix.numCells.z*radix.numCells.y +  
+			         int(floor(beads[i].r.y/radix.sizeCells))*radix.numCells.z +
+		             int(floor(beads[i].r.z/radix.sizeCells));	
+				
+		if (cellID < 0 || cellID > radix.nCells-1) return;
+		
+		// -------------------------------
+		// loop over beads in the same cell:
+		// -------------------------------
+		
+		int start = radix.cellStart[cellID];
+		if (start != -1) {
+			int end = radix.cellEnd[cellID];
+			for (int k=start; k<end; k++) {
+				int j = radix.particleIndices[k];
+				if (j < 0 || j >= nBeads) continue;
+				if (i==j) continue;
+				if (beads[i].rodID == beads[j].rodID) continue;
+				pairwise_bead_interaction_forces_with_friction(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);
+			}
+		}
+				
+		// -------------------------------
+		// loop over neighboring cells:
+		// -------------------------------
+		
+        for (int c=0; c<radix.nncells; c++) {
+            // get neighboring cell ID
+			int naborcellID = radix.cellMap[cellID*radix.nncells + c];
+			int start = radix.cellStart[naborcellID];
+			if (start != -1) {
+				int end = radix.cellEnd[naborcellID];
+				for (int k=start; k<end; k++) {
+					int j = radix.particleIndices[k];
+					if (j < 0 || j >= nBeads) continue;
+					if (i==j) continue;
+					if (beads[i].rodID == beads[j].rodID) continue;
+					pairwise_bead_interaction_forces_with_friction(i,j,repA,repD,lubforceMax,beads,Box,pbcFlag);
+				}
+			}
+		}
+		
+	}
+}
+
+
+
+
 
 
 
@@ -2093,6 +2334,27 @@ __device__ inline int rod_voxel_ndx(
     if (k < 0) k += Nz;
     if (k >= Nz) k -= Nz;
     return k*Nx*Ny + j*Nx + i;	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to radix cell ID:
+// --------------------------------------------------------
+
+__device__ inline int cell_index(
+	int i, 
+	int j,
+	int k, 
+	const int3 size)
+{
+    if (i < 0) i += size.x;
+    if (i >= size.x) i -= size.x;
+    if (j < 0) j += size.y;
+    if (j >= size.y) j -= size.y;
+    if (k < 0) k += size.z;
+    if (k >= size.z) k -= size.z;
+    return i*size.z*size.y + j*size.z + k;
 }
 
 
