@@ -272,7 +272,8 @@ void scsp_3D_rods_nozzle::initSystem()
 	// build the binMap array for neighbor lists: 
 	// ----------------------------------------------
 		
-	rods.build_binMap(nBlocks,nThreads);	
+	rods.build_binMap(nBlocks,nThreads);
+	rods.build_cellMap_radix(nBlocks,nThreads);	
 		
 	// ----------------------------------------------		
 	// copy arrays from host to device: 

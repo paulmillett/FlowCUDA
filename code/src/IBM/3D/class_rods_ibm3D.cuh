@@ -138,6 +138,7 @@ class class_rods_ibm3D {
 	void add_xdir_force_to_beads(int,int,float);
 	void compute_wall_forces(int,int);
 	void build_binMap(int,int);
+	void build_cellMap_radix(int,int);
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);
 	void nonbonded_bead_interactions(int,int);

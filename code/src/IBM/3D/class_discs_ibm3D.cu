@@ -10,6 +10,9 @@
 # include <sstream>
 # include <stdlib.h>
 # include <time.h>
+# include <thrust/device_ptr.h>
+# include <thrust/sort.h>
+# include <thrust/gather.h>
 using namespace std;  
 
 
@@ -74,7 +77,8 @@ class_discs_ibm3D::class_discs_ibm3D()
 	// if we need bins, do some calculations:
 	binsFlag = false;
 	if (nDiscs > 1) binsFlag = true;
-	if (binsFlag) {		
+	if (binsFlag) {
+		// linked-list cells data
 		bins.sizeBins = inputParams("IBM_DISCS/sizeBins",2.0);
 		bins.binMax = inputParams("IBM_DISCS/binMax",1);			
 		bins.numBins.x = int(floor(N.x/bins.sizeBins));
@@ -82,6 +86,14 @@ class_discs_ibm3D::class_discs_ibm3D()
 	    bins.numBins.z = int(floor(N.z/bins.sizeBins));
 		bins.nBins = bins.numBins.x*bins.numBins.y*bins.numBins.z;
 		bins.nnbins = 26;
+		// radix-sort data
+		radix.sizeCells = inputParams("IBM_DISCS/sizeBins",2.0);
+		radix.cellMax = inputParams("IBM_DISCS/binMax",1);
+		radix.numCells.x = int(floor(N.x/radix.sizeCells));
+	    radix.numCells.y = int(floor(N.y/radix.sizeCells));
+	    radix.numCells.z = int(floor(N.z/radix.sizeCells));
+		radix.nCells = radix.numCells.x*radix.numCells.y*radix.numCells.z;
+		radix.nncells = 26;
 	}	
 }
 
@@ -112,10 +124,18 @@ void class_discs_ibm3D::allocate()
 	cudaMalloc((void **) &beads, nBeads*sizeof(beaddisc));
 	cudaMalloc((void **) &discs, nDiscs*sizeof(disc));
 	cudaMalloc((void **) &states, nDiscs*sizeof(curandState));
-	if (binsFlag) {		
+	if (binsFlag) {
+		// linked-list cells data	
 		cudaMalloc((void **) &bins.binMembers, bins.nBins*bins.binMax*sizeof(int));
 		cudaMalloc((void **) &bins.binOccupancy, bins.nBins*sizeof(int));
-		cudaMalloc((void **) &bins.binMap, bins.nBins*26*sizeof(int));		
+		cudaMalloc((void **) &bins.binMap, bins.nBins*26*sizeof(int));
+		// radix-sort data
+		cudaMalloc((void **) &radix.particleCellIDs, nBeads*sizeof(int));
+		cudaMalloc((void **) &radix.particleIndices, nBeads*sizeof(int));
+		cudaMalloc((void **) &radix.cellStart, radix.nCells*sizeof(int));
+		cudaMalloc((void **) &radix.cellEnd, radix.nCells*sizeof(int));		
+		cudaMalloc((void **) &radix.cellMap, radix.nCells*26*sizeof(int));
+		cudaMalloc((void **) &radix.newParticleIndices, nBeads*sizeof(int));	
 	}	
 }
 
@@ -134,10 +154,18 @@ void class_discs_ibm3D::deallocate()
 	// free array memory (device):
 	cudaFree(beads);
 	cudaFree(discs);
-	if (binsFlag) {		
+	if (binsFlag) {	
+		// linked-list cells data		
 		cudaFree(bins.binMembers);
 		cudaFree(bins.binOccupancy);
-		cudaFree(bins.binMap);				
+		cudaFree(bins.binMap);
+		// radix-sort data
+		cudaFree(radix.particleCellIDs);
+		cudaFree(radix.particleIndices);
+		cudaFree(radix.cellStart);
+		cudaFree(radix.cellEnd);
+		cudaFree(radix.cellMap);
+		cudaFree(radix.newParticleIndices);			
 	}		
 }
 
@@ -453,14 +481,13 @@ void class_discs_ibm3D::randomize_discs(float sepWall)
 // randomize rod positions in cylinder:
 // --------------------------------------------------------
 
-void class_discs_ibm3D::randomize_discs_cylinder(float sepWall)
+void class_discs_ibm3D::randomize_discs_cylinder(float sepMin, float sepWall)
 {
 	
 	// copy bead positions from device to host:
 	cudaMemcpy(beadsH, beads, sizeof(beaddisc)*nBeads, cudaMemcpyDeviceToHost);
 	
 	// assign random position and orientation to each disc:
-	const float sepMin = sepWall;
 	float3* discCOM = (float3*)malloc(nDiscs*sizeof(float3));
 				
 	// loop over discs
@@ -877,6 +904,43 @@ void class_discs_ibm3D::stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19& lbm,
 
 
 
+// --------------------------------------------------------
+// Take step forward for discs IBM in a cylinder channel:
+// --------------------------------------------------------
+
+void class_discs_ibm3D::stepIBM_Euler_cylindrical_channel_radix(class_scsp_D3Q19& lbm, float chRad, int nBlocks, int nThreads) 
+{
+		
+	// ----------------------------------------------------------
+	//  here, the Euler algorithm is used to update the 
+	//  rod positions 
+	// ----------------------------------------------------------
+	
+	// zero fluid forces:
+	lbm.zero_forces(nBlocks,nThreads);
+			
+	// calculate IBM forces:
+	zero_bead_forces(nBlocks,nThreads);
+	zero_disc_forces_torques_moments(nBlocks,nThreads);
+	lbm.interpolate_gradient_of_velocity_disc(nBlocks,nThreads,beads,nBeads);
+	radix_nonbonded_bead_interactions_with_friction(nBlocks,nThreads);
+	compute_wall_forces_cylinder(chRad,nBlocks,nThreads);	
+	unwrap_bead_coordinates(nBlocks,nThreads);
+	sum_disc_forces_torques_moments(nBlocks,nThreads);
+			
+	// update IBM positions:
+	enforce_max_disc_force_torque(nBlocks,nThreads);
+	update_disc_position_orientation_fluid(nBlocks,nThreads);
+	update_bead_position_discs(nBlocks,nThreads);
+	update_bead_velocity_discs(nBlocks,nThreads);
+	
+	// extrapolate rod force to fluid lattice (this uses bead positions from before update):
+	lbm.extrapolate_force_bead_disc(nBlocks,nThreads,beads,discs,nBeads);
+
+}
+
+
+
 
 
 
@@ -1119,6 +1183,21 @@ void class_discs_ibm3D::build_binMap(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to kernel that builds the cellMap array for radix-sorting:
+// --------------------------------------------------------
+
+void class_discs_ibm3D::build_cellMap_radix(int nBlocks, int nThreads)
+{
+	if (nDiscs > 1) {
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;	
+		build_radix_cellMap_IBM3D
+		<<<nBlocks,nThreads>>> (radix);			
+	}	
+}
+
+
+
+// --------------------------------------------------------
 // Call to kernel that resets bin lists:
 // --------------------------------------------------------
 
@@ -1173,6 +1252,107 @@ void class_discs_ibm3D::nonbonded_bead_interactions_with_friction(int nBlocks, i
 		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;								
 		nonbonded_bead_interactions_with_friction_IBM3D
 		<<<nBlocks,nThreads>>> (beads,bins,repA,repD,lubforceMax,nBeads,Box,pbcFlag);
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates nonbonded forces using
+// radix-sort:
+// --------------------------------------------------------
+
+void class_discs_ibm3D::radix_nonbonded_bead_interactions_with_friction(int nBlocks, int nThreads)
+{
+	if (nDiscs > 1) {
+		
+		if (!binsFlag) cout << "Warning: IBM radix arrays have not been initialized" << endl;								
+		
+		// calculate new cell hashes and reset particle indices
+		calculate_radix_cellIDs_per_bead_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,nBeads);
+		cudaDeviceSynchronize();
+		
+		// sort bead indices by their updated cell hash
+	    thrust::device_ptr<int> th_hashes_ptr(radix.particleCellIDs);
+	    thrust::device_ptr<int> th_indices_ptr(radix.particleIndices);    
+	    thrust::sort_by_key(th_hashes_ptr, th_hashes_ptr + nBeads, th_indices_ptr);
+		cudaDeviceSynchronize();
+		
+		// reset cell start & end indices to -1 every step
+		cudaMemset(radix.cellStart, -1, radix.nCells*sizeof(int));
+		cudaMemset(radix.cellEnd,   -1, radix.nCells*sizeof(int));
+		cudaDeviceSynchronize();
+		
+		// find starting and ending indices for occupied cells
+		calculate_radix_cell_offsets_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,nBeads);
+		cudaDeviceSynchronize();
+		
+		// calculate non-bonded forces		
+		nonbonded_bead_interactions_with_friction_radix_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,repA,repD,lubforceMax,nBeads,Box,pbcFlag);
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Re-order the beads array so that beads near one another
+// are close together in memory, which is good for radix-sort:
+// --------------------------------------------------------
+
+void class_discs_ibm3D::radix_reorder_beads(int nBlocks, int nThreads)
+{
+	if (nDiscs > 1) {
+		
+		if (!binsFlag) cout << "Warning: IBM radix arrays have not been initialized" << endl;								
+				
+		// calculate new cell hashes and reset particle indices
+		calculate_radix_cellIDs_per_bead_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,nBeads);
+		cudaDeviceSynchronize();
+		
+		// sort bead indices by their updated cell hash
+	    thrust::device_ptr<int> th_hashes_ptr(radix.particleCellIDs);
+	    thrust::device_ptr<int> th_indices_ptr(radix.particleIndices);    
+	    thrust::sort_by_key(th_hashes_ptr, th_hashes_ptr + nBeads, th_indices_ptr);
+		cudaDeviceSynchronize();
+		
+		// allocate temporary buffer just for this reordering step:
+		beaddisc* beads_sorted = nullptr;
+		cudaMalloc(&beads_sorted, nBeads*sizeof(beaddisc));
+		cudaDeviceSynchronize();
+		
+	    // gather beads into contiguous sorted layout
+	    thrust::device_ptr<beaddisc> beads_ptr(beads);
+	    thrust::device_ptr<beaddisc> beads_sorted_ptr(beads_sorted);
+		//thrust::device_ptr<int> th_indices_ptr(radix.particleIndices);  // already declared
+	    thrust::gather(th_indices_ptr, th_indices_ptr + nBeads, beads_ptr, beads_sorted_ptr);
+		cudaDeviceSynchronize();
+		
+	    // swap pointer and free temporary memory
+	    cudaFree(beads);
+	    beads = beads_sorted;
+		cudaDeviceSynchronize();
+		
+		// update bead index mapping
+		update_new_bead_indices_IBM3D
+		<<<nBlocks,nThreads>>> (radix,nBeads);
+		cudaDeviceSynchronize();
+		
+		// update disc data
+		update_disc_bead_indices_IBM3D
+		<<<nBlocks,nThreads>>> (discs,radix,nDiscs);
+		cudaDeviceSynchronize();
+		
+		/*
+		// find starting and ending indices for occupied cells
+		calculate_radix_cell_offsets_IBM3D
+		<<<nBlocks,nThreads>>> (beads,radix,nBeads);
+		cudaDeviceSynchronize();
+		*/
+		
 	}	
 }
 
@@ -1332,14 +1512,17 @@ void class_discs_ibm3D::push_discs_inside_nozzle(float lenCylinder, float radInl
 void class_discs_ibm3D::write_output(std::string tagname, int tagnum)
 {
 	write_vtk_immersed_boundary_3D_discs(tagname,tagnum,
-	nBeads,nBeadsPerDisc,nDiscs,beadsH,discsH);
+	nBeads,nBeadsPerDisc,nDiscs,Box,beadsH,discsH);
+	
+	//if (tagnum == 0) write_vtk_discs_beads();
+	
 }
 
 
 
 // --------------------------------------------------------
 // Unwrap bead coordinates based on difference between bead
-// position and the rod's center bead position:
+// position and the disc's center bead position:
 // --------------------------------------------------------
 
 void class_discs_ibm3D::unwrap_bead_coordinates()
@@ -1356,7 +1539,7 @@ void class_discs_ibm3D::unwrap_bead_coordinates()
 
 
 // --------------------------------------------------------
-// Output the rod orientation, position, and radial position
+// Output the disc orientation, position, and radial position
 // inside cylindrical channel
 // --------------------------------------------------------
 
@@ -1369,12 +1552,12 @@ void class_discs_ibm3D::orientation_in_cylindrical_channel(int step)
 	
 	ofstream outfile;
 	std::stringstream filenamecombine;
-	filenamecombine << "vtkoutput/" << "rod_orientation.dat";
+	filenamecombine << "vtkoutput/" << "disc_orientation.dat";
 	string filename = filenamecombine.str();
 	outfile.open(filename.c_str(), ios::out | ios::app);
 	
 	// -----------------------------------------
-	// Loop over the capsules  
+	// Loop over the discs  
 	// -----------------------------------------
 		
 	for (int r=0; r<nDiscs; r++) {		
@@ -1398,5 +1581,44 @@ void class_discs_ibm3D::orientation_in_cylindrical_channel(int step)
 
 
 
+// --------------------------------------------------------
+// Output all the bead positions for the discs to vtk file
+// --------------------------------------------------------
+
+void class_discs_ibm3D::write_vtk_discs_beads()
+{
+	
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "discs_beads.vtk";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// -----------------------------------
+	//	Write the 'vtk' file header:
+	// -----------------------------------
+
+	string d = "   ";
+	outfile << "# vtk DataFile Version 3.1" << endl;
+	outfile << "VTK file containing IBM data" << endl;
+	outfile << "ASCII" << endl;
+	outfile << " " << endl;
+	outfile << "DATASET POLYDATA" << endl;			
+	
+	// -----------------------------------
+	//	Write the bead positions:
+	// -----------------------------------
+		
+	outfile << " " << endl;	
+	outfile << "POINTS " << nBeads << " float" << endl;
+	for (int i=0; i<nBeads; i++) {
+		outfile << fixed << setprecision(3) << beadsH[i].r.x << "  " << beadsH[i].r.y << "  " << beadsH[i].r.z << endl;
+	}
+	
+}
 
 

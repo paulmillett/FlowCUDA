@@ -231,6 +231,7 @@ void scsp_3D_discs_cylinder::initSystem()
 	// ----------------------------------------------
 	
 	discs.build_binMap(nBlocks,nThreads);	
+	discs.build_cellMap_radix(nBlocks,nThreads);
 		
 	// ----------------------------------------------		
 	// copy arrays from host to device: 
@@ -257,7 +258,7 @@ void scsp_3D_discs_cylinder::initSystem()
 	// ----------------------------------------------
 			
 	if (nDiscs > 1) {
-		discs.randomize_discs_cylinder(Ddisc); 
+		discs.randomize_discs_cylinder(Ddisc + 0.25, Ddisc/2.0f + 0.25); 
 	}
 	discs.set_disc_position_orientation(nBlocks,nThreads);
 	
@@ -317,8 +318,10 @@ void scsp_3D_discs_cylinder::cycleForward(int stepsPerCycle, int currentCycle)
 		cout << "-----------------------------------------------" << endl;
 		cout << "Equilibrating for " << nStepsEquilibrate << " steps..." << endl;
 		for (int i=0; i<nStepsEquilibrate; i++) {
+			if (i == 0) discs.radix_reorder_beads(nBlocks,nThreads);	
 			if (i%10000 == 0) cout << "equilibration step " << i << endl;
-			discs.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
+			//discs.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
+			discs.stepIBM_Euler_cylindrical_channel_radix(lbm,chRad,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing(nBlocks,nThreads);
 			cudaDeviceSynchronize();
@@ -334,8 +337,10 @@ void scsp_3D_discs_cylinder::cycleForward(int stepsPerCycle, int currentCycle)
 	// ----------------------------------------------
 		
 	for (int step=0; step<stepsPerCycle; step++) {
-		cummulativeSteps++;		
-		discs.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
+		cummulativeSteps++;
+		if (step == 0) discs.radix_reorder_beads(nBlocks,nThreads);	
+		//discs.stepIBM_Euler_cylindrical_channel(lbm,chRad,nBlocks,nThreads);
+		discs.stepIBM_Euler_cylindrical_channel_radix(lbm,chRad,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing(nBlocks,nThreads);
 		cudaDeviceSynchronize();

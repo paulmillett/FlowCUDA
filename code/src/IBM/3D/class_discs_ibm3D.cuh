@@ -10,6 +10,7 @@
 # include "data_structs/disc_data.h"
 # include "data_structs/tensor.h"
 # include "data_structs/neighbor_bins_data.h"
+# include "data_structs/radix_sort_data.h"
 # include <cuda.h>
 # include <curand.h>
 # include <curand_kernel.h>
@@ -41,7 +42,8 @@ class class_discs_ibm3D {
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;
-	bindata bins;	
+	bindata bins;
+	radixdata radix;	
 				
 	// host arrays:
 	beaddisc* beadsH;
@@ -77,7 +79,7 @@ class class_discs_ibm3D {
 	void rotate_and_shift_bead_positions(int,float,float,float,float,float,float);
 	void rotate_and_shift_bead_positions_using_orientation_vector(int);
 	void randomize_discs(float);
-	void randomize_discs_cylinder(float);
+	void randomize_discs_cylinder(float,float);
 	void randomize_discs_duct();
 	void randomize_discs_nozzle(float,float,float,float);
 	void randomize_discs_nozzle_backfill(float,float,float,float);
@@ -85,7 +87,8 @@ class class_discs_ibm3D {
 	void semi_randomize_rods_xdir_alligned_cylinder(float,float,float,float);
 	float calc_separation_pbc(float3,float3);
 	void stepIBM_Euler(class_scsp_D3Q19&,int,int);
-	void stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19&,float,int,int);	
+	void stepIBM_Euler_cylindrical_channel(class_scsp_D3Q19&,float,int,int);
+	void stepIBM_Euler_cylindrical_channel_radix(class_scsp_D3Q19&,float,int,int);	
 	void init_rand_kernel(int,int);
 	void zero_disc_forces_torques_moments(int,int);
 	void set_disc_position_orientation(int,int);
@@ -105,10 +108,13 @@ class class_discs_ibm3D {
 	void add_xdir_force_to_beads(int,int,float);
 	void compute_wall_forces(int,int);
 	void build_binMap(int,int);
+	void build_cellMap_radix(int,int);
 	void reset_bin_lists(int,int);
 	void build_bin_lists(int,int);
 	void nonbonded_bead_interactions(int,int);
 	void nonbonded_bead_interactions_with_friction(int,int);
+	void radix_nonbonded_bead_interactions_with_friction(int,int);
+	void radix_reorder_beads(int,int);
 	void wall_forces_ydir(int,int);
 	void wall_forces_zdir(int,int);
 	void wall_forces_ydir_zdir(int,int);
@@ -122,6 +128,7 @@ class class_discs_ibm3D {
 	void write_output(std::string,int);
 	void unwrap_bead_coordinates();
 	void orientation_in_cylindrical_channel(int);
+	void write_vtk_discs_beads();
 	
 };
 

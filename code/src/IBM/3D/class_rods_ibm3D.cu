@@ -1821,6 +1821,21 @@ void class_rods_ibm3D::build_binMap(int nBlocks, int nThreads)
 
 
 // --------------------------------------------------------
+// Call to kernel that builds the cellMap array for radix-sorting:
+// --------------------------------------------------------
+
+void class_rods_ibm3D::build_cellMap_radix(int nBlocks, int nThreads)
+{
+	if (nRods > 1) {
+		if (!binsFlag) cout << "Warning: IBM bin arrays have not been initialized" << endl;	
+		build_radix_cellMap_IBM3D
+		<<<nBlocks,nThreads>>> (radix);			
+	}	
+}
+
+
+
+// --------------------------------------------------------
 // Call to kernel that resets bin lists:
 // --------------------------------------------------------
 

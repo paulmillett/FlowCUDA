@@ -1570,11 +1570,21 @@ void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nB
 	// -----------------------------------------------
 		
 	outfile << " " << endl;
-	//outfile << "CELL_DATA " << nRods << endl;
 	outfile << "SCALARS " << "rodtype " << "int " << endl;
 	outfile << "LOOKUP_TABLE default" << endl;
 	for (int i=0; i<nRods; i++) {
 		outfile << rods[i].rodType << endl;
+	}
+	
+	// -----------------------------------------------
+	//	Write whether rod is touching wall (0=no, 1=yes):
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	outfile << "SCALARS " << "wallContact " << "int " << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nRods; i++) {
+		outfile << rods[i].wallContact << endl;
 	}
 	
 	// -----------------------------------
@@ -1608,7 +1618,7 @@ void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nB
 // -------------------------------------------------------------------------
 
 void write_vtk_immersed_boundary_3D_discs(std::string tagname, int tagnum, int nBeads, 
-                                          int nBeadsPerDisc, int nDiscs, beaddisc* beads, disc* discs)
+                                          int nBeadsPerDisc, int nDiscs, float3 Box, beaddisc* beads, disc* discs)
 {
 		
 	// -----------------------------------
@@ -1635,44 +1645,53 @@ void write_vtk_immersed_boundary_3D_discs(std::string tagname, int tagnum, int n
 	// -----------------------------------
 	//	Write the bead positions:
 	// -----------------------------------
-
+	
+	/*
 	outfile << " " << endl;	
 	outfile << "POINTS " << nBeads << " float" << endl;
 	for (int i=0; i<nBeads; i++) {
 		outfile << fixed << setprecision(3) << beads[i].r.x << "  " << beads[i].r.y << "  " << beads[i].r.z << endl;
 	}
-		
-	/*
-	outfile << " " << endl;	
-	outfile << "POINTS " << 2*nRods << " float" << endl;
-	for (int i=0; i<nRods; i++) {
-		int head = rods[i].headBead;
-		int tail = rods[i].tailBead;
-		outfile << fixed << setprecision(3) << beads[head].r.x << "  " << beads[head].r.y << "  " << beads[head].r.z << endl;
-		outfile << fixed << setprecision(3) << beads[tail].r.x << "  " << beads[tail].r.y << "  " << beads[tail].r.z << endl;
-	}
 	*/
-			
+		
+	outfile << " " << endl;	
+	outfile << "POINTS " << 2*nDiscs << " float" << endl;
+	for (int i=0; i<nDiscs; i++) {
+		float3 head = discs[i].r + discs[i].h2*discs[i].p;
+		float3 tail = discs[i].r - discs[i].h2*discs[i].p;
+		outfile << fixed << setprecision(3) << head.x << "  " << head.y << "  " << head.z << endl;
+		outfile << fixed << setprecision(3) << tail.x << "  " << tail.y << "  " << tail.z << endl;
+	}
+				
 	// -----------------------------------------------
 	//	Write the line information:
 	// -----------------------------------------------
-	
-	/*
+		
 	outfile << " " << endl;
-	outfile << "LINES " << nRods << " " << 3*nRods << endl;
-	for (int i=0; i<nRods; i++) {
-		outfile << 2 << " " << rods[i].headBead << " " << rods[i].tailBead << endl;
-	}
-	*/
-	
-	/*
-	outfile << " " << endl;
-	outfile << "LINES " << nRods << " " << 3*nRods << endl;
-	for (int i=0; i<nRods; i++) {
+	outfile << "LINES " << nDiscs << " " << 3*nDiscs << endl;
+	for (int i=0; i<nDiscs; i++) {
 		outfile << 2 << " " << 2*i << " " << 2*i+1 << endl;
 	}
-	*/
-				
+	
+	// -----------------------------------------------
+	//	Write the A_rr orientation tensor value for each disc:
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	outfile << "CELL_DATA " << nDiscs << endl;
+	outfile << "SCALARS " << "Arr " << "float " << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nDiscs; i++) {
+		const float ymid = (Box.y-1.0)/2.0;
+		const float zmid = (Box.z-1.0)/2.0;
+		const float yi = discs[i].r.y - ymid;  // distance to channel centerline
+		const float zi = discs[i].r.z - zmid;  // "                            "
+		const float ri = sqrt(yi*yi + zi*zi);
+		float3 nri = make_float3(0.0f, yi/ri, zi/ri);
+		float Arr = dot(discs[i].p,nri);
+		outfile << abs(Arr) << endl;
+	}
+					
 	// -----------------------------------------------
 	//	Close the file:
 	// -----------------------------------------------

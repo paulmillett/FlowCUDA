@@ -1523,7 +1523,7 @@ __global__ void interpolate_gradient_of_velocity_bead_IBM3D(
 
 
 // --------------------------------------------------------
-// IBM3D kernel to build the cellMap array for radix:
+// IBM3D kernel to build the cellMap array for radix sort:
 // --------------------------------------------------------
 
 __global__ void build_radix_cellMap_IBM3D(

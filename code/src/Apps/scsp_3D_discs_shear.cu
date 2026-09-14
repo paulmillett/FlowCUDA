@@ -159,12 +159,27 @@ void scsp_3D_discs_shear::initSystem()
 	// initialize macros: 
 	// ----------------------------------------------
 	
+	for (int k=0; k<Nz; k++) {
+		for (int j=0; j<Ny; j++) {
+			for (int i=0; i<Nx; i++) {
+				int ndx = k*Nx*Ny + j*Nx + i;				
+				float ux = -shearVel + float(k)*(2.0*shearVel/float(Nz-1));				
+				lbm.setU(ndx,ux);
+				lbm.setV(ndx,0.0);
+				lbm.setW(ndx,0.0);
+				lbm.setR(ndx,1.0);
+			}
+		}
+	} 
+	
+	/*
 	for (int i=0; i<nVoxels; i++) {
 		lbm.setU(i,0.0);
 		lbm.setV(i,0.0);
 		lbm.setW(i,0.0);
 		lbm.setR(i,1.0);		
 	}
+	*/
 	
 	// ----------------------------------------------			
 	// initialize rod immersed boundary info: 
