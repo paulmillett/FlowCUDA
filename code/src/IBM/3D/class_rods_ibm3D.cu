@@ -242,7 +242,17 @@ void class_rods_ibm3D::create_first_rod()
 		beadsH[i].rodID = 0;
 		beadsH[i].centerOffset = nBeadsPerRod/2 - i;
 	}
-		
+	
+	// calculate geometric polar moment of inertia:
+	float J = 0.0;
+	int centerBead = nBeadsPerRod/2;
+	for (int i=0; i<nBeadsPerRod; i++) {
+		float3 rrel = beadsH[i].r - beadsH[centerBead].r;
+		J += length(rrel)*length(rrel);
+	}
+	cout << "Rod moment of inertia = " << J << endl;
+	
+	
 	// set up indices for ALL rods:
 	for (int f=0; f<nRods; f++) {
 		rodsH[f].rodType = 0;
@@ -251,6 +261,7 @@ void class_rods_ibm3D::create_first_rod()
 		rodsH[f].headBead = f*nBeadsPerRod;    // head bead (first bead)
 		rodsH[f].tailBead = f*nBeadsPerRod + nBeadsPerRod - 1;  // tail bead (last bead)
 		rodsH[f].centerBead = f*nBeadsPerRod + nBeadsPerRod/2;  // center-of-mass, assuming nBeadsPerRod is odd		
+		rodsH[f].J = J;                                         // geometric polar moment of inertia
 	}
 }
 
@@ -2249,17 +2260,38 @@ void class_rods_ibm3D::orientation_in_cylindrical_channel(int step)
 	string filename = filenamecombine.str();
 	outfile.open(filename.c_str(), ios::out | ios::app);
 	
+	// Right-align all numerical outputs globally
+	outfile << std::right;
+	
 	// -----------------------------------------
 	// Loop over the capsules  
 	// -----------------------------------------
 		
 	for (int r=0; r<nRods; r++) {		
+		
 		// radial distance to channel centerline:
 		float ymid = (Box.y-1.0)/2.0;
 		float zmid = (Box.z-1.0)/2.0;
 		float yi = rodsH[r].r.y - ymid;
 		float zi = rodsH[r].r.z - zmid;
 		float ri = sqrt(yi*yi + zi*zi);
+		
+		// print the first few columns which are integers:
+		outfile << setw(10) << step;
+		outfile << setw(8)  << r;
+		outfile << setw(4)  << rodsH[r].wallContact;
+		outfile << setw(4)  << rodsH[r].nContacts;
+		
+		// print the floats:
+		outfile << std::fixed << std::setprecision(4);
+		outfile << setw(10) << rodsH[r].p.x << setw(10) << rodsH[r].p.y << setw(10) << rodsH[r].p.z;
+		outfile << setw(10) << rodsH[r].r.x << setw(10) << rodsH[r].r.y << setw(10) << rodsH[r].r.z;
+		outfile << setw(10) << ri;
+		outfile << std::fixed << std::setprecision(7);
+		outfile << setw(12) << rodsH[r].v.x << setw(12) << rodsH[r].v.y << setw(12) << rodsH[r].v.z;
+		outfile << endl;
+		
+		/*
 		// print data:
 		outfile << fixed << setprecision(4) << step << "  " << r << "  " << rodsH[r].p.x << "  " 
 			                                                             << rodsH[r].p.y << "  " 
@@ -2267,7 +2299,8 @@ void class_rods_ibm3D::orientation_in_cylindrical_channel(int step)
 																		 << rodsH[r].r.x << "  "
 																		 << rodsH[r].r.y << "  " 
 																		 << rodsH[r].r.z << "  "
-																		 << ri << endl;		
+																		 << ri << endl;	
+		*/	
 	}
 
 }
@@ -2309,6 +2342,103 @@ void class_rods_ibm3D::output_stresslet_tensor(int step)
 												<< "  " << StressletH[0].zx << "  " << StressletH[0].zy << "  " << StressletH[0].zz << endl;
 
 }
+
+
+
+// --------------------------------------------------------
+// Count the number of rod-rod contacts by determining
+// how many rod-rod pairs are overlapping
+// --------------------------------------------------------
+
+void class_rods_ibm3D::count_rod_rod_contacts()
+{
+	// reset the number of contacts per rod:
+	for (int i=1; i<nRods; i++) {
+		rodsH[i].nContacts = 0;
+	}
+	
+	// loop over rod pairs & check for overlaps:
+	for (int i=1; i<nRods; i++) {
+		for (int j=0; j<i; j++) {
+			if (check_rod_overlap(rodsH[i], rodsH[j])) {
+				rodsH[i].nContacts++;
+				rodsH[j].nContacts++;
+			}			
+		}	
+	}
+	
+}
+
+
+
+// --------------------------------------------------------
+// Returns true if the axis SEPARATES the rods (i.e., NO overlap)
+// --------------------------------------------------------
+
+bool class_rods_ibm3D::check_rod_overlap(rod rod1, rod rod2)
+{
+	// separation vector:
+	float3 R12 = rod1.r - rod2.r;
+	
+	// 1. Cylinder Face Normals (P1, P2)
+	if (is_separating_axis(rod1.p, R12, rod1, rod2)) return false;
+	if (is_separating_axis(rod2.p, R12, rod1, rod2)) return false;
+
+	// 2. Cross Product of Orientation Axes (P1 x P2)
+	float3 P1xP2 = cross(rod1.p, rod2.p);
+	if (is_separating_axis(P1xP2, R12, rod1, rod2)) return false;
+
+	// 3. Cross Products with Center Displacement Vector R12
+	if (is_separating_axis(cross(rod1.p, R12), R12, rod1, rod2)) return false;
+	if (is_separating_axis(cross(rod2.p, R12), R12, rod1, rod2)) return false;
+
+	// 4. Rim/Rim and Edge Interaction Axes
+	if (is_separating_axis(cross(rod1.p, P1xP2), R12, rod1, rod2)) return false;
+	if (is_separating_axis(cross(rod2.p, P1xP2), R12, rod1, rod2)) return false;
+	
+	// No separating axis found -> Cylinders overlap
+	return true;
+}
+	
+
+
+// --------------------------------------------------------
+// Returns true if the axis SEPARATES the rods (i.e., NO overlap)
+// --------------------------------------------------------
+
+bool class_rods_ibm3D::is_separating_axis(float3 u_dir, float3 R12, rod rod1, rod rod2)
+{
+	// Check that the candidate axis is not a zero vector
+	float len_sq = length2(u_dir);
+	if (len_sq < 1e-6f) return false;  // Degenerate cross product (e.g., parallel vectors)
+
+	// Normalize candidate axis
+	float inv_len = 1.0f / std::sqrt(len_sq);
+	float3 u = make_float3(u_dir.x * inv_len, u_dir.y * inv_len, u_dir.z * inv_len);
+	
+	float r1 = rod1.rad;
+	float r2 = rod2.rad;
+	float h1 = rod1.ar*r1;
+	float h2 = rod2.ar*r2;
+	
+	// Projected distance between center points
+	float center_dist = std::abs(dot(R12, u));
+
+	// Rod 1 half-extent along axis u
+	float dot1 = dot(rod1.p, u);
+	float sin1_sq = std::max(0.0f, 1.0f - dot1 * dot1);
+	float extent1 = h1 * std::abs(dot1) + r1 * std::sqrt(sin1_sq);
+
+	// Rod 2 half-extent along axis u
+	float dot2 = dot(rod2.p, u);
+	float sin2_sq = std::max(0.0f, 1.0f - dot2 * dot2);
+	float extent2 = h2 * std::abs(dot2) + r2 * std::sqrt(sin2_sq);
+
+	// Separation condition along axis u
+	return center_dist > (extent1 + extent2);
+}
+
+
 
 
 

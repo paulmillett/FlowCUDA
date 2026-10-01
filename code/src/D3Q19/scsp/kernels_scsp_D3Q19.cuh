@@ -63,6 +63,18 @@ __global__ void scsp_add_body_force_D3Q19(
 	int);
 
 
+__global__ void scsp_add_body_force_nozzle_D3Q19(
+	float,
+	float,
+	float,
+	float,
+	float*,
+	float*,
+	float*,
+	int,
+	int);
+		
+
 __global__ void scsp_add_body_force_kolmogorov_D3Q19(
 	float,
 	float*,

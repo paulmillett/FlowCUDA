@@ -33,18 +33,20 @@ struct rod {
 	int tailBead;
 	int centerBead;
 	int nBeads;
-	int indxB0;   // starting bead index for filament
-	float rad;    // radius of bead 
-	float ar;     // aspect ratio of rod
-	float mobPar; // mobility coefficient (parallel)
-	float mobPer; // mobility coefficient (perpendicular)
-	float mobRot; // mobility coefficient (rotational)
-	float3 r;     // position
-	float3 v;     // velocity
-	float3 f;     // force	
-	float3 t;     // torque
-	float3 p;     // orientation vector
-	float3 uf;    // fluid velocity at rod position
+	int indxB0;    // starting bead index for filament
+	int nContacts; // number of rod-rod contacts for this fiber
+	float rad;     // radius of bead 
+	float ar;      // aspect ratio of rod
+	float mobPar;  // mobility coefficient (parallel)
+	float mobPer;  // mobility coefficient (perpendicular)
+	float mobRot;  // mobility coefficient (rotational)
+	float J;       // geometric polar moment of inertia = sum(R_bead - R_com)^2 
+	float3 r;      // position
+	float3 v;      // velocity
+	float3 f;      // force	
+	float3 t;      // torque
+	float3 p;      // orientation vector
+	float3 uf;     // fluid velocity at rod position
 	tensor gradu;         // gradient of fluid velocity
 	bool wallContact;     // is the fiber contacting the wall?
 	//float Ixx,Iyy,Izz;  // moments of inertia

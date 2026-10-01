@@ -391,6 +391,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 //			rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
 			rods.stepIBM_Euler_nozzle_channel_radix(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
 			lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+			//lbm.add_body_force_nozzle(bodyForx,0.0,0.0,lenCylinder,nBlocks,nThreads);
 			lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);	
 			cudaDeviceSynchronize();
 		}
@@ -410,6 +411,7 @@ void scsp_3D_rods_nozzle::cycleForward(int stepsPerCycle, int currentCycle)
 //		rods.stepIBM_Euler_nozzle_channel(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
 		rods.stepIBM_Euler_nozzle_channel_radix(lbm,lenCylinder,lenInlet,radInlet,radOutlet,backfillVel,nBlocks,nThreads);
 		lbm.add_body_force(bodyForx,0.0,0.0,nBlocks,nThreads);
+		//lbm.add_body_force_nozzle(bodyForx,0.0,0.0,lenCylinder,nBlocks,nThreads);
 		lbm.stream_collide_save_forcing_solid(nBlocks,nThreads);
 		cudaDeviceSynchronize();
 	}
@@ -441,13 +443,15 @@ void scsp_3D_rods_nozzle::writeOutput(std::string tagname, int step)
 {				
 	if (step == 0) {
 		// only print out vtk files
+		rods.count_rod_rod_contacts();
 		rods.orientation_in_cylindrical_channel(step);
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 		rods.write_output("rods",step);
 	}
 	
 	if (step > 0) { 					
-		// output rod position & orientation: 
+		// output rod information:
+		rods.count_rod_rod_contacts();
 		rods.orientation_in_cylindrical_channel(step);
 				
 		// calculate relative flow-rate:

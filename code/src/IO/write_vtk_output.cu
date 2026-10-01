@@ -1587,6 +1587,17 @@ void write_vtk_immersed_boundary_3D_rods(std::string tagname, int tagnum, int nB
 		outfile << rods[i].wallContact << endl;
 	}
 	
+	// -----------------------------------------------
+	//	Write number of rod-rod contacts per rod:
+	// -----------------------------------------------
+		
+	outfile << " " << endl;
+	outfile << "SCALARS " << "num_RR_Contacts " << "int " << endl;
+	outfile << "LOOKUP_TABLE default" << endl;
+	for (int i=0; i<nRods; i++) {
+		outfile << rods[i].nContacts << endl;
+	}
+	
 	// -----------------------------------
 	//	Write if headBead:
 	// -----------------------------------

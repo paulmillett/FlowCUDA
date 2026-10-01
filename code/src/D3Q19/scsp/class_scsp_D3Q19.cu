@@ -1058,6 +1058,19 @@ void class_scsp_D3Q19::add_body_force(float bx, float by, float bz, int nBlocks,
 
 
 // --------------------------------------------------------
+// Call to "scsp_add_body_force_nozzle_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_D3Q19::add_body_force_nozzle(float bx, float by, float bz, float lenCylinder, int nBlocks, int nThreads)
+{
+	if (!forceFlag) cout << "Warning: LBM force arrays have not been initialized" << endl;
+	scsp_add_body_force_nozzle_D3Q19 
+	<<<nBlocks,nThreads>>> (bx,by,bz,lenCylinder,Fx,Fy,Fz,Nx,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
 // Call to "scsp_add_body_forces_D3Q19" kernel:
 // --------------------------------------------------------
 

@@ -286,7 +286,8 @@ __global__ void update_rod_position_orientation_fluid_IBM3D(
 		tensor mobTensor = rods[i].mobPar*ppT + rods[i].mobPer*Imppt;
 	
 		// rod translation:	
-		rods[i].r += dt*(rods[i].uf + mobTensor*rods[i].f);
+		rods[i].v = rods[i].uf + mobTensor*rods[i].f;
+		rods[i].r += dt*rods[i].v;
 		
 		// rod shape factor for rotation:
 		float ar = rods[i].ar;
@@ -1366,7 +1367,7 @@ __global__ void extrapolate_force_bead_rod_IBM3D(
 		// F^rot = (T x (X_k - X_com)) / SUM(|X-X_com|^2) 
 		// --------------------------------------
 		
-		float denom = L0*L0*nBeadsPerRod*(nBeadsPerRod*nBeadsPerRod - 1.0f)/12.0f;
+		float denom = rods[rodID].J;  // L0*L0*nBeadsPerRod*(nBeadsPerRod*nBeadsPerRod - 1.0f)/12.0f;
 		float3 rrel = beads[i].r - rods[rodID].r;
 		float3 Frot = cross(rods[rodID].t,rrel)/denom;
 		beadForce += Frot;		

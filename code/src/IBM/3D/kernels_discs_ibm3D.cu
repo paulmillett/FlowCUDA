@@ -1066,13 +1066,25 @@ __global__ void extrapolate_force_bead_disc_IBM3D(
 		
 		// --------------------------------------
 		// the rod torque is converted to a force
+		// per bead that is linearly proportional
+		// to the distance that the bead is from
+		// the rod center: 
+		// F^rot = (T x (X_k - X_com)) / SUM(|X-X_com|^2) 
+		// --------------------------------------
+				
+		float3 rrel = beads[i].rrel;
+		float3 Frot = cross(discs[discID].t,rrel)/discs[discID].J;
+		beadForce += Frot;				
+		
+		// --------------------------------------
+		// the rod torque is converted to a force
 		// by calculating the force couple that
 		// produces the same torque, assuming the
 		// separation distance is 1/2 the rod length.
 		// The force couple is then spread across
 		// the rod
 		// --------------------------------------
-		
+				
 		/*
 		float Lrod = float(discs[discID].nBeads-1)*L0;
 		float Lrod2 = Lrod/2.0;
@@ -1378,16 +1390,6 @@ __global__ void check_bead_info_IBM3D(
 		printf("bead %i rodID = %i \n", i, beads[i].discID);			
 	}
 }
-
-
-
-
-
-
-
-
-
-
 
 
 

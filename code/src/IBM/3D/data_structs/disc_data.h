@@ -16,7 +16,7 @@ struct beaddisc {
 	float3 v;
 	float3 f;
 	float3 rm1;
-	float3 rrel;   // separation vector to disc center
+	float3 rrel;   // R_bead - R_disc_com
 	float3 uf;     // fluid velocity at bead position	
 	tensor gradu;  // gradient of fluid velocity at bead position
 	float3 wallContactHist;   // accumulated tangential distance during contact with wall 
@@ -40,6 +40,7 @@ struct disc {
 	float mobPerT; // mobility coefficient translational (perpendicular)
 	float mobParR; // mobility coefficient rotational    (parallel)
 	float mobPerR; // mobility coefficient rotational    (parallel)
+	float J;       // geometric polar moment of inertia = sum(R_bead - R_com)^2
 	float3 r;      // position
 	float3 v;      // velocity
 	float3 f;      // force	

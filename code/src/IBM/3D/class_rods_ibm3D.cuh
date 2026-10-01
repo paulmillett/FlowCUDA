@@ -162,7 +162,9 @@ class class_rods_ibm3D {
 	bool cylinder_overlap(float3,float3,float,float,float);
 	void orientation_in_cylindrical_channel(int);
 	void output_stresslet_tensor(int);
-	
+	void count_rod_rod_contacts();
+	bool check_rod_overlap(rod,rod);
+	bool is_separating_axis(float3,float3,rod,rod);	
 };
 
 # endif  // CLASS_RODS_IBM3D_H

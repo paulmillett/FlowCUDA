@@ -247,8 +247,11 @@ void class_discs_ibm3D::create_first_disc()
 	}
 	
 	// each bead calculates distance to disc center-of-mass:
+	float J = 0.0;
 	for (int i=0; i<nB; i++) {
-		beadsH[i].rrel = beadsH[i].r - beadsH[centerBead].r;
+		float3 rrel = beadsH[i].r - beadsH[centerBead].r;
+		beadsH[i].rrel = rrel;
+		J += length(rrel)*length(rrel);
 	}	
 			
 	// set up indices for ALL discs:
@@ -258,6 +261,7 @@ void class_discs_ibm3D::create_first_disc()
 		discsH[i].indxB0 = i*nBeadsPerDisc;                   // start index for beads
 		discsH[i].centerBead = i*nBeadsPerDisc + centerBead;  // center-of-mass
 		discsH[i].q.set_values(0.0f,0.0f,0.0f,1.0f);          // initial normal vector is along z (0,0,1)
+		discsH[i].J = J;                                      // geometric polar moment of inertia
 	}
 }
 
@@ -1514,7 +1518,7 @@ void class_discs_ibm3D::write_output(std::string tagname, int tagnum)
 	write_vtk_immersed_boundary_3D_discs(tagname,tagnum,
 	nBeads,nBeadsPerDisc,nDiscs,Box,beadsH,discsH);
 	
-	//if (tagnum == 0) write_vtk_discs_beads();
+	if (tagnum == 0) write_vtk_discs_beads();
 	
 }
 
