@@ -615,7 +615,7 @@ void class_rods_ibm3D::randomize_rods_nozzle_backfill(float lenCylinder, float r
 			float tri = sqrt(tyi*tyi + tzi*tzi);
 			
 			// if head and tail are inside the radial wall, then accept and exit:
-			if (hri < radInlet && tri < radInlet) {
+			if (hri < (radInlet-0.5) && tri < (radInlet-0.5)) {
 				rotate_and_shift_bead_positions_using_orientation_vector(i);
 				break;
 			}

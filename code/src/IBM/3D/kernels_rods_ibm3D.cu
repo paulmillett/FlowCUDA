@@ -358,7 +358,7 @@ __global__ void update_rod_position_fluid_IBM3D(
 
 // --------------------------------------------------------
 // IBM3D kernel to assign rods in the backfill zone a set
-// velocity:
+// velocity (also zero their forces & torques):
 // --------------------------------------------------------
 
 __global__ void assign_velocity_to_backfill_rods_IBM3D(
@@ -374,6 +374,8 @@ __global__ void assign_velocity_to_backfill_rods_IBM3D(
 			rods[i].uf.x = ufx;
 			rods[i].uf.y = 0.0;
 			rods[i].uf.z = 0.0;
+			rods[i].f = make_float3(0.0f);
+			rods[i].t = make_float3(0.0f);
 		}
 	}
 }
@@ -482,7 +484,7 @@ __global__ void move_rod_back_to_inlet_random_IBM3D(
 				float tri = sqrt(tyi*tyi + tzi*tzi);
 				
 				// if head and tail are inside the radial wall, then exit:
-				if (hri < radI && tri < radI) break;
+				if (hri < (radI-0.5) && tri < (radI-0.5)) break;
 				
 			}
 			
