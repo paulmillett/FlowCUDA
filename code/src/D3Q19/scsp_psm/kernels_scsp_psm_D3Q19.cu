@@ -184,9 +184,9 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
 		// set pID[] and eps[] to default values:
 		// --------------------------------------------------
 		
-		eps[i] = 0.0;
+		eps[i] = 0.0f;
 		pID[i] = -1;
-		const float delta = 0.5;   // interface width
+		const float delta = 0.5f;   // interface width
 		
 		// --------------------------------------------------		
 		// loop over particles:
@@ -204,11 +204,11 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
 			
 			// if lattice site is inside sphere, mark it:			
 			if (dist <= p.rad - delta) {
-				eps[i] = 1.0;
+				eps[i] = 1.0f;
 				pID[i] = s;
 			}
 			else if (dist <= p.rad + delta) {
-				eps[i] = 0.5*(1.0 - (dist - p.rad)/delta);
+				eps[i] = 0.5f*(1.0f - (dist - p.rad)/delta);
 				pID[i] = s;
 			}
 		}
@@ -262,7 +262,7 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
 		
         const int offst = 19 * i;    
         const float epsilon = eps[i];
-		const float tauinv = 2.0/(6.0*nu + 1.0);   // 1/tau
+		const float tauinv = 2.0f/(6.0f*nu + 1.0f);   // 1/tau
         
         // --------------------------------------------------        
         // STREAMING - load populations from adjacent voxels
@@ -343,8 +343,8 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
             // Blended collision operator
             for (int q=0; q<19; q++) {
 				int qopp = opp[q];
-                float omegaF = ft[q] - feq[q];
-				//float omegaS = ft[qopp] - feq[q] + feqS[q] - feqS[qopp];  // standard solid collision
+                float omegaF = -(ft[q] - feq[q]);
+				//float omegaS = ft[qopp] - feq[q] + feqS[q] - feqS[qopp];  // standard solid collision (has bug)
 				float omegaS = ft[qopp] - ft[q] + feqS[q] - feq[qopp];      // non-equil BB solid collision
 				f2[offst + q] = ft[q] + (1.0 - B)*tauinv*omegaF + B*omegaS;
             }

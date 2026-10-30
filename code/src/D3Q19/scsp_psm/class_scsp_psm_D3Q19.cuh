@@ -73,7 +73,11 @@ public:
 	float getV(int);
 	float getW(int);
 	float getR(int);
+	void set_sphere_position(int,float,float,float);
+	void set_sphere_radius(int,float);
+	void zero_sphere_forces_velocities(int);
 	void initial_equilibrium(int,int);
+	void map_particles_to_lattice(int,int);
 	void stream_collide_save(int,int);
 	void stream_collide_save_forcing(int,int);	
 	void set_boundary_shear_velocity(float,float,int,int);

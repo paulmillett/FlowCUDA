@@ -332,6 +332,37 @@ float class_scsp_psm_D3Q19::getR(int i)
 
 
 
+// --------------------------------------------------------
+// Setters for spheres:
+// --------------------------------------------------------
+
+
+
+void class_scsp_psm_D3Q19::set_sphere_position(int i, float x, float y, float z)
+{
+	spheresH[i].r.x = x;
+	spheresH[i].r.y = x;
+	spheresH[i].r.z = x;
+}
+
+void class_scsp_psm_D3Q19::set_sphere_radius(int i, float r)
+{
+	spheresH[i].rad = r;
+	spheresH[i].vol = 4.0*M_PI*r*r*r/3.0;
+	spheresH[i].mass = spheresH[i].vol;        // assume density = 1 (matched with fluid)
+	spheresH[i].I = 2.0*spheresH[i].mass*r*r;  // moment of inertia
+}
+
+void class_scsp_psm_D3Q19::zero_sphere_forces_velocities(int i)
+{
+	spheresH[i].f = make_float3(0.0f);
+	spheresH[i].v = make_float3(0.0f);
+	spheresH[i].t = make_float3(0.0f);
+	spheresH[i].L = make_float3(0.0f);
+	spheresH[i].w = make_float3(0.0f);	
+}
+
+
 
 
 
@@ -361,6 +392,18 @@ void class_scsp_psm_D3Q19::initial_equilibrium(int nBlocks, int nThreads)
 {
 	scsp_psm_initial_equilibrium_D3Q19 
 	<<<nBlocks,nThreads>>> (f1,r,u,v,w,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "scsp_psm_map_particles_to_lattice_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_psm_D3Q19::map_particles_to_lattice(int nBlocks, int nThreads)
+{
+	scsp_psm_map_particles_to_lattice_D3Q19 
+	<<<nBlocks,nThreads>>> (eps,pID,spheres,nSpheres,Nx,Ny,Nz,nVoxels);
 }
 
 
