@@ -1,0 +1,42 @@
+[GPU]
+	nThreads = 512
+[]
+
+
+[LBM]
+	App = scsp_3D_psm_shear
+	nu = 0.166666666
+	shearRate = 0.001
+[]
+
+
+[Particles]
+	nSpheres = 1
+[]
+
+
+[Lattice]
+	D = 3
+	Q = 19
+	source = box
+	nVoxels = 262144
+	Nx = 64
+	Ny = 64
+	Nz = 64
+	numIolets = 0
+[]
+
+
+[Time]
+	nSteps = 3000
+[]
+
+
+[Output]
+	nOutputs = 10
+	format = structured
+	fName = macros
+	iskip = 1
+	jskip = 1
+	kskip = 1 
+[]
