@@ -317,7 +317,7 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
 			// Calculate weighting factor B(eps, tau) where (tau - 0.5) = 3*nu
             float tau_minus_half = 3.0f * nu;
             float B = (epsilon * tau_minus_half) / ((1.0f - epsilon) + tau_minus_half);
-
+						
             // Unravel 1D index into 3D grid spatial coordinates (x, y, z)
             int x = i % Nx;
             int y = (i / Nx) % Ny;
@@ -332,6 +332,7 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
             float usx = p.v.x + (p.w.y * rz - p.w.z * ry);
             float usy = p.v.y + (p.w.z * rx - p.w.x * rz);
             float usz = p.v.z + (p.w.x * ry - p.w.y * rx);
+			//float rhoS = 1.0f;
 			
 			// Equilibrium populations based on solid velocity
 			float feqS[19];
@@ -339,15 +340,43 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
 			
             // Direction opposite lookup map for D3Q19
             const int opp[19] = {0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15, 18, 17};
-
+			
+			// hydrodynamic forces acting on the particles
+            float fx_node = 0.0f;
+            float fy_node = 0.0f;
+            float fz_node = 0.0f;
+			
+			// Define D3Q19 lattice velocity vectors
+            const float cx[19] = {0.0f,  1.0f, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f,  1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f};
+            const float cy[19] = {0.0f,  0.0f,  0.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, -1.0f};
+            const float cz[19] = {0.0f,  0.0f,  0.0f,  0.0f,  0.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  1.0f, -1.0f,  1.0f};
+						
             // Blended collision operator
             for (int q=0; q<19; q++) {
+				// fluid portion
 				int qopp = opp[q];
-                float omegaF = -(ft[q] - feq[q]);
-				//float omegaS = ft[qopp] - feq[q] + feqS[q] - feqS[qopp];  // standard solid collision (has bug)
-				float omegaS = ft[qopp] - ft[q] + feqS[q] - feq[qopp];      // non-equil BB solid collision
-				f2[offst + q] = ft[q] + (1.0 - B)*tauinv*omegaF + B*omegaS;
+                float omegaF = -(ft[q] - feq[q])*tauinv;
+				float omegaS = ft[qopp] - ft[q] + feqS[q] - feq[qopp];  // non-equil BB solid collision
+				f2[offst + q] = ft[q] + (1.0f - B)*omegaF + B*omegaS;				
+				// sum hydrodynamic forces acting on the particle due to momemtum exchange
+                fx_node += omegaS*cx[q];
+                fy_node += omegaS*cy[q];
+                fz_node += omegaS*cz[q];
             }
+            fx_node *= B;
+			fy_node *= B;
+			fz_node *= B;
+			
+			// Add local hydrodynamic forces to the particle            
+			atomicAdd(&(spheres[id].f.x), fx_node);
+            atomicAdd(&(spheres[id].f.y), fy_node);
+            atomicAdd(&(spheres[id].f.z), fz_node);
+
+            // Add local hydrodynamic torques to the particle, T = r x F
+			atomicAdd(&(spheres[id].t.x), ry * fz_node - rz * fy_node);
+            atomicAdd(&(spheres[id].t.y), rz * fx_node - rx * fz_node);
+            atomicAdd(&(spheres[id].t.z), rx * fy_node - ry * fx_node);			
+			
         } 
 		
         // --------------------------------------------------
@@ -461,7 +490,7 @@ __device__ void equilibrium_populations_psm_D3Q19(
 // kernel to zero sphere forces & torques:
 // --------------------------------------------------------
 
-__global__ void zero_sphere_forces_torques(
+__global__ void zero_sphere_forces_torques_D3Q19(
 	sphere* spheres,	
 	int nSpheres)
 {
@@ -476,10 +505,11 @@ __global__ void zero_sphere_forces_torques(
 
 
 // --------------------------------------------------------
-// kernel to update sphere position and orientation:
+// kernel to update sphere position and orientation, first
+// half-step for the velocity-verlet algorithm:
 // --------------------------------------------------------
 
-__global__ void update_sphere_position_orientation(
+__global__ void update_sphere_position_orientation_verlet_1_D3Q19(
 	sphere* spheres,
 	float dt,
 	int nSpheres)
@@ -487,7 +517,49 @@ __global__ void update_sphere_position_orientation(
 	// define sphere:
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nSpheres) {
+		float3 accel = spheres[i].f/spheres[i].mass;
+		float3 angac = spheres[i].t/spheres[i].I;
 		
+		spheres[i].r += spheres[i].v*dt + 0.5f*dt*dt*accel;
+		spheres[i].v += 0.5f*dt*accel;
+		spheres[i].w += 0.5f*dt*angac;
+		
+		/*
+		spheres[i].r += spheres[i].v*dt;
+		spheres[i].v = make_float3(0.0f,0.0f,0.0f); 
+		spheres[i].w = make_float3(0.0f,0.01f,0.0f);
+		*/
+		
+		//printf("force_x = %f, force_y = %f, force_z = %f \n", accel.x, accel.y, accel.z);
+		//printf("angac_x = %f, angac_y = %f, angac_z = %f \n", angac.x, angac.y, angac.z);
+				
+		// Note: maybe consider storing the particle half-step
+		// positions to use in the mapping to lattice.  This may
+		// improve accuracy
+	}
+}
+
+
+
+// --------------------------------------------------------
+// kernel to update sphere position and orientation, second
+// half-step for the velocity-verlet algorithm:
+// --------------------------------------------------------
+
+__global__ void update_sphere_position_orientation_verlet_2_D3Q19(
+	sphere* spheres,
+	float dt,
+	int nSpheres)
+{
+	// define sphere:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nSpheres) {
+		float3 accel = spheres[i].f/spheres[i].mass;
+		float3 angac = spheres[i].t/spheres[i].I;
+		spheres[i].v += 0.5*dt*accel;
+		spheres[i].w += 0.5*dt*angac;
+		//spheres[i].v = make_float3(0.0f,0.0f,0.0f); 
+		//spheres[i].w = make_float3(0.0f,0.01f,0.0f);
 	}
 }
 

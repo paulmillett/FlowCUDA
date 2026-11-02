@@ -29,6 +29,7 @@ private:
 	float* vH;
 	float* wH;
 	float* rH;
+	float* epsH;
 	int* nListH;
 	int* streamIndexH;
 	int* voxelTypeH;
@@ -76,8 +77,10 @@ public:
 	void set_sphere_position(int,float,float,float);
 	void set_sphere_radius(int,float);
 	void zero_sphere_forces_velocities(int);
+	void stepPSM_verlet_shear(float,int,int);
 	void initial_equilibrium(int,int);
 	void map_particles_to_lattice(int,int);
+	void zero_sphere_forces_torques(int,int);
 	void stream_collide_save(int,int);
 	void stream_collide_save_forcing(int,int);	
 	void set_boundary_shear_velocity(float,float,int,int);
@@ -85,6 +88,8 @@ public:
 	void set_channel_wall_velocity(float,int,int);
 	void set_boundary_slit_density(int,int);
 	void set_boundary_duct_density(int,int);
+	void update_spheres_verlet_1(int,int);
+	void update_spheres_verlet_2(int,int);
 	void zero_forces(int,int);
 	void add_body_force(float,float,float,int,int);	
 	void add_body_force_kolmogorov(float,int,int);	

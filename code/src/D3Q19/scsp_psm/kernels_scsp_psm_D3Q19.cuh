@@ -47,7 +47,7 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
 	int,
 	int,
 	int);													 
-
+		
 
 __global__ void scsp_psm_stream_collide_save_D3Q19(
 	float*,
@@ -75,15 +75,22 @@ __device__ void equilibrium_populations_psm_D3Q19(
 	const float);
 	
 	
-__global__ void zero_sphere_forces_torques(
+__global__ void zero_sphere_forces_torques_D3Q19(
 	sphere*,	
 	int);
 
 
-__global__ void update_sphere_position_orientation(
+__global__ void update_sphere_position_orientation_verlet_1_D3Q19(
 	sphere*,
 	float,
 	int);
+
+
+__global__ void update_sphere_position_orientation_verlet_2_D3Q19(
+	sphere*,
+	float,
+	int);
+
 
 
 

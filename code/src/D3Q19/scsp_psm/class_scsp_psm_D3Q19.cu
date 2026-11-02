@@ -72,6 +72,7 @@ void class_scsp_psm_D3Q19::allocate()
     vH = (float*)malloc(nVoxels*sizeof(float));
 	wH = (float*)malloc(nVoxels*sizeof(float));
     rH = (float*)malloc(nVoxels*sizeof(float));
+	epsH = (float*)malloc(nVoxels*sizeof(float));
 	nListH = (int*)malloc(nVoxels*Q*sizeof(int));
 	voxelTypeH = (int*)malloc(nVoxels*sizeof(int));
 	streamIndexH = (int*)malloc(nVoxels*Q*sizeof(int));
@@ -119,6 +120,7 @@ void class_scsp_psm_D3Q19::deallocate()
 	free(vH);
 	free(wH);
 	free(rH);
+	free(epsH);
 	free(nListH);
 	free(voxelTypeH);
 	free(streamIndexH);	
@@ -170,6 +172,7 @@ void class_scsp_psm_D3Q19::memcopy_device_to_host()
 	cudaMemcpy(uH, u, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(vH, v, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(wH, w, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
+	cudaMemcpy(epsH, eps, sizeof(float)*nVoxels, cudaMemcpyDeviceToHost);
 	cudaMemcpy(spheresH, spheres, sizeof(sphere)*nSpheres, cudaMemcpyDeviceToHost);
 }
 
@@ -341,16 +344,16 @@ float class_scsp_psm_D3Q19::getR(int i)
 void class_scsp_psm_D3Q19::set_sphere_position(int i, float x, float y, float z)
 {
 	spheresH[i].r.x = x;
-	spheresH[i].r.y = x;
-	spheresH[i].r.z = x;
+	spheresH[i].r.y = y;
+	spheresH[i].r.z = z;
 }
 
 void class_scsp_psm_D3Q19::set_sphere_radius(int i, float r)
 {
 	spheresH[i].rad = r;
-	spheresH[i].vol = 4.0*M_PI*r*r*r/3.0;
-	spheresH[i].mass = spheresH[i].vol;        // assume density = 1 (matched with fluid)
-	spheresH[i].I = 2.0*spheresH[i].mass*r*r;  // moment of inertia
+	spheresH[i].vol = 4.0f*M_PI*r*r*r/3.0f;
+	spheresH[i].mass = spheresH[i].vol;              // assume density = 1 (matched with fluid)
+	spheresH[i].I = 2.0f*spheresH[i].mass*r*r/5.0f;  // moment of inertia
 }
 
 void class_scsp_psm_D3Q19::zero_sphere_forces_velocities(int i)
@@ -361,6 +364,39 @@ void class_scsp_psm_D3Q19::zero_sphere_forces_velocities(int i)
 	spheresH[i].L = make_float3(0.0f);
 	spheresH[i].w = make_float3(0.0f);	
 }
+
+
+
+// --------------------------------------------------------
+// Take step forward for the PSM method:
+// --------------------------------------------------------
+
+
+
+void class_scsp_psm_D3Q19::stepPSM_verlet_shear(float shearVel, int nBlocks, int nThreads)
+{
+	
+	// first velocity-Verlet half-step for the spheres:
+	update_spheres_verlet_1(nBlocks,nThreads);
+	cudaDeviceSynchronize();
+	
+	// zero forces for both LBM and spheres:
+	zero_forces(nBlocks,nThreads);
+	zero_sphere_forces_torques(nBlocks,nThreads);
+	cudaDeviceSynchronize();
+	
+	// map particles to the LBM lattice:
+	map_particles_to_lattice(nBlocks,nThreads);
+	
+	// update fluid:
+	stream_collide_save(nBlocks,nThreads);
+	set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);
+	
+	// second velocity-Verlet half-step for the spheres:
+	update_spheres_verlet_2(nBlocks,nThreads);
+	
+}
+
 
 
 
@@ -404,6 +440,18 @@ void class_scsp_psm_D3Q19::map_particles_to_lattice(int nBlocks, int nThreads)
 {
 	scsp_psm_map_particles_to_lattice_D3Q19 
 	<<<nBlocks,nThreads>>> (eps,pID,spheres,nSpheres,Nx,Ny,Nz,nVoxels);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "zero_sphere_forces_torques" kernel:
+// --------------------------------------------------------
+
+void class_scsp_psm_D3Q19::zero_sphere_forces_torques(int nBlocks, int nThreads)
+{
+	zero_sphere_forces_torques_D3Q19 
+	<<<nBlocks,nThreads>>> (spheres,nSpheres);
 }
 
 
@@ -453,6 +501,33 @@ void class_scsp_psm_D3Q19::set_boundary_shear_velocity(float uBot, float uTop, i
 	scsp_psm_set_boundary_shear_velocity_D3Q19 
 	<<<nBlocks,nThreads>>> (uBot,uTop,f1,u,v,w,r,Nx,Ny,Nz,nVoxels);
 }
+
+
+
+// --------------------------------------------------------
+// Call to "set_boundary_shear_velocity_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_psm_D3Q19::update_spheres_verlet_1(int nBlocks, int nThreads)
+{
+	update_sphere_position_orientation_verlet_1_D3Q19 
+	<<<nBlocks,nThreads>>> (spheres,dt,nSpheres);
+}
+
+
+
+// --------------------------------------------------------
+// Call to "set_boundary_shear_velocity_D3Q19" kernel:
+// --------------------------------------------------------
+
+void class_scsp_psm_D3Q19::update_spheres_verlet_2(int nBlocks, int nThreads)
+{
+	update_sphere_position_orientation_verlet_2_D3Q19 
+	<<<nBlocks,nThreads>>> (spheres,dt,nSpheres);
+}
+
+
+
 
 
 
@@ -598,7 +673,7 @@ void class_scsp_psm_D3Q19::add_body_force_kolmogorov(float Fo, int nBlocks, int 
 void class_scsp_psm_D3Q19::vtk_structured_output_ruvw(std::string tagname, int tagnum,
                                             int iskip, int jskip, int kskip, int precision)
 {
-	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,rH,uH,vH,wH,iskip,jskip,kskip,precision);
+	write_vtk_structured_grid(tagname,tagnum,Nx,Ny,Nz,epsH,uH,vH,wH,iskip,jskip,kskip,precision);
 }
 
 

@@ -137,8 +137,8 @@ void scsp_3D_psm_shear::initSystem()
 	// initialize spheres: 
 	// ----------------------------------------------
 	
-	lbm.set_sphere_position(0,32.0,32.0,32.0);
-	lbm.set_sphere_radius(0,10.0);
+	lbm.set_sphere_position(0,31.5,31.5,31.5); 
+	lbm.set_sphere_radius(0,10.0f);
 	lbm.zero_sphere_forces_velocities(0);	
 		
 	// ----------------------------------------------
@@ -187,10 +187,7 @@ void scsp_3D_psm_shear::cycleForward(int stepsPerCycle, int currentCycle)
 	
 	for (int step=0; step<stepsPerCycle; step++) {
 		cummulativeSteps++;	
-		lbm.zero_forces(nBlocks,nThreads);
-		lbm.map_particles_to_lattice(nBlocks,nThreads);
-		lbm.stream_collide_save(nBlocks,nThreads);
-		lbm.set_boundary_shear_velocity(-shearVel,shearVel,nBlocks,nThreads);				
+		lbm.stepPSM_verlet_shear(shearVel,nBlocks,nThreads);				
 		cudaDeviceSynchronize();
 	}
 	
