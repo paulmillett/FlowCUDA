@@ -162,7 +162,9 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
 	int Nx,
 	int Ny,
 	int Nz,
-	int nVoxels)
+	int nVoxels,
+	float3 Box,
+	int3 pbcFlag)
 {
     // -----------------------------------------------
     // define voxel:
@@ -179,6 +181,7 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
         int x = i % Nx;
         int y = (i / Nx) % Ny;
         int z = i / (Nx * Ny);
+		float3 r_voxel = make_float3(float(x), float(y), float(z));
 		
 		// --------------------------------------------------		
 		// set pID[] and eps[] to default values:
@@ -186,7 +189,7 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
 		
 		eps[i] = 0.0f;
 		pID[i] = -1;
-		const float delta = 0.5f;   // interface width
+		const float delta = 0.5f;   // interface half-width
 		
 		// --------------------------------------------------		
 		// loop over particles:
@@ -196,11 +199,11 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
 			
 			// distance between lattice site and sphere coords
             sphere p = spheres[s];
-            float rx = (float)x - p.r.x;
-            float ry = (float)y - p.r.y;
-            float rz = (float)z - p.r.z;
-			// need to correct for PBC's
-			float dist = sqrt(rx*rx + ry*ry + rz*rz);
+			float3 dr = r_voxel - p.r;
+						
+			// correct for PBC's
+			dr -= roundf(dr/Box)*Box*pbcFlag;			
+			float dist = length(dr);
 			
 			// if lattice site is inside sphere, mark it:			
 			if (dist <= p.rad - delta) {
@@ -245,7 +248,9 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
     int Nx,
     int Ny,
     int Nz,
-    int nVoxels)
+    int nVoxels,
+	float3 Box,
+	int3 pbcFlag)
 {
     
 	// -----------------------------------------------
@@ -323,17 +328,23 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
             int y = (i / Nx) % Ny;
             int z = i / (Nx * Ny);
 
-            // Compute local solid velocity: u_s = V_p + omega_p x (x - X_p)
+            // Distance between lattice site and particle center
             int id = pID[i];
             sphere p = spheres[id];
             float rx = (float)x - p.r.x;
             float ry = (float)y - p.r.y;
-            float rz = (float)z - p.r.z;
+            float rz = (float)z - p.r.z;   
+						
+			// Correct for PBCs
+			rx -= roundf(rx/Box.x)*Box.x*pbcFlag.x;
+			ry -= roundf(ry/Box.y)*Box.y*pbcFlag.y;
+			rz -= roundf(rz/Box.z)*Box.z*pbcFlag.z;
+						
+			// Compute local solid velocity: u_s = V_p + omega_p x (x - X_p)
             float usx = p.v.x + (p.w.y * rz - p.w.z * ry);
             float usy = p.v.y + (p.w.z * rx - p.w.x * rz);
             float usz = p.v.z + (p.w.x * ry - p.w.y * rx);
-			//float rhoS = 1.0f;
-			
+						
 			// Equilibrium populations based on solid velocity
 			float feqS[19];
 			equilibrium_populations_psm_D3Q19(feqS,rho,usx,usy,usz);
@@ -357,7 +368,7 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
 				int qopp = opp[q];
                 float omegaF = -(ft[q] - feq[q])*tauinv;
 				float omegaS = ft[qopp] - ft[q] + feqS[q] - feq[qopp];  // non-equil BB solid collision
-				f2[offst + q] = ft[q] + (1.0f - B)*omegaF + B*omegaS;				
+				f2[offst + q] = ft[q] + (1.0f - B)*omegaF + B*omegaS;
 				// sum hydrodynamic forces acting on the particle due to momemtum exchange
                 fx_node += omegaS*cx[q];
                 fy_node += omegaS*cy[q];
@@ -367,15 +378,20 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
 			fy_node *= B;
 			fz_node *= B;
 			
+			// negative of the momentum-exchange force is applied to the particle
+            fx_node *= -1.0f;
+			fy_node *= -1.0f;
+			fz_node *= -1.0f;
+						
 			// Add local hydrodynamic forces to the particle            
-			atomicAdd(&(spheres[id].f.x), fx_node);
-            atomicAdd(&(spheres[id].f.y), fy_node);
-            atomicAdd(&(spheres[id].f.z), fz_node);
+			atomicAdd(&spheres[id].f.x, fx_node);
+            atomicAdd(&spheres[id].f.y, fy_node);
+            atomicAdd(&spheres[id].f.z, fz_node);
 
             // Add local hydrodynamic torques to the particle, T = r x F
-			atomicAdd(&(spheres[id].t.x), ry * fz_node - rz * fy_node);
-            atomicAdd(&(spheres[id].t.y), rz * fx_node - rx * fz_node);
-            atomicAdd(&(spheres[id].t.z), rx * fy_node - ry * fx_node);			
+			atomicAdd(&spheres[id].t.x, ry * fz_node - rz * fy_node);
+            atomicAdd(&spheres[id].t.y, rz * fx_node - rx * fz_node);
+            atomicAdd(&spheres[id].t.z, rx * fy_node - ry * fx_node);			
 			
         } 
 		
@@ -518,21 +534,10 @@ __global__ void update_sphere_position_orientation_verlet_1_D3Q19(
 	int i = blockIdx.x*blockDim.x + threadIdx.x;		
 	if (i < nSpheres) {
 		float3 accel = spheres[i].f/spheres[i].mass;
-		float3 angac = spheres[i].t/spheres[i].I;
-		
+		float3 angac = spheres[i].t/spheres[i].I;		
 		spheres[i].r += spheres[i].v*dt + 0.5f*dt*dt*accel;
 		spheres[i].v += 0.5f*dt*accel;
-		spheres[i].w += 0.5f*dt*angac;
-		
-		/*
-		spheres[i].r += spheres[i].v*dt;
-		spheres[i].v = make_float3(0.0f,0.0f,0.0f); 
-		spheres[i].w = make_float3(0.0f,0.01f,0.0f);
-		*/
-		
-		//printf("force_x = %f, force_y = %f, force_z = %f \n", accel.x, accel.y, accel.z);
-		//printf("angac_x = %f, angac_y = %f, angac_z = %f \n", angac.x, angac.y, angac.z);
-				
+		spheres[i].w += 0.5f*dt*angac;						
 		// Note: maybe consider storing the particle half-step
 		// positions to use in the mapping to lattice.  This may
 		// improve accuracy
@@ -558,8 +563,6 @@ __global__ void update_sphere_position_orientation_verlet_2_D3Q19(
 		float3 angac = spheres[i].t/spheres[i].I;
 		spheres[i].v += 0.5*dt*accel;
 		spheres[i].w += 0.5*dt*angac;
-		//spheres[i].v = make_float3(0.0f,0.0f,0.0f); 
-		//spheres[i].w = make_float3(0.0f,0.01f,0.0f);
 	}
 }
 

@@ -36,11 +36,16 @@ using namespace std;
 
 class_scsp_psm_D3Q19::class_scsp_psm_D3Q19()
 {
+	// domain attributes:
 	Q = 19;
 	GetPot inputParams("input.dat");
 	Nx = inputParams("Lattice/Nx",1);
 	Ny = inputParams("Lattice/Ny",1);
 	Nz = inputParams("Lattice/Nz",1);
+	Box.x = float(Nx);   // assume dx=1
+	Box.y = float(Ny);
+	Box.z = float(Nz);
+	pbcFlag = make_int3(1,1,1);
 	nVoxels = inputParams("Lattice/nVoxels",0);
 	nSpheres = inputParams("Particles/nSpheres",0);
 	nu = inputParams("LBM/nu",0.1666666);
@@ -89,7 +94,6 @@ void class_scsp_psm_D3Q19::allocate()
 	cudaMalloc((void **) &spheres, nSpheres*sizeof(sphere));
 	cudaMalloc((void **) &eps, nVoxels*sizeof(float));
 	cudaMalloc((void **) &pID, nVoxels*sizeof(int));	
-	
 }
 
 
@@ -282,6 +286,12 @@ void class_scsp_psm_D3Q19::stream_index_pull()
 // Setters for host arrays:
 // --------------------------------------------------------
 
+
+void class_scsp_psm_D3Q19::set_pbcFlag(int x, int y, int z)
+{
+	pbcFlag.x = x; pbcFlag.y = y; pbcFlag.z = z;
+}
+
 void class_scsp_psm_D3Q19::setNu(float val)
 {
 	nu = val;
@@ -439,7 +449,7 @@ void class_scsp_psm_D3Q19::initial_equilibrium(int nBlocks, int nThreads)
 void class_scsp_psm_D3Q19::map_particles_to_lattice(int nBlocks, int nThreads)
 {
 	scsp_psm_map_particles_to_lattice_D3Q19 
-	<<<nBlocks,nThreads>>> (eps,pID,spheres,nSpheres,Nx,Ny,Nz,nVoxels);
+	<<<nBlocks,nThreads>>> (eps,pID,spheres,nSpheres,Nx,Ny,Nz,nVoxels,Box,pbcFlag);
 }
 
 
@@ -463,7 +473,7 @@ void class_scsp_psm_D3Q19::zero_sphere_forces_torques(int nBlocks, int nThreads)
 void class_scsp_psm_D3Q19::stream_collide_save(int nBlocks, int nThreads)
 {
 	scsp_psm_stream_collide_save_D3Q19 
-	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,eps,pID,streamIndex,spheres,nu,Nx,Ny,Nz,nVoxels);
+	<<<nBlocks,nThreads>>> (f1,f2,r,u,v,w,eps,pID,streamIndex,spheres,nu,Nx,Ny,Nz,nVoxels,Box,pbcFlag);
 	float* temp = f1;
 	f1 = f2;
 	f2 = temp;

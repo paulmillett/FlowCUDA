@@ -54,7 +54,7 @@ scsp_3D_psm_shear::scsp_3D_psm_shear() : lbm()
 	cout << "Shear wall velocity = " << shearVel << endl;	
 	
 	// ----------------------------------------------
-	// Immersed-Boundary parameters:
+	// Sphere parameters:
 	// ----------------------------------------------
 	
 	nSpheres = inputParams("Particles/nSpheres",1);
@@ -81,6 +81,8 @@ scsp_3D_psm_shear::scsp_3D_psm_shear() : lbm()
 	
 	lbm.allocate();
 	
+	cout << "Done with Constructor!" << endl;
+	
 }
 
 
@@ -101,7 +103,7 @@ scsp_3D_psm_shear::~scsp_3D_psm_shear()
 // --------------------------------------------------------
 
 void scsp_3D_psm_shear::initSystem()
-{
+{		
 		
 	// ----------------------------------------------
 	// 'GetPot' object containing input parameters:
@@ -132,6 +134,12 @@ void scsp_3D_psm_shear::initSystem()
 		lbm.setW(i,0.0);
 		lbm.setR(i,1.0);		
 	}
+
+	// ----------------------------------------------			
+	// set periodic boundary conditions: 
+	// ----------------------------------------------
+	
+	lbm.set_pbcFlag(1,1,0);
 	
 	// ----------------------------------------------			
 	// initialize spheres: 

@@ -46,7 +46,9 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
 	int,
 	int,
 	int,
-	int);													 
+	int,
+	float3,
+	int3);													 
 		
 
 __global__ void scsp_psm_stream_collide_save_D3Q19(
@@ -64,7 +66,9 @@ __global__ void scsp_psm_stream_collide_save_D3Q19(
     int,
     int,
     int,
-    int);
+    int,
+	float3,
+	int3);
 
 
 __device__ void equilibrium_populations_psm_D3Q19(

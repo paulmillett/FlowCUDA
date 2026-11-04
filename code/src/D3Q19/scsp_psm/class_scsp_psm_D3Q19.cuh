@@ -23,6 +23,8 @@ private:
 	float nu;
 	float dt;
 	bool forceFlag;
+	float3 Box;
+	int3 pbcFlag;
 		
 	// host arrays:
 	float* uH;
@@ -65,6 +67,7 @@ public:
 	void create_lattice_box_slit();
 	void create_lattice_box_channel();	
 	void stream_index_pull();
+	void set_pbcFlag(int,int,int);
 	void setNu(float);
 	void setU(int,float);
 	void setV(int,float);
