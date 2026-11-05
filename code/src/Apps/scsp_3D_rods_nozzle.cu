@@ -444,6 +444,7 @@ void scsp_3D_rods_nozzle::writeOutput(std::string tagname, int step)
 	if (step == 0) {
 		// only print out vtk files
 		rods.count_rod_rod_contacts();
+		rods.sum_rod_cummulative_outflux(step);
 		rods.orientation_in_cylindrical_channel(step);
 		lbm.vtk_structured_output_ruvw(tagname,step,iskip,jskip,kskip,precision); 
 		rods.write_output("rods",step);
@@ -452,6 +453,7 @@ void scsp_3D_rods_nozzle::writeOutput(std::string tagname, int step)
 	if (step > 0) { 					
 		// output rod information:
 		rods.count_rod_rod_contacts();
+		rods.sum_rod_cummulative_outflux(step);
 		rods.orientation_in_cylindrical_channel(step);
 				
 		// calculate relative flow-rate:

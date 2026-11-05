@@ -262,6 +262,7 @@ void class_rods_ibm3D::create_first_rod()
 		rodsH[f].tailBead = f*nBeadsPerRod + nBeadsPerRod - 1;  // tail bead (last bead)
 		rodsH[f].centerBead = f*nBeadsPerRod + nBeadsPerRod/2;  // center-of-mass, assuming nBeadsPerRod is odd		
 		rodsH[f].J = J;                                         // geometric polar moment of inertia
+		rodsH[f].nResets = 0;                       
 	}
 }
 
@@ -2264,7 +2265,7 @@ void class_rods_ibm3D::orientation_in_cylindrical_channel(int step)
 	outfile << std::right;
 	
 	// -----------------------------------------
-	// Loop over the capsules  
+	// Loop over the rods:  
 	// -----------------------------------------
 		
 	for (int r=0; r<nRods; r++) {		
@@ -2281,7 +2282,7 @@ void class_rods_ibm3D::orientation_in_cylindrical_channel(int step)
 		outfile << setw(8)  << r;
 		outfile << setw(4)  << rodsH[r].wallContact;
 		outfile << setw(4)  << rodsH[r].nContacts;
-		
+				
 		// print the floats:
 		outfile << std::fixed << std::setprecision(4);
 		outfile << setw(10) << rodsH[r].p.x << setw(10) << rodsH[r].p.y << setw(10) << rodsH[r].p.z;
@@ -2341,6 +2342,44 @@ void class_rods_ibm3D::output_stresslet_tensor(int step)
 		                                        << "  " << StressletH[0].yx << "  " << StressletH[0].yy << "  " << StressletH[0].yz 
 												<< "  " << StressletH[0].zx << "  " << StressletH[0].zy << "  " << StressletH[0].zz << endl;
 
+}
+
+
+
+// --------------------------------------------------------
+// Sum the number of rods that have passed through the 
+// nozzle outlet
+// --------------------------------------------------------
+
+void class_rods_ibm3D::sum_rod_cummulative_outflux(int step)
+{
+	
+	// -----------------------------------------
+	// Define the file location and name:
+	// -----------------------------------------
+	
+	ofstream outfile;
+	std::stringstream filenamecombine;
+	filenamecombine << "vtkoutput/" << "rod_outlet_flux.dat";
+	string filename = filenamecombine.str();
+	outfile.open(filename.c_str(), ios::out | ios::app);
+	
+	// Right-align all numerical outputs globally
+	outfile << std::right;
+	
+	// -----------------------------------------
+	// Output the cummulative number of rods 
+	// that have exited the nozzle:
+	// -----------------------------------------	
+	
+	int nCummlativeOut = 0;
+	for (int i=1; i<nRods; i++) {
+		nCummlativeOut += rodsH[i].nResets;
+	}
+	
+	outfile << setw(10) << step;
+	outfile << setw(4)  << nCummlativeOut << endl;
+	
 }
 
 

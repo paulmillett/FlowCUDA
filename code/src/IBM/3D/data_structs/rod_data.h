@@ -35,6 +35,7 @@ struct rod {
 	int nBeads;
 	int indxB0;    // starting bead index for filament
 	int nContacts; // number of rod-rod contacts for this fiber
+	int nResets;   // number of times the rod has been been re-wrapped
 	float rad;     // radius of bead 
 	float ar;      // aspect ratio of rod
 	float mobPar;  // mobility coefficient (parallel)

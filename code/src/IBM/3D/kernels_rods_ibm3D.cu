@@ -488,6 +488,9 @@ __global__ void move_rod_back_to_inlet_random_IBM3D(
 				
 			}
 			
+			// update the 'nReset' value for this rod
+			rods[i].nResets++;
+			
 			// save the final updated state back to global memory
 		    state[i] = localState;
 		}			
