@@ -523,6 +523,11 @@ __global__ void zero_sphere_forces_torques_D3Q19(
 // --------------------------------------------------------
 // kernel to update sphere position and orientation, first
 // half-step for the velocity-verlet algorithm:
+//
+// Note: maybe consider storing the particle half-step
+// positions to use in the mapping to lattice.  This may
+// improve accuracy
+//
 // --------------------------------------------------------
 
 __global__ void update_sphere_position_orientation_verlet_1_D3Q19(
@@ -537,10 +542,7 @@ __global__ void update_sphere_position_orientation_verlet_1_D3Q19(
 		float3 angac = spheres[i].t/spheres[i].I;		
 		spheres[i].r += spheres[i].v*dt + 0.5f*dt*dt*accel;
 		spheres[i].v += 0.5f*dt*accel;
-		spheres[i].w += 0.5f*dt*angac;						
-		// Note: maybe consider storing the particle half-step
-		// positions to use in the mapping to lattice.  This may
-		// improve accuracy
+		spheres[i].w += 0.5f*dt*angac;
 	}
 }
 
@@ -697,5 +699,293 @@ __global__ void computeForcesKernel(
 }
 
 */
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate sphere-sphere interactions
+// using the radix-sort lists:
+// --------------------------------------------------------
+
+__global__ void sphere_interactions_with_friction_radix_PSM(
+	sphere* spheres,
+	radixdata_psm radix,
+	float repA,
+	float repD,
+	float lubforceMax,
+	int nSpheres,
+	float3 Box,	
+	int3 pbcFlag)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nSpheres) {		
+		
+		// -------------------------------
+		// calculate cell ID:
+		// -------------------------------
+		
+		int cellID = int(floor(spheres[i].r.x/radix.sizeCells))*radix.numCells.z*radix.numCells.y +  
+			         int(floor(spheres[i].r.y/radix.sizeCells))*radix.numCells.z +
+		             int(floor(spheres[i].r.z/radix.sizeCells));	
+				
+		if (cellID < 0 || cellID > radix.nCells-1) return;
+		
+		// -------------------------------
+		// loop over spheres in the same cell:
+		// -------------------------------
+		
+		int start = radix.cellStart[cellID];
+		if (start != -1) {
+			int end = radix.cellEnd[cellID];
+			for (int k=start; k<end; k++) {
+				int j = radix.particleIndices[k];
+				if (j < 0 || j >= nSpheres) continue;
+				if (i==j) continue;
+				pairwise_sphere_interaction_forces_with_friction(i,j,repA,repD,lubforceMax,spheres,Box,pbcFlag);
+			}
+		}
+				
+		// -------------------------------
+		// loop over neighboring cells:
+		// -------------------------------
+		
+        for (int c=0; c<radix.nncells; c++) {
+            // get neighboring cell ID
+			int naborcellID = radix.cellMap[cellID*radix.nncells + c];
+			int start = radix.cellStart[naborcellID];
+			if (start != -1) {
+				int end = radix.cellEnd[naborcellID];
+				for (int k=start; k<end; k++) {
+					int j = radix.particleIndices[k];
+					if (j < 0 || j >= nSpheres) continue;
+					if (i==j) continue;
+					pairwise_sphere_interaction_forces_with_friction(i,j,repA,repD,lubforceMax,spheres,Box,pbcFlag);
+				}
+			}
+		}
+		
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to calculate i-j lubrication force.  The 
+// model comes from Ladd & Verberg, Journal of Statistical
+// Physics, 104 (2001) 1191.  See Eq. (74).
+// --------------------------------------------------------
+
+__device__ inline void pairwise_sphere_interaction_forces_with_friction(
+	const int i, 
+	const int j,
+	const float repA,
+	const float repD,
+	const float lubforceMax,
+	sphere* spheres,
+	float3 Box,
+	int3 pbcFlag)
+{
+	float3 rij = spheres[i].r - spheres[j].r;
+	rij -= roundf(rij/Box)*Box*pbcFlag;  // PBC's	
+	const float r = length(rij);	
+	const float Ri = spheres[i].rad;  // sphere radius
+	const float Rj = spheres[j].rad;  // sphere radius 
+	const float gapMax = 0.67f;       // max gap for lubrication forces
+	const float cutoff = Ri + Rj + gapMax;		
+	
+	printf("separation = %f, Ri = %f, Rj = %f \n", r, Ri, Rj);
+	
+	// interaction range:
+	if (r < cutoff) {			
+		
+		float3 uij = rij/r;
+		float3 vij = spheres[i].v - spheres[j].v;   // modify this to account for angular velocity!!!
+		float udotv = dot(uij,vij);
+		
+		// lubrication force:
+		if (r > (Ri+Rj)) {
+			
+			const float nu = 0.1666666667f;
+			
+			// normal lubrication force:
+			float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);			
+			float gap = r - Ri - Rj;
+			if (gap < 0.001f) gap = 0.001f;
+			float invgap = 1.0f/gap - 1.0f/gapMax;		
+			float lubforce = -6.0f*M_PI*nu*coeff*udotv*invgap;
+			float lubforcemag = abs(lubforce);
+			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
+			spheres[i].f += lubforce*(uij);
+			
+			
+			printf("lubforce_Norm = %f \n", lubforce);
+			
+			
+			// tangential lubrication force:
+			float3 uTanij = vij - udotv*uij;  // tangential relative velocity
+			float3 lubforceTan = -6.0f*M_PI*nu*Ri*log(gapMax/gap)*uTanij;
+			float lubforceTanmag = length(lubforceTan);
+			if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
+			spheres[i].f += lubforceTan;
+			
+			
+			printf("lubforce_Tang = %f \n", lubforceTan);
+			
+		}
+		
+		// contact force:
+		if (r < (Ri+Rj)) {
+			
+			// normal force
+			const float cN = 0.1f*repA;
+			const float forceN_elastic = repA - (repA/repD)*r;
+			float forceN_damping = cN*udotv;
+			if (forceN_damping < 0.0f) forceN_damping = 0.0;
+			const float forceN = forceN_elastic + forceN_damping;
+			spheres[i].f += forceN*uij;
+			
+			// tangential (friction) force
+			const float dt = 1.0f;  // assumed time step
+			float3 uTij = (vij - udotv*uij)*dt;
+			float deltaT = length(uTij);	
+			if (deltaT > 0.0f) {
+				const float kT = repA;
+				const float fric = 0.5f;
+				float forceT = min(kT*deltaT,fric*forceN);
+				spheres[i].f -= forceT*(uTij/deltaT);		
+			}
+			
+		}
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to build the cellMap array for radix sort:
+// --------------------------------------------------------
+
+__global__ void build_radix_cellMap_PSM(
+	radixdata_psm radix)
+{
+	// define cell:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
+	if (i < radix.nCells) {	
+		// calculate cell's x,y,z coordinates:				
+		int cellx = i/(radix.numCells.y*radix.numCells.z);
+		int celly = (i/radix.numCells.z)%radix.numCells.y;
+		int cellz = i%radix.numCells.z;
+				
+		// determine neighboring cells:		
+		int cnt = 0;
+		int offst = i*radix.nncells;		
+		for (int cx = cellx-1; cx < cellx+2; cx++) {
+			for (int cy = celly-1; cy < celly+2; cy++) {
+				for (int cz = cellz-1; cz < cellz+2; cz++) {
+					// do not include current bin
+					if (cx==cellx && cy==celly && cz==cellz) continue;
+					// cell index of neighbor (re-using the bin_index function)
+					radix.cellMap[offst+cnt] = cell_index_PSM(cx,cy,cz,radix.numCells);
+					// update counter
+					cnt++;
+				}
+			}
+		}		
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to radix cell ID:
+// --------------------------------------------------------
+
+__device__ inline int cell_index_PSM(
+	int i, 
+	int j,
+	int k, 
+	const int3 size)
+{
+    if (i < 0) i += size.x;
+    if (i >= size.x) i -= size.x;
+    if (j < 0) j += size.y;
+    if (j >= size.y) j -= size.y;
+    if (k < 0) k += size.z;
+    if (k >= size.z) k -= size.z;
+    return i*size.z*size.y + j*size.z + k;
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to find cellIDs for each sphere for radix-sort:
+// --------------------------------------------------------
+
+__global__ void calculate_radix_cellIDs_per_sphere_PSM(
+	sphere* spheres,
+	radixdata_psm radix,
+	int nSpheres)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nSpheres) {		
+		int cellID = int(floor(spheres[i].r.x/radix.sizeCells))*radix.numCells.z*radix.numCells.y +  
+			         int(floor(spheres[i].r.y/radix.sizeCells))*radix.numCells.z +
+		             int(floor(spheres[i].r.z/radix.sizeCells));
+		if (cellID < 0 || cellID > radix.nCells-1) cellID = radix.nCells;  // for beads in backfill zone
+		radix.particleCellIDs[i] = cellID;
+		radix.particleIndices[i] = i;			
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to find the starting and ending indices
+// for each cell block:
+// --------------------------------------------------------
+
+__global__ void calculate_radix_cell_offsets_PSM(
+	sphere* spheres,
+	radixdata_psm radix,
+	int nSpheres)
+{
+	// define bead:
+	int i = blockIdx.x*blockDim.x + threadIdx.x;		
+	if (i < nSpheres) {
+		int cell = radix.particleCellIDs[i];  // this should be sorted
+		// ignore out-of-bounds sentinel hash:
+	    if (cell < 0 || cell >= radix.nCells) return;
+		// find start and end index:
+		if (i == 0 || cell != radix.particleCellIDs[i-1]) radix.cellStart[cell] = i;
+		if (i == nSpheres-1 || cell != radix.particleCellIDs[i+1]) radix.cellEnd[cell] = i+1;
+	}
+}
+
+
+
+// --------------------------------------------------------
+// IBM3D kernel to map sphere indices after a re-order:
+// --------------------------------------------------------
+
+__global__ void update_new_bead_indices_PSM(
+	radixdata_psm radix,
+	int nSpheres)
+{
+	// define bead:
+	int newIndex = blockIdx.x*blockDim.x + threadIdx.x;
+	if (newIndex < nSpheres) {
+	    // Read which original bead ID was moved to 'newIndex'
+	    int originalID = radix.particleIndices[newIndex];
+	    // Write the mapping: originalID -> newIndex
+		radix.newParticleIndices[originalID] = newIndex;		
+	}
+}
+
+
+
+
 
 

@@ -145,10 +145,22 @@ void scsp_3D_psm_shear::initSystem()
 	// initialize spheres: 
 	// ----------------------------------------------
 	
-	lbm.set_sphere_position(0,31.5,31.5,31.5); 
-	lbm.set_sphere_radius(0,10.0f);
+	float prad = inputParams("Particles/radius",3.0f);	
+	
+	lbm.set_sphere_position(0,25.0,31.5,33.5); 
+	lbm.set_sphere_radius(0,prad);
 	lbm.zero_sphere_forces_velocities(0);	
-		
+	
+	lbm.set_sphere_position(1,40.0,31.5,29.0); 
+	lbm.set_sphere_radius(1,prad);
+	lbm.zero_sphere_forces_velocities(1);	
+	
+	// ----------------------------------------------
+	// build the binMap array for neighbor lists: 
+	// ----------------------------------------------
+	
+	lbm.build_cellMap_radix(nBlocks,nThreads);	
+	
 	// ----------------------------------------------
 	// write initial output file:
 	// ----------------------------------------------

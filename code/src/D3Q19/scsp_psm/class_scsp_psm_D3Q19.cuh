@@ -8,6 +8,7 @@
 # include "../../IO/write_vtk_output.cuh"
 # include "kernels_scsp_psm_D3Q19.cuh"
 # include "sphere.h"
+# include "radix.h"
 # include <cuda.h>
 # include <string>
 
@@ -22,9 +23,14 @@ private:
 	int nSpheres;
 	float nu;
 	float dt;
+	float repA;
+	float repD;
+	float lubforceMax;
 	bool forceFlag;
 	float3 Box;
 	int3 pbcFlag;
+	bool binsFlag;
+	radixdata_psm radix;	
 		
 	// host arrays:
 	float* uH;
@@ -93,6 +99,8 @@ public:
 	void set_boundary_duct_density(int,int);
 	void update_spheres_verlet_1(int,int);
 	void update_spheres_verlet_2(int,int);
+	void build_cellMap_radix(int,int);
+	void radix_sphere_interactions_with_friction(int,int);
 	void zero_forces(int,int);
 	void add_body_force(float,float,float,int,int);	
 	void add_body_force_kolmogorov(float,int,int);	

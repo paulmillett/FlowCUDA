@@ -7,6 +7,9 @@
 # include <string>
 # include <sstream>
 # include <stdlib.h>
+# include <thrust/device_ptr.h>
+# include <thrust/sort.h>
+# include <thrust/gather.h>
 using namespace std;  
 
 
@@ -36,7 +39,7 @@ using namespace std;
 
 class_scsp_psm_D3Q19::class_scsp_psm_D3Q19()
 {
-	// domain attributes:
+	// LBM attributes:
 	Q = 19;
 	GetPot inputParams("input.dat");
 	Nx = inputParams("Lattice/Nx",1);
@@ -47,10 +50,28 @@ class_scsp_psm_D3Q19::class_scsp_psm_D3Q19()
 	Box.z = float(Nz);
 	pbcFlag = make_int3(1,1,1);
 	nVoxels = inputParams("Lattice/nVoxels",0);
-	nSpheres = inputParams("Particles/nSpheres",0);
 	nu = inputParams("LBM/nu",0.1666666);
 	dt = inputParams("Time/dt",1.0);
 	forceFlag = false;
+	
+	// particle data:
+	nSpheres = inputParams("Particles/nSpheres",0);
+	lubforceMax = inputParams("Particles/lubforceMax",0.0);
+	
+	// if we need bins, do some calculations:
+	binsFlag = false;
+	if (nSpheres > 1) binsFlag = true;
+	if (binsFlag) {		
+		// radix-sort data
+		radix.sizeCells = inputParams("Particles/sizeBins",2.0);
+		radix.cellMax = inputParams("Particles/binMax",1);
+		radix.numCells.x = int(floor(Nx/radix.sizeCells));
+	    radix.numCells.y = int(floor(Ny/radix.sizeCells));
+	    radix.numCells.z = int(floor(Nz/radix.sizeCells));
+		radix.nCells = radix.numCells.x*radix.numCells.y*radix.numCells.z;
+		radix.nncells = 26;
+	}	
+	
 }
 
 
@@ -93,7 +114,16 @@ void class_scsp_psm_D3Q19::allocate()
 	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));	
 	cudaMalloc((void **) &spheres, nSpheres*sizeof(sphere));
 	cudaMalloc((void **) &eps, nVoxels*sizeof(float));
-	cudaMalloc((void **) &pID, nVoxels*sizeof(int));	
+	cudaMalloc((void **) &pID, nVoxels*sizeof(int));
+	// radix-sort data
+	if (binsFlag) {	
+		cudaMalloc((void **) &radix.particleCellIDs, nSpheres*sizeof(int));
+		cudaMalloc((void **) &radix.particleIndices, nSpheres*sizeof(int));
+		cudaMalloc((void **) &radix.cellStart, radix.nCells*sizeof(int));
+		cudaMalloc((void **) &radix.cellEnd, radix.nCells*sizeof(int));		
+		cudaMalloc((void **) &radix.cellMap, radix.nCells*26*sizeof(int));
+		cudaMalloc((void **) &radix.newParticleIndices, nSpheres*sizeof(int));
+	}
 }
 
 
@@ -141,11 +171,21 @@ void class_scsp_psm_D3Q19::deallocate()
 	cudaFree(spheres);
 	cudaFree(eps);
 	cudaFree(pID);
+	// fluid force arrays
 	if (forceFlag) {
 		cudaFree(Fx);
 		cudaFree(Fy);
 		cudaFree(Fz);
 	}
+	// radix-sort data
+	if (binsFlag) {
+		cudaFree(radix.particleCellIDs);
+		cudaFree(radix.particleIndices);
+		cudaFree(radix.cellStart);
+		cudaFree(radix.cellEnd);
+		cudaFree(radix.cellMap);
+		cudaFree(radix.newParticleIndices);
+	}		
 }
 
 
@@ -395,6 +435,9 @@ void class_scsp_psm_D3Q19::stepPSM_verlet_shear(float shearVel, int nBlocks, int
 	zero_sphere_forces_torques(nBlocks,nThreads);
 	cudaDeviceSynchronize();
 	
+	// particle-particle interactions:
+	radix_sphere_interactions_with_friction(nBlocks,nThreads);
+	
 	// map particles to the LBM lattice:
 	map_particles_to_lattice(nBlocks,nThreads);
 	
@@ -535,6 +578,70 @@ void class_scsp_psm_D3Q19::update_spheres_verlet_2(int nBlocks, int nThreads)
 	update_sphere_position_orientation_verlet_2_D3Q19 
 	<<<nBlocks,nThreads>>> (spheres,dt,nSpheres);
 }
+
+
+
+// --------------------------------------------------------
+// Call to kernel that builds the cellMap array for radix-sorting:
+// --------------------------------------------------------
+
+void class_scsp_psm_D3Q19::build_cellMap_radix(int nBlocks, int nThreads)
+{
+	if (nSpheres > 1) {
+		if (!binsFlag) cout << "Warning: particle bin arrays have not been initialized" << endl;	
+		build_radix_cellMap_PSM
+		<<<nBlocks,nThreads>>> (radix);			
+	}	
+}
+
+
+
+// --------------------------------------------------------
+// Call to kernel that calculates pairwise sphere forces
+// using radix-sort:
+// --------------------------------------------------------
+
+void class_scsp_psm_D3Q19::radix_sphere_interactions_with_friction(int nBlocks, int nThreads)
+{
+	if (nSpheres > 1) {
+		
+		if (!binsFlag) cout << "Warning: particle radix arrays have not been initialized" << endl;								
+		
+		// calculate new cell hashes and reset particle indices
+		calculate_radix_cellIDs_per_sphere_PSM
+		<<<nBlocks,nThreads>>> (spheres,radix,nSpheres);
+		cudaDeviceSynchronize();
+		
+		// sort bead indices by their updated cell hash
+	    thrust::device_ptr<int> th_hashes_ptr(radix.particleCellIDs);
+	    thrust::device_ptr<int> th_indices_ptr(radix.particleIndices);    
+	    thrust::sort_by_key(th_hashes_ptr, th_hashes_ptr + nSpheres, th_indices_ptr);
+		cudaDeviceSynchronize();
+		
+		// reset cell start & end indices to -1 every step
+		cudaMemset(radix.cellStart, -1, radix.nCells*sizeof(int));
+		cudaMemset(radix.cellEnd,   -1, radix.nCells*sizeof(int));
+		cudaDeviceSynchronize();
+		
+		// find starting and ending indices for occupied cells
+		calculate_radix_cell_offsets_PSM
+		<<<nBlocks,nThreads>>> (spheres,radix,nSpheres);
+		cudaDeviceSynchronize();
+		
+		// calculate pairwise sphere forces		
+		sphere_interactions_with_friction_radix_PSM
+		<<<nBlocks,nThreads>>> (spheres,radix,repA,repD,lubforceMax,nSpheres,Box,pbcFlag);
+	}	
+}
+
+
+
+
+
+
+//    ADD IN FUNCTION THAT RE-ORDERS SPHERE ARRAYS (SEE MY OTHER CODE) !!!!!!
+//    re-ordering should not occur every time step (just every output step)
+
 
 
 
