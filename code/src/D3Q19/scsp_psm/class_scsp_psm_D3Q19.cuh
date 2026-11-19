@@ -25,12 +25,12 @@ private:
 	float dt;
 	float repA;
 	float repD;
-	float lubforceMax;
 	bool forceFlag;
 	float3 Box;
 	int3 pbcFlag;
 	bool binsFlag;
-	radixdata_psm radix;	
+	radixdata_psm radix;
+	contact dem;
 		
 	// host arrays:
 	float* uH;

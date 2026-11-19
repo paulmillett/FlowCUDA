@@ -710,9 +710,7 @@ __global__ void computeForcesKernel(
 __global__ void sphere_interactions_with_friction_radix_PSM(
 	sphere* spheres,
 	radixdata_psm radix,
-	float repA,
-	float repD,
-	float lubforceMax,
+	contact dem,
 	int nSpheres,
 	float3 Box,	
 	int3 pbcFlag)
@@ -742,7 +740,7 @@ __global__ void sphere_interactions_with_friction_radix_PSM(
 				int j = radix.particleIndices[k];
 				if (j < 0 || j >= nSpheres) continue;
 				if (i==j) continue;
-				pairwise_sphere_interaction_forces_with_friction(i,j,repA,repD,lubforceMax,spheres,Box,pbcFlag);
+				pairwise_sphere_interaction_forces_with_friction(i,j,dem,spheres,Box,pbcFlag);
 			}
 		}
 				
@@ -760,7 +758,7 @@ __global__ void sphere_interactions_with_friction_radix_PSM(
 					int j = radix.particleIndices[k];
 					if (j < 0 || j >= nSpheres) continue;
 					if (i==j) continue;
-					pairwise_sphere_interaction_forces_with_friction(i,j,repA,repD,lubforceMax,spheres,Box,pbcFlag);
+					pairwise_sphere_interaction_forces_with_friction(i,j,dem,spheres,Box,pbcFlag);
 				}
 			}
 		}
@@ -779,9 +777,7 @@ __global__ void sphere_interactions_with_friction_radix_PSM(
 __device__ inline void pairwise_sphere_interaction_forces_with_friction(
 	const int i, 
 	const int j,
-	const float repA,
-	const float repD,
-	const float lubforceMax,
+	const contact dem,
 	sphere* spheres,
 	float3 Box,
 	int3 pbcFlag)
@@ -800,62 +796,74 @@ __device__ inline void pairwise_sphere_interaction_forces_with_friction(
 	if (r < cutoff) {			
 		
 		float3 uij = rij/r;
-		float3 vij = spheres[i].v - spheres[j].v;   // modify this to account for angular velocity!!!
-		float udotv = dot(uij,vij);
 		
+		// contact point relative velocity:
+		float3 rc_i = -Ri*uij;
+		float3 rc_j =  Rj*uij;
+		float3 v_ci = spheres[i].v + cross(spheres[i].w, rc_i);
+		float3 v_cj = spheres[j].v + cross(spheres[j].w, rc_j);		
+		float3 vij = v_ci - v_cj;      // Relative velocity at contact point (i relative to j)
+		float uNormij = dot(uij, vij); // Normal component of relative velocity
+				
 		// lubrication force:
-		if (r > (Ri+Rj)) {
+		if (r > (Ri + Rj)) {
 			
 			const float nu = 0.1666666667f;
-			
+			const float lubforceMax = dem.lubforceMax;
+						
 			// normal lubrication force:
 			float coeff = (Ri*Rj*Ri*Rj)/(Ri+Rj)/(Ri+Rj);			
 			float gap = r - Ri - Rj;
 			if (gap < 0.001f) gap = 0.001f;
 			float invgap = 1.0f/gap - 1.0f/gapMax;		
-			float lubforce = -6.0f*M_PI*nu*coeff*udotv*invgap;
-			float lubforcemag = abs(lubforce);
+			float lubforce = -6.0f*M_PI*nu*coeff*uNormij*invgap;
+			float lubforcemag = fabs(lubforce);
 			if (lubforcemag > lubforceMax) lubforce *= (lubforceMax/lubforcemag);
 			spheres[i].f += lubforce*(uij);
-			
-			
-			printf("lubforce_Norm = %f \n", lubforce);
-			
-			
+								
 			// tangential lubrication force:
-			float3 uTanij = vij - udotv*uij;  // tangential relative velocity
-			float3 lubforceTan = -6.0f*M_PI*nu*Ri*log(gapMax/gap)*uTanij;
+			float3 uTanij = vij - uNormij*uij;  // tangential relative velocity
+			float3 lubforceTan = -6.0f*M_PI*nu*Ri*logf(gapMax/gap)*uTanij;
 			float lubforceTanmag = length(lubforceTan);
 			if (lubforceTanmag > lubforceMax) lubforceTan *= (lubforceMax/lubforceTanmag);
 			spheres[i].f += lubforceTan;
-			
-			
-			printf("lubforce_Tang = %f \n", lubforceTan);
-			
+			spheres[i].t += cross(rc_i,lubforceTan);
+		
 		}
 		
 		// contact force:
-		if (r < (Ri+Rj)) {
+		if (r < (Ri + Rj)) {
 			
-			// normal force
-			const float cN = 0.1f*repA;
-			const float forceN_elastic = repA - (repA/repD)*r;
-			float forceN_damping = cN*udotv;
-			if (forceN_damping < 0.0f) forceN_damping = 0.0;
-			const float forceN = forceN_elastic + forceN_damping;
+			// parameters from DEM struct
+			const float kN = dem.kN;
+			const float kT = dem.kT;
+			const float cN = dem.cN;
+			const float cT = dem.cT;
+			const float muFric = dem.muFric;			
+					
+			// normal force (linear spring-damper model)
+			const float overlap = Ri + Rj - r;
+			float forceN_elastic = kN*overlap;
+			float forceN_damping = cN*uNormij;
+			float forceN = forceN_elastic + forceN_damping;
+			if (forceN < 0.0f) forceN = 0.0f;
 			spheres[i].f += forceN*uij;
+						
+			// tangential (friction) force model
+			float3 uTij = vij - uNormij*uij; // tangential relative velocity vector
+			float3 forceT = -cT*uTij;        // tangential damping/friction
 			
-			// tangential (friction) force
-			const float dt = 1.0f;  // assumed time step
-			float3 uTij = (vij - udotv*uij)*dt;
-			float deltaT = length(uTij);	
-			if (deltaT > 0.0f) {
-				const float kT = repA;
-				const float fric = 0.5f;
-				float forceT = min(kT*deltaT,fric*forceN);
-				spheres[i].f -= forceT*(uTij/deltaT);		
+			// Coulomb friction limit check
+			float max_friction = muFric*forceN;
+			float forceTmag = length(forceT);
+			if (forceTmag > max_friction && forceTmag > 1e-12f) {
+				forceT = (forceT/forceTmag)*max_friction;
 			}
 			
+			// friction force and torque
+			spheres[i].f += forceT;
+			spheres[i].t += cross(rc_i,forceT);
+						
 		}
 	}	
 }

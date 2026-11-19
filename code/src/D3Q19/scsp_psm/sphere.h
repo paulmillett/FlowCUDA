@@ -26,4 +26,19 @@ struct sphere {
 
 
 
+// --------------------------------------------------------
+// struct that defines the contact parameters for sphere-
+// sphere interactions:
+// --------------------------------------------------------
+
+struct contact {
+	float kN;
+	float kT;
+	float cN;
+	float cT;
+	float muFric;
+	float lubforceMax;
+};
+
+
 # endif  // SPHERE_H

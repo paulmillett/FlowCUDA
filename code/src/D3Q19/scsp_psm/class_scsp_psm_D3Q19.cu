@@ -56,7 +56,12 @@ class_scsp_psm_D3Q19::class_scsp_psm_D3Q19()
 	
 	// particle data:
 	nSpheres = inputParams("Particles/nSpheres",0);
-	lubforceMax = inputParams("Particles/lubforceMax",0.0);
+	dem.kN = inputParams("Particles/kN",0.0);
+	dem.kT = inputParams("Particles/kT",0.0);
+	dem.cN = inputParams("Particles/cN",0.0);
+	dem.cT = inputParams("Particles/cT",0.0);
+	dem.muFric = inputParams("Particles/muFric",0.0);
+	dem.lubforceMax = inputParams("Particles/lubforceMax",0.0);	
 	
 	// if we need bins, do some calculations:
 	binsFlag = false;
@@ -630,7 +635,7 @@ void class_scsp_psm_D3Q19::radix_sphere_interactions_with_friction(int nBlocks, 
 		
 		// calculate pairwise sphere forces		
 		sphere_interactions_with_friction_radix_PSM
-		<<<nBlocks,nThreads>>> (spheres,radix,repA,repD,lubforceMax,nSpheres,Box,pbcFlag);
+		<<<nBlocks,nThreads>>> (spheres,radix,dem,nSpheres,Box,pbcFlag);
 	}	
 }
 

@@ -100,9 +100,7 @@ __global__ void update_sphere_position_orientation_verlet_2_D3Q19(
 __global__ void sphere_interactions_with_friction_radix_PSM(
 	sphere*,
 	radixdata_psm,
-	float,
-	float,
-	float,
+	const contact,
 	int,
 	float3,	
 	int3);
@@ -111,9 +109,7 @@ __global__ void sphere_interactions_with_friction_radix_PSM(
 __device__ inline void pairwise_sphere_interaction_forces_with_friction(
 	const int, 
 	const int,
-	const float,
-	const float,
-	const float,
+	const contact,
 	sphere*,
 	float3,
 	int3);		
