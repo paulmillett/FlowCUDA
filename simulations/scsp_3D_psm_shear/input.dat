@@ -11,7 +11,16 @@
 
 
 [Particles]
-	nSpheres = 1
+	nSpheres = 2
+	radius = 5.0
+	sizeBins = 16.0
+	binMax = 20	
+	kN = 0.1
+	kT = 0.1
+	cN = 0.1
+	cT = 0.1
+	muFric = 0.5
+	lubforceMax = 10.0
 []
 
 
@@ -28,7 +37,8 @@
 
 
 [Time]
-	nSteps = 3000
+	dt = 1.0
+	nSteps = 5000
 []
 
 

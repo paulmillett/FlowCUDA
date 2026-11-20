@@ -789,23 +789,30 @@ __device__ inline void pairwise_sphere_interaction_forces_with_friction(
 	const float Rj = spheres[j].rad;  // sphere radius 
 	const float gapMax = 0.67f;       // max gap for lubrication forces
 	const float cutoff = Ri + Rj + gapMax;		
-	
-	printf("separation = %f, Ri = %f, Rj = %f \n", r, Ri, Rj);
-	
+
+	// -------------------------------
 	// interaction range:
+	// -------------------------------
+	
 	if (r < cutoff) {			
 		
 		float3 uij = rij/r;
 		
+		// -------------------------------
 		// contact point relative velocity:
+		// -------------------------------
+		
 		float3 rc_i = -Ri*uij;
 		float3 rc_j =  Rj*uij;
 		float3 v_ci = spheres[i].v + cross(spheres[i].w, rc_i);
 		float3 v_cj = spheres[j].v + cross(spheres[j].w, rc_j);		
 		float3 vij = v_ci - v_cj;      // Relative velocity at contact point (i relative to j)
 		float uNormij = dot(uij, vij); // Normal component of relative velocity
-				
+		
+		// -------------------------------		
 		// lubrication force:
+		// -------------------------------
+		
 		if (r > (Ri + Rj)) {
 			
 			const float nu = 0.1666666667f;
@@ -831,7 +838,10 @@ __device__ inline void pairwise_sphere_interaction_forces_with_friction(
 		
 		}
 		
+		// -------------------------------
 		// contact force:
+		// -------------------------------
+		
 		if (r < (Ri + Rj)) {
 			
 			// parameters from DEM struct
