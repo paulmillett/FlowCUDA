@@ -489,6 +489,104 @@ __device__ void equilibrium_populations_psm_D3Q19(
 
 
 // ******************************************************************************
+//	Shan-Chen single-component, multi-phase model...
+// ******************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to calculate Shan-Chen forces for a single-
+// component, multi-phase psuedopotential model
+// --------------------------------------------------------
+
+__global__ void scmp_psm_Shan_Chen_Forces_D3Q19(
+	float* f1,
+	float* r,
+	float* Fx,
+	float* Fy,
+	float* Fz,
+	int* nList,
+	int nVoxels,
+	float G)
+{
+    // -----------------------------------------------
+    // define voxel:
+    // -----------------------------------------------
+	
+	int i = blockIdx.x*blockDim.x + threadIdx.x;	
+	
+	if (i < nVoxels) {		
+		
+		// local voxel info:
+		const int offst = i*19;
+		const float ws = 1.0/18.0;
+		const float wd = 1.0/36.0;
+		float p0 = psi_SC_SCMP(r[i]);
+		
+		// neighbor psi values:
+		float p1 = psi_SC_SCMP(r[nList[offst+1]]);
+		float p2 = psi_SC_SCMP(r[nList[offst+2]]);
+		float p3 = psi_SC_SCMP(r[nList[offst+3]]);
+		float p4 = psi_SC_SCMP(r[nList[offst+4]]);
+		float p5 = psi_SC_SCMP(r[nList[offst+5]]);
+		float p6 = psi_SC_SCMP(r[nList[offst+6]]);
+		float p7 = psi_SC_SCMP(r[nList[offst+7]]);
+		float p8 = psi_SC_SCMP(r[nList[offst+8]]);
+		float p9 = psi_SC_SCMP(r[nList[offst+9]]);
+		float p10 = psi_SC_SCMP(r[nList[offst+10]]);
+		float p11 = psi_SC_SCMP(r[nList[offst+11]]);
+		float p12 = psi_SC_SCMP(r[nList[offst+12]]);
+		float p13 = psi_SC_SCMP(r[nList[offst+13]]);
+		float p14 = psi_SC_SCMP(r[nList[offst+14]]);
+		float p15 = psi_SC_SCMP(r[nList[offst+15]]);
+		float p16 = psi_SC_SCMP(r[nList[offst+16]]);
+		float p17 = psi_SC_SCMP(r[nList[offst+17]]);
+		float p18 = psi_SC_SCMP(r[nList[offst+18]]);							
+		
+		// sum neighbor psi values times wi times ei				
+		float sumNbrPsix = ws*p1 + wd*p7 + wd*p9  + wd*p13 + wd*p15 - (ws*p2 + wd*p8  + wd*p10 + wd*p14 + wd*p16);
+		float sumNbrPsiy = ws*p3 + wd*p7 + wd*p11 + wd*p14 + wd*p17 - (ws*p4 + wd*p8  + wd*p12 + wd*p13 + wd*p18);
+		float sumNbrPsiz = ws*p5 + wd*p9 + wd*p11 + wd*p16 + wd*p18 - (ws*p6 + wd*p10 + wd*p12 + wd*p15 + wd*p17);
+		
+		// Shan-Chen forces
+		Fx[i] += -p0*G*(sumNbrPsix);			
+		Fy[i] += -p0*G*(sumNbrPsiy);
+		Fz[i] += -p0*G*(sumNbrPsiz);
+        
+	}		
+}
+
+
+
+// --------------------------------------------------------
+// D3Q19 kernel to calculate Shan-Chen forces for a single-
+// component, multi-phase psuedopotential model
+// --------------------------------------------------------
+
+__device__ float psi_SC_SCMP(float rho)
+{
+	return (1.0f - expf(-rho));
+}
+
+
+
+
+
+
+
+
+
+
+// ******************************************************************************
 //	Rigid sphere dynamics...
 // ******************************************************************************
 

@@ -50,7 +50,7 @@ __global__ void scsp_psm_map_particles_to_lattice_D3Q19(
 	int,
 	float3,
 	int3);													 
-		
+
 
 __global__ void scsp_psm_stream_collide_save_D3Q19(
 	float*,
@@ -78,6 +78,21 @@ __device__ void equilibrium_populations_psm_D3Q19(
 	const float,
 	const float,
 	const float);
+
+
+__global__ void scmp_psm_Shan_Chen_Forces_D3Q19(
+	float*,
+	float*,
+	float*,
+	float*,
+	float*,
+	int*,
+	int,
+	float);
+
+
+__device__ float psi_SC_SCMP(
+	float rho);
 	
 	
 __global__ void zero_sphere_forces_torques_D3Q19(

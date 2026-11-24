@@ -115,7 +115,8 @@ void class_scsp_psm_D3Q19::allocate()
 	cudaMalloc((void **) &w, nVoxels*sizeof(float));
 	cudaMalloc((void **) &r, nVoxels*sizeof(float));
 	cudaMalloc((void **) &f1, nVoxels*Q*sizeof(float));
-	cudaMalloc((void **) &f2, nVoxels*Q*sizeof(float));		
+	cudaMalloc((void **) &f2, nVoxels*Q*sizeof(float));
+	cudaMalloc((void **) &nList, nVoxels*Q*sizeof(int));
 	cudaMalloc((void **) &streamIndex, nVoxels*Q*sizeof(int));	
 	cudaMalloc((void **) &spheres, nSpheres*sizeof(sphere));
 	cudaMalloc((void **) &eps, nVoxels*sizeof(float));
@@ -171,7 +172,8 @@ void class_scsp_psm_D3Q19::deallocate()
 	cudaFree(w);
 	cudaFree(r);
 	cudaFree(f1);
-	cudaFree(f2);	
+	cudaFree(f2);
+	cudaFree(nList);
 	cudaFree(streamIndex);
 	cudaFree(spheres);
 	cudaFree(eps);
@@ -205,6 +207,7 @@ void class_scsp_psm_D3Q19::memcopy_host_to_device()
 	cudaMemcpy(v, vH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
 	cudaMemcpy(w, wH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
 	cudaMemcpy(r, rH, sizeof(float)*nVoxels, cudaMemcpyHostToDevice);
+	cudaMemcpy(nList, nListH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
 	cudaMemcpy(streamIndex, streamIndexH, sizeof(int)*nVoxels*Q, cudaMemcpyHostToDevice);
 	cudaMemcpy(spheres, spheresH, sizeof(sphere)*nSpheres, cudaMemcpyHostToDevice);
 }

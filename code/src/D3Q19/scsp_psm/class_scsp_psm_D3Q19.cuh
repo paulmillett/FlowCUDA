@@ -56,6 +56,7 @@ private:
 	float* eps;
 	int* pID;
 	int* streamIndex;
+	int* nList;
 	sphere* spheres;
 		
 public:
